@@ -1558,6 +1558,11 @@ function studentPrintCertificate() {
             size: A4 landscape;
             margin: 0;
         }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         body {
             margin: 0;
             padding: 0;
@@ -1576,6 +1581,14 @@ function studentPrintCertificate() {
             box-sizing: border-box;
             margin: 0;
             page-break-after: avoid;
+            page-break-inside: avoid;
+        }
+        #studentCertificatePreview {
+            display: block;
+            margin: 0;
+            padding: 0;
+            width: 297mm;
+            height: 210mm;
         }
         img {
             -webkit-print-color-adjust: exact !important;
@@ -1586,20 +1599,32 @@ function studentPrintCertificate() {
             print-color-adjust: exact !important;
         }
         @media print {
-            body {
+            html, body {
                 margin: 0;
                 padding: 0;
+                width: 100%;
+                height: 100%;
             }
             .certificate {
                 width: 297mm;
                 height: 210mm;
                 margin: 0;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+            #studentCertificatePreview {
+                width: 297mm;
+                height: 210mm;
+                margin: 0;
+                padding: 0;
             }
         }
     `);
     printWindow.document.write('</style>');
     printWindow.document.write('</head><body>');
+    printWindow.document.write('<div id="studentCertificatePreview">');
     printWindow.document.write(printContents);
+    printWindow.document.write('</div>');
     printWindow.document.write('</body></html>');
     printWindow.document.close();
     
@@ -1607,7 +1632,7 @@ function studentPrintCertificate() {
     setTimeout(function() {
         printWindow.focus();
         printWindow.print();
-    }, 500);
+    }, 1000);
 }
 
 function studentBackToResults() {
