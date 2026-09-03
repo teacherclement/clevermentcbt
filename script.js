@@ -1545,9 +1545,9 @@ function studentGenerateCertificate() {
 }
 
 function studentPrintCertificate() {
-    var printContents = document.getElementById('studentCertificatePreview').outerHTML;
+    var printContents = document.getElementById('studentCertificatePreview').innerHTML;
     var originalContents = document.body.innerHTML;
-    document.body.innerHTML = '<div style="padding:20px;">' + printContents + '</div>';
+    document.body.innerHTML = '<html><head><title>Certificate</title><style>@page { size: A4 landscape; margin: 0; } body { margin: 0; padding: 0; } .certificate { width: 297mm; height: 210mm; margin: 0; } img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }</style></head><body>' + printContents + '</body></html>';
     window.print();
     document.body.innerHTML = originalContents;
     location.reload();
