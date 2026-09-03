@@ -217,7 +217,7 @@ var ADMIN_PASSWORD = 'cleverment2026';
 // ============================================================
 
 function backToLanding() {
-    var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard', '#studentView'];
+    var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
     for (var i = 0; i < sections.length; i++) {
         var el = document.querySelector(sections[i]);
         if (el) el.style.display = 'none';
