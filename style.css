@@ -1011,3 +1011,32 @@ button:disabled {
         padding: 0 10px;
     }
 }
+
+/* ===== Print Styles ===== */
+@media print {
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+    
+    .certificate {
+        width: 297mm !important;
+        height: 210mm !important;
+        margin: 0 !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
+    }
+    
+    #studentCertificatePreview {
+        display: block !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    img {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
