@@ -1040,3 +1040,27 @@ button:disabled {
         print-color-adjust: exact !important;
     }
 }
+
+/* ===== Fix for Print Blank Page ===== */
+@media print {
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 100% !important;
+        width: 100% !important;
+        background: white !important;
+    }
+    
+    #studentCertificateSection {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: white !important;
+    }
+    
+    .certificate {
+        margin: 0 auto !important;
+        page-break-before: avoid !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
+    }
+}
