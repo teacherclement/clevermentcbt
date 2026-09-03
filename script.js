@@ -1545,12 +1545,69 @@ function studentGenerateCertificate() {
 }
 
 function studentPrintCertificate() {
-    var printContents = document.getElementById('studentCertificatePreview').innerHTML;
-    var originalContents = document.body.innerHTML;
-    document.body.innerHTML = '<html><head><title>Certificate</title><style>@page { size: A4 landscape; margin: 0; } body { margin: 0; padding: 0; } .certificate { width: 297mm; height: 210mm; margin: 0; } img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }</style></head><body>' + printContents + '</body></html>';
-    window.print();
-    document.body.innerHTML = originalContents;
-    location.reload();
+    // Get the certificate HTML
+    var certificate = document.getElementById('studentCertificatePreview');
+    var printContents = certificate.innerHTML;
+    
+    // Open a new window for printing
+    var printWindow = window.open('', '_blank', 'width=900,height=600');
+    printWindow.document.write('<html><head><title>Certificate</title>');
+    printWindow.document.write('<style>');
+    printWindow.document.write(`
+        @page {
+            size: A4 landscape;
+            margin: 0;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .certificate {
+            width: 297mm;
+            height: 210mm;
+            position: relative;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #ffffff 0%, #fdfcf9 65%, #f7f3e8 100%);
+            box-sizing: border-box;
+            margin: 0;
+            page-break-after: avoid;
+        }
+        img {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        div {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            .certificate {
+                width: 297mm;
+                height: 210mm;
+                margin: 0;
+            }
+        }
+    `);
+    printWindow.document.write('</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(printContents);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    
+    // Wait for images to load then print
+    setTimeout(function() {
+        printWindow.focus();
+        printWindow.print();
+    }, 500);
 }
 
 function studentBackToResults() {
