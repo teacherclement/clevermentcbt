@@ -226,7 +226,7 @@ function backToLanding() {
 }
 
 function showStudentAccess() {
-    var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard', '#studentView'];
+    var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
     for (var i = 0; i < sections.length; i++) {
         var el = document.querySelector(sections[i]);
         if (el) el.style.display = 'none';
@@ -237,7 +237,7 @@ function showStudentAccess() {
 }
 
 function showTeacherLogin() {
-    var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard', '#studentView'];
+    var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
     for (var i = 0; i < sections.length; i++) {
         var el = document.querySelector(sections[i]);
         if (el) el.style.display = 'none';
@@ -247,7 +247,7 @@ function showTeacherLogin() {
 }
 
 function showAdminLogin() {
-    var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard', '#studentView'];
+    var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
     for (var i = 0; i < sections.length; i++) {
         var el = document.querySelector(sections[i]);
         if (el) el.style.display = 'none';
