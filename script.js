@@ -1825,7 +1825,11 @@ function downloadCertificatePDF() {
             logging: false
         }).then(function(canvas) {
             var imgData = canvas.toDataURL('image/jpeg', 0.98);
-            var pdf = new jsPDF('landscape', 'mm', 'a4');
+            var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+            if (!jsPDFCtor) {
+                throw new Error('jsPDF library not found. Please check that jspdf.umd.min.js loaded correctly.');
+            }
+            var pdf = new jsPDFCtor('landscape', 'mm', 'a4');
             pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
             pdf.save('Certificate-' + studentName + '.pdf');
             document.body.removeChild(tempDiv);
