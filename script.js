@@ -1569,9 +1569,13 @@ function formatDate(date) {
 }
 
 function studentGenerateCertificate() {
+    // Hide header and footer
+    document.querySelector('.header').style.display = 'none';
+    document.querySelector('.footer').style.display = 'none';
     document.getElementById('studentResultsSection').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'block';
     
+    // Fill certificate data
     document.getElementById('studentCertName').textContent = studentName;
     document.getElementById('studentCertSubject').textContent = studentSubject;
     document.getElementById('studentCertScore').textContent = studentScore + '% - ' + getGrade(studentScore);
@@ -1687,6 +1691,10 @@ function studentPrintCertificate() {
 }
 
 function studentBackToResults() {
+    // Show header and footer again
+    document.querySelector('.header').style.display = 'block';
+    document.querySelector('.footer').style.display = 'block';
+    
     document.getElementById('studentCertificateSection').style.display = 'none';
     document.getElementById('studentResultsSection').style.display = 'block';
 }
