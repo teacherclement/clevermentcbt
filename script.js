@@ -22,18 +22,15 @@ function updateURL(page) {
 }
 
 function showPageFromURL(page) {
-    // Hide all sections first
     var sections = ['landingPage', 'studentAccess', 'studentAssessmentView', 'teacherAuth', 'teacherDashboard', 'adminAuth', 'adminDashboard', 'studentCertificateSection', 'studentResultsSection'];
     for (var i = 0; i < sections.length; i++) {
         var el = document.getElementById(sections[i]);
         if (el) el.style.display = 'none';
     }
     
-    // Show header and footer by default (will be hidden for certificate)
     document.querySelector('.header').style.display = 'block';
     document.querySelector('.footer').style.display = 'block';
     
-    // Show the requested page
     if (page === 'landing' || page === '') {
         document.getElementById('landingPage').style.display = 'block';
     } else if (page === 'student') {
@@ -65,7 +62,7 @@ function showPageFromURL(page) {
 }
 
 // ============================================================
-// SAVE AND RESTORE PAGE STATE (Legacy - kept for compatibility)
+// SAVE AND RESTORE PAGE STATE (Legacy)
 // ============================================================
 
 function savePageState() {
@@ -508,7 +505,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     }
 
-    // ===== RESTORE PAGE FROM URL =====
     var page = getPageFromURL();
     if (page) {
         showPageFromURL(page);
@@ -1624,48 +1620,60 @@ function formatDate(date) {
 }
 
 // ============================================================
-// DOWNLOAD CERTIFICATE AS PDF (One Click)
+// DOWNLOAD CERTIFICATE AS PDF (One Click - CLEAN)
 // ============================================================
 
 function downloadCertificatePDF() {
-    // Get the certificate element
-    var element = document.getElementById('studentCertificatePreview');
+    // Create a temporary container that ONLY contains the certificate
+    var tempDiv = document.createElement('div');
+    tempDiv.style.position = 'fixed';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.top = '0';
+    tempDiv.style.width = '297mm';
+    tempDiv.style.height = '210mm';
+    tempDiv.style.margin = '0';
+    tempDiv.style.padding = '0';
+    tempDiv.style.background = 'white';
+    tempDiv.style.zIndex = '-1';
     
-    // Create a clone of the certificate to avoid affecting the page
-    var clone = element.cloneNode(true);
+    // Clone the certificate content (only the inner .certificate div)
+    var originalCert = document.querySelector('.certificate');
+    var cloneCert = originalCert.cloneNode(true);
     
-    // Create a temporary container
-    var tempContainer = document.createElement('div');
-    tempContainer.style.position = 'fixed';
-    tempContainer.style.left = '-9999px';
-    tempContainer.style.top = '0';
-    tempContainer.style.width = '297mm';
-    tempContainer.style.height = '210mm';
-    tempContainer.style.background = 'white';
-    tempContainer.style.padding = '0';
-    tempContainer.style.margin = '0';
-    tempContainer.appendChild(clone);
-    document.body.appendChild(tempContainer);
+    // Remove any extra spacing/wrappers
+    cloneCert.style.margin = '0';
+    cloneCert.style.padding = '0';
+    cloneCert.style.width = '297mm';
+    cloneCert.style.height = '210mm';
+    cloneCert.style.position = 'relative';
+    cloneCert.style.overflow = 'hidden';
+    cloneCert.style.background = 'radial-gradient(circle at center, #ffffff 0%, #fdfcf9 65%, #f7f3e8 100%)';
+    cloneCert.style.boxSizing = 'border-box';
     
     // Fill certificate data in the clone
-    clone.querySelector('#studentCertName').textContent = studentName;
-    clone.querySelector('#studentCertSubject').textContent = studentSubject;
-    clone.querySelector('#studentCertScore').textContent = studentScore + '% - ' + getGrade(studentScore);
-    clone.querySelector('#studentCertDate').textContent = formatDate(new Date());
-    clone.querySelector('#studentCertId').textContent = 'CERT-' + String(Date.now()).slice(-6);
-    clone.querySelector('#studentCertCode').textContent = currentAssessmentCode;
+    cloneCert.querySelector('#studentCertName').textContent = studentName;
+    cloneCert.querySelector('#studentCertSubject').textContent = studentSubject;
+    cloneCert.querySelector('#studentCertScore').textContent = studentScore + '% - ' + getGrade(studentScore);
+    cloneCert.querySelector('#studentCertDate').textContent = formatDate(new Date());
+    cloneCert.querySelector('#studentCertId').textContent = 'CERT-' + String(Date.now()).slice(-6);
+    cloneCert.querySelector('#studentCertCode').textContent = currentAssessmentCode;
     
     var teacherName = window.assessmentTeacherName || 'Unknown Teacher';
-    clone.querySelector('#studentCertTeacher').textContent = teacherName;
+    var teacherEl = cloneCert.querySelector('#studentCertTeacher');
+    if (teacherEl) teacherEl.textContent = teacherName;
     
     var signatureUrl = window.assessmentTeacherSignature || '';
-    var signatureImg = clone.querySelector('#studentCertSignature');
-    if (signatureUrl) {
+    var signatureImg = cloneCert.querySelector('#studentCertSignature');
+    if (signatureUrl && signatureImg) {
         signatureImg.src = signatureUrl;
         signatureImg.style.display = 'block';
-    } else {
+    } else if (signatureImg) {
         signatureImg.style.display = 'none';
     }
+    
+    // Append to temp container
+    tempDiv.appendChild(cloneCert);
+    document.body.appendChild(tempDiv);
     
     // Wait for render then generate PDF
     setTimeout(function() {
@@ -1678,7 +1686,8 @@ function downloadCertificatePDF() {
                 useCORS: true, 
                 letterRendering: true,
                 width: 297 * 3.779,
-                height: 210 * 3.779
+                height: 210 * 3.779,
+                logging: false
             },
             jsPDF: { 
                 unit: 'mm', 
@@ -1688,59 +1697,71 @@ function downloadCertificatePDF() {
             pagebreak: { mode: 'avoid-all' }
         };
         
-        html2pdf().set(opt).from(clone).save().then(function() {
-            document.body.removeChild(tempContainer);
+        html2pdf().set(opt).from(cloneCert).save().then(function() {
+            document.body.removeChild(tempDiv);
         });
     }, 500);
 }
 
 // ============================================================
-// DOWNLOAD CERTIFICATE AS IMAGE (One Click)
+// DOWNLOAD CERTIFICATE AS IMAGE (One Click - CLEAN)
 // ============================================================
 
 function downloadCertificateImage() {
-    // Get the certificate element
-    var element = document.getElementById('studentCertificatePreview');
+    // Create a temporary container that ONLY contains the certificate
+    var tempDiv = document.createElement('div');
+    tempDiv.style.position = 'fixed';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.top = '0';
+    tempDiv.style.width = '297mm';
+    tempDiv.style.height = '210mm';
+    tempDiv.style.margin = '0';
+    tempDiv.style.padding = '0';
+    tempDiv.style.background = 'white';
+    tempDiv.style.zIndex = '-1';
     
-    // Create a clone of the certificate
-    var clone = element.cloneNode(true);
+    // Clone the certificate content (only the inner .certificate div)
+    var originalCert = document.querySelector('.certificate');
+    var cloneCert = originalCert.cloneNode(true);
     
-    // Create a temporary container
-    var tempContainer = document.createElement('div');
-    tempContainer.style.position = 'fixed';
-    tempContainer.style.left = '-9999px';
-    tempContainer.style.top = '0';
-    tempContainer.style.width = '297mm';
-    tempContainer.style.height = '210mm';
-    tempContainer.style.background = 'white';
-    tempContainer.style.padding = '0';
-    tempContainer.style.margin = '0';
-    tempContainer.appendChild(clone);
-    document.body.appendChild(tempContainer);
+    // Remove any extra spacing/wrappers
+    cloneCert.style.margin = '0';
+    cloneCert.style.padding = '0';
+    cloneCert.style.width = '297mm';
+    cloneCert.style.height = '210mm';
+    cloneCert.style.position = 'relative';
+    cloneCert.style.overflow = 'hidden';
+    cloneCert.style.background = 'radial-gradient(circle at center, #ffffff 0%, #fdfcf9 65%, #f7f3e8 100%)';
+    cloneCert.style.boxSizing = 'border-box';
     
     // Fill certificate data in the clone
-    clone.querySelector('#studentCertName').textContent = studentName;
-    clone.querySelector('#studentCertSubject').textContent = studentSubject;
-    clone.querySelector('#studentCertScore').textContent = studentScore + '% - ' + getGrade(studentScore);
-    clone.querySelector('#studentCertDate').textContent = formatDate(new Date());
-    clone.querySelector('#studentCertId').textContent = 'CERT-' + String(Date.now()).slice(-6);
-    clone.querySelector('#studentCertCode').textContent = currentAssessmentCode;
+    cloneCert.querySelector('#studentCertName').textContent = studentName;
+    cloneCert.querySelector('#studentCertSubject').textContent = studentSubject;
+    cloneCert.querySelector('#studentCertScore').textContent = studentScore + '% - ' + getGrade(studentScore);
+    cloneCert.querySelector('#studentCertDate').textContent = formatDate(new Date());
+    cloneCert.querySelector('#studentCertId').textContent = 'CERT-' + String(Date.now()).slice(-6);
+    cloneCert.querySelector('#studentCertCode').textContent = currentAssessmentCode;
     
     var teacherName = window.assessmentTeacherName || 'Unknown Teacher';
-    clone.querySelector('#studentCertTeacher').textContent = teacherName;
+    var teacherEl = cloneCert.querySelector('#studentCertTeacher');
+    if (teacherEl) teacherEl.textContent = teacherName;
     
     var signatureUrl = window.assessmentTeacherSignature || '';
-    var signatureImg = clone.querySelector('#studentCertSignature');
-    if (signatureUrl) {
+    var signatureImg = cloneCert.querySelector('#studentCertSignature');
+    if (signatureUrl && signatureImg) {
         signatureImg.src = signatureUrl;
         signatureImg.style.display = 'block';
-    } else {
+    } else if (signatureImg) {
         signatureImg.style.display = 'none';
     }
     
+    // Append to temp container
+    tempDiv.appendChild(cloneCert);
+    document.body.appendChild(tempDiv);
+    
     // Wait for render then download image
     setTimeout(function() {
-        html2canvas(clone, {
+        html2canvas(cloneCert, {
             scale: 3,
             useCORS: true,
             backgroundColor: '#ffffff',
@@ -1748,7 +1769,6 @@ function downloadCertificateImage() {
             height: 210 * 3.779,
             logging: false
         }).then(function(canvas) {
-            // Create download link
             var link = document.createElement('a');
             link.download = 'Certificate-' + studentName + '.png';
             link.href = canvas.toDataURL('image/png');
@@ -1756,8 +1776,7 @@ function downloadCertificateImage() {
             link.click();
             document.body.removeChild(link);
             
-            // Remove temporary container
-            document.body.removeChild(tempContainer);
+            document.body.removeChild(tempDiv);
         });
     }, 500);
 }
@@ -1852,7 +1871,6 @@ function studentPrintCertificate() {
 }
 
 function studentBackToResults() {
-    // Show header and footer again
     document.querySelector('.header').style.display = 'block';
     document.querySelector('.footer').style.display = 'block';
     
