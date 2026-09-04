@@ -29,22 +29,18 @@ function savePageState() {
 function restorePageState() {
     var savedPage = localStorage.getItem('cleverment_current_page');
     if (savedPage) {
-        // Hide all sections first
         var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
         for (var i = 0; i < sections.length; i++) {
             var el = document.querySelector(sections[i]);
             if (el) el.style.display = 'none';
         }
-        // Show the saved page
         var target = document.getElementById(savedPage);
         if (target) {
             target.style.display = 'block';
-            // If it's teacher dashboard, reload data
             if (savedPage === 'teacherDashboard' && currentTeacher) {
                 renderTeacherDashboard();
                 renderCSVHistory();
             }
-            // If it's admin dashboard, reload data
             if (savedPage === 'adminDashboard') {
                 renderAdminDashboard();
             }
@@ -52,7 +48,6 @@ function restorePageState() {
     }
 }
 
-// Save state whenever user navigates
 function saveStateAndNavigate(pageId) {
     localStorage.setItem('cleverment_current_page', pageId);
 }
@@ -345,7 +340,6 @@ function togglePasswordVisibility(inputId, buttonId) {
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Student Class Dropdown
     var classSelect = document.getElementById('studentClassInput');
     var customWrapper = document.querySelector('.custom-class-wrapper-student');
     var customInput = document.getElementById('studentCustomClass');
@@ -361,7 +355,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Teacher Class Dropdown
     var teacherClassSelect = document.getElementById('teacherClassSelect');
     var teacherCustomWrapper = document.querySelector('.custom-class-wrapper-teacher');
     var teacherCustomInput = document.getElementById('teacherCustomClass');
@@ -377,7 +370,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Teacher Subject Dropdown
     var teacherSubjectSelect = document.getElementById('teacherSubjectSelect');
     var teacherSubjWrapper = document.querySelector('.custom-subject-wrapper-teacher');
     var teacherSubjInput = document.getElementById('teacherCustomSubject');
@@ -409,7 +401,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Signature upload preview
     var signatureInput = document.getElementById('teacherCertSignature');
     if (signatureInput) {
         signatureInput.addEventListener('change', function(e) {
@@ -431,7 +422,6 @@ document.addEventListener('DOMContentLoaded', function() {
     renderTeacherPublishedList();
     renderAdminTeacherList();
 
-    // Teacher filters
     var tClass = document.getElementById('teacherAdminFilterClass');
     var tSubject = document.getElementById('teacherAdminFilterSubject');
     var tSort = document.getElementById('teacherAdminFilterSort');
@@ -439,7 +429,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (tSubject) tSubject.addEventListener('change', applyTeacherFilters);
     if (tSort) tSort.addEventListener('change', applyTeacherFilters);
 
-    // Admin filters
     var aTeacher = document.getElementById('adminResultsFilterTeacher');
     var aClass = document.getElementById('adminResultsFilterClass');
     var aSubject = document.getElementById('adminResultsFilterSubject');
@@ -447,7 +436,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (aClass) aClass.addEventListener('change', applyAdminFilters);
     if (aSubject) aSubject.addEventListener('change', applyAdminFilters);
 
-    // Auto-check code from URL
     var codeFromURL = getCodeFromURL();
     if (codeFromURL) {
         setTimeout(function() {
@@ -593,9 +581,7 @@ function teacherLogin() {
     }
 
     getTeacherFromDatabase(email).then(function(teacher) {
-        // ===== STEP 1: CHECK IF ACCOUNT EXISTS =====
         if (!teacher) {
-            // Fallback to localStorage
             var teachers = getTeachersLocal();
             var found = null;
             for (var i = 0; i < teachers.length; i++) {
@@ -619,19 +605,16 @@ function teacherLogin() {
             return;
         }
 
-        // ===== STEP 2: CHECK IF ACCOUNT IS PAUSED =====
         if (teacher.paused === true) {
             alert('Your account has been paused. Please contact the admin on Whatsapp: +2349069959358 to reactivate. YOU MAY NEED TO PAY A TOKEN OF ₦1,000');
             return;
         }
 
-        // ===== STEP 3: CHECK PASSWORD =====
         if (teacher.password_hash !== password) {
             alert('Invalid email or password. Please try again.');
             return;
         }
 
-        // ===== STEP 4: LOGIN SUCCESSFUL =====
         currentTeacher = {
             id: teacher.id,
             name: teacher.name,
@@ -708,7 +691,7 @@ function teacherLoadFromBank() {
 }
 
 function teacherSaveToBank() {
-	if (teacherQuestions.length === 0) {
+    if (teacherQuestions.length === 0) {
         var fileInput = document.getElementById('teacherCsvFile');
         var file = fileInput.files[0];
         if (file) {
@@ -858,7 +841,7 @@ function teacherPublishAssessment() {
             return;
         }
     } else {
-    	subject = subjectSelect.value.trim();
+        subject = subjectSelect.value.trim();
         if (!subject) {
             alert('Please select a subject!');
             subjectSelect.focus();
@@ -883,13 +866,11 @@ function teacherPublishAssessment() {
         }
     }
 
-    // Get teacher name and signature for certificate
     var teacherCertName = document.getElementById('teacherCertName').value.trim();
     var signatureInput = document.getElementById('teacherCertSignature');
     var teacherSignature = '';
 
     if (signatureInput.files && signatureInput.files[0]) {
-        // Convert to base64 to store with assessment
         var reader = new FileReader();
         reader.onload = function(e) {
             teacherSignature = e.target.result;
@@ -935,7 +916,6 @@ function doPublish(subject, className, teacherCertName, teacherSignature) {
     var timeLimit = parseInt(document.getElementById('teacherTimerSelect').value) * 60;
     var shuffle = document.getElementById('teacherShuffleQuestions').checked;
 
-    // 3-DIGIT CODE FORMAT
     var code = subject.substring(0, 3).toUpperCase() + '-' + className.substring(0, 3).toUpperCase() + '-' + String(Date.now()).slice(-3);
 
     var assessment = {
@@ -1569,7 +1549,7 @@ function formatDate(date) {
 }
 
 function studentGenerateCertificate() {
-    // Hide header and footer
+    // Hide everything except certificate section
     document.querySelector('.header').style.display = 'none';
     document.querySelector('.footer').style.display = 'none';
     document.getElementById('studentResultsSection').style.display = 'none';
@@ -1583,11 +1563,9 @@ function studentGenerateCertificate() {
     document.getElementById('studentCertId').textContent = 'CERT-' + String(Date.now()).slice(-6);
     document.getElementById('studentCertCode').textContent = currentAssessmentCode;
     
-    // Teacher Name
     var teacherName = window.assessmentTeacherName || 'Unknown Teacher';
     document.getElementById('studentCertTeacher').textContent = teacherName;
     
-    // Teacher Signature
     var signatureUrl = window.assessmentTeacherSignature || '';
     var signatureImg = document.getElementById('studentCertSignature');
     if (signatureUrl) {
@@ -1599,11 +1577,9 @@ function studentGenerateCertificate() {
 }
 
 function studentPrintCertificate() {
-    // Get the certificate HTML
     var certificate = document.getElementById('studentCertificatePreview');
     var printContents = certificate.innerHTML;
     
-    // Open a new window for printing
     var printWindow = window.open('', '_blank', 'width=900,height=600');
     printWindow.document.write('<style>body { margin: 0; padding: 0; background: white; } .certificate { margin: 0 auto; } .print-btn { display: none !important; }</style>');
     printWindow.document.write('<html><head><title>Certificate</title>');
@@ -1683,7 +1659,6 @@ function studentPrintCertificate() {
     printWindow.document.write('</body></html>');
     printWindow.document.close();
     
-    // Wait for images to load then print
     setTimeout(function() {
         printWindow.focus();
         printWindow.print();
@@ -1914,7 +1889,6 @@ async function renderAdminTeacherList() {
 async function adminPauseTeacher(id) {
     if (!confirm('Pause/unpause this teacher?')) return;
     
-    // Get the teacher from Supabase
     var teachers = await getAllTeachersFromDatabase();
     var teacher = null;
     for (var i = 0; i < teachers.length; i++) {
@@ -1929,10 +1903,8 @@ async function adminPauseTeacher(id) {
         return;
     }
     
-    // Toggle paused status
     var newPaused = !teacher.paused;
     
-    // Update in Supabase
     try {
         var { error } = await supabase
             .from('cleverment_teachers')
@@ -1954,7 +1926,6 @@ async function adminPauseTeacher(id) {
 async function adminDeleteTeacher(id) {
     if (!confirm('Delete this teacher? This will permanently remove their account and all their data.')) return;
     
-    // Delete from Supabase
     try {
         var { error } = await supabase
             .from('cleverment_teachers')
@@ -1966,7 +1937,6 @@ async function adminDeleteTeacher(id) {
             return;
         }
         
-        // Also remove from localStorage
         var teachers = getTeachersLocal();
         var filtered = teachers.filter(function(t) { return t.id !== id; });
         saveTeachersLocal(filtered);
@@ -2229,7 +2199,6 @@ if ('serviceWorker' in navigator) {
 // SAVE PAGE STATE (Step 2)
 // ============================================================
 
-// Save current page before refresh
 window.addEventListener('beforeunload', function() {
     var currentPage = '';
     if (document.getElementById('landingPage').style.display === 'block') currentPage = 'landingPage';
@@ -2245,7 +2214,6 @@ window.addEventListener('beforeunload', function() {
     }
 });
 
-// Restore page after refresh
 window.addEventListener('load', function() {
     var savedPage = localStorage.getItem('cleverment_page');
     if (savedPage && savedPage !== 'landingPage') {
@@ -2257,12 +2225,10 @@ window.addEventListener('load', function() {
         var target = document.getElementById(savedPage);
         if (target) {
             target.style.display = 'block';
-            // If teacher dashboard, reload data
             if (savedPage === 'teacherDashboard' && currentTeacher) {
                 renderTeacherDashboard();
                 renderCSVHistory();
             }
-            // If admin dashboard, reload data
             if (savedPage === 'adminDashboard') {
                 renderAdminDashboard();
             }
