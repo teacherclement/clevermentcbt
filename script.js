@@ -670,7 +670,7 @@ function teacherLogin() {
         }
 
         if (teacher.paused === true) {
-            alert('Your account has been paused. Please contact the admin on Whatsapp: +2349069959358 to reactivate. YOU MAY NEED TO PAY A TOKEN OF ₦1,000');
+            alert('Your account has been paused. Please contact the admin on Whatsapp: +2349069959358 to reactivate. YOU MAY NEED TO PAY A TOKEN OF ₦2,500 TO REACTIVATE 😊');
             return;
         }
 
