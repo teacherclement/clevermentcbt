@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: cleverment
+    runtime: static
+    staticPublishPath: .
+    buildCommand: ""
+    headers:
+      # Never let the browser cache index.html, script.js, style.css or
+      # sw.js on its own — always revalidate with the server so a new
+      # deploy is picked up on the very next load.
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
+      - path: /script.js
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
+      - path: /style.css
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate

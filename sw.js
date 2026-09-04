@@ -1,8 +1,14 @@
 // ============================================================
 // CLEVERMENT SERVICE WORKER (Offline Support)
 // ============================================================
+// Strategy: NETWORK-FIRST. Always try to fetch the latest version
+// from the network first; only fall back to the cached copy if the
+// network request fails (e.g. the device is offline). This means
+// deployed updates show up immediately instead of being masked by
+// an old cached copy.
+// ============================================================
 
-var CACHE_NAME = 'cleverment-v1';
+var CACHE_NAME = 'cleverment-v2';
 var urlsToCache = [
     '/',
     '/index.html',
@@ -13,8 +19,10 @@ var urlsToCache = [
     'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg'
 ];
 
-// Install: Cache files
+// Install: cache the core files, and activate this new worker
+// immediately instead of waiting for old tabs to close.
 self.addEventListener('install', function(event) {
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(function(cache) {
@@ -23,7 +31,7 @@ self.addEventListener('install', function(event) {
     );
 });
 
-// Activate: Clean old caches
+// Activate: clean old caches and take control of open tabs right away.
 self.addEventListener('activate', function(event) {
     event.waitUntil(
         caches.keys().then(function(cacheNames) {
@@ -34,29 +42,29 @@ self.addEventListener('activate', function(event) {
                     }
                 })
             );
+        }).then(function() {
+            return self.clients.claim();
         })
     );
 });
 
-// Fetch: Serve from cache or network
+// Fetch: NETWORK-FIRST, cache as a fallback for offline use.
 self.addEventListener('fetch', function(event) {
+    if (event.request.method !== 'GET') return;
+
     event.respondWith(
-        caches.match(event.request)
+        fetch(event.request)
             .then(function(response) {
-                if (response) {
-                    return response;
-                }
-                return fetch(event.request).then(function(response) {
-                    if (!response || response.status !== 200 || response.type !== 'basic') {
-                        return response;
-                    }
+                if (response && response.status === 200 && response.type === 'basic') {
                     var responseToCache = response.clone();
-                    caches.open(CACHE_NAME)
-                        .then(function(cache) {
-                            cache.put(event.request, responseToCache);
-                        });
-                    return response;
-                });
+                    caches.open(CACHE_NAME).then(function(cache) {
+                        cache.put(event.request, responseToCache);
+                    });
+                }
+                return response;
+            })
+            .catch(function() {
+                return caches.match(event.request);
             })
     );
 });

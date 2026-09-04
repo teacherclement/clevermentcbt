@@ -48,16 +48,27 @@ function showPageFromURL(page) {
         document.getElementById('teacherAuth').style.display = 'block';
         showTeacherLoginForm();
     } else if (page === 'teacher-dashboard') {
-        document.getElementById('teacherDashboard').style.display = 'block';
         if (currentTeacher) {
+            document.getElementById('teacherDashboard').style.display = 'block';
+            document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + currentTeacher.name + '!';
+            document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email;
             renderTeacherDashboard();
             renderCSVHistory();
+        } else {
+            document.getElementById('teacherAuth').style.display = 'block';
+            showTeacherLoginForm();
+            updateURL('teacher');
         }
     } else if (page === 'admin') {
         document.getElementById('adminAuth').style.display = 'block';
     } else if (page === 'admin-dashboard') {
-        document.getElementById('adminDashboard').style.display = 'block';
-        renderAdminDashboard();
+        if (localStorage.getItem('cleverment_admin_session') === 'true') {
+            document.getElementById('adminDashboard').style.display = 'block';
+            renderAdminDashboard();
+        } else {
+            document.getElementById('adminAuth').style.display = 'block';
+            updateURL('admin');
+        }
     }
 }
 
@@ -494,6 +505,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (aClass) aClass.addEventListener('change', applyAdminFilters);
     if (aSubject) aSubject.addEventListener('change', applyAdminFilters);
 
+    var savedTeacherSession = localStorage.getItem('cleverment_teacher_session');
+    if (savedTeacherSession) {
+        try {
+            currentTeacher = JSON.parse(savedTeacherSession);
+        } catch (e) {
+            currentTeacher = null;
+        }
+    }
+
+    var codeInputEl = document.getElementById('assessmentCode');
+    if (codeInputEl) {
+        codeInputEl.addEventListener('input', function() {
+            var raw = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9);
+            var formatted = raw;
+            if (raw.length > 6) {
+                formatted = raw.slice(0, 3) + '-' + raw.slice(3, 6) + '-' + raw.slice(6);
+            } else if (raw.length > 3) {
+                formatted = raw.slice(0, 3) + '-' + raw.slice(3);
+            }
+            this.value = formatted;
+        });
+    }
+
     var codeFromURL = getCodeFromURL();
     if (codeFromURL) {
         setTimeout(function() {
@@ -505,9 +539,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     }
 
-    var page = getPageFromURL();
-    if (page) {
-        showPageFromURL(page);
+    var quizWasRestored = restoreQuizState();
+
+    if (!quizWasRestored) {
+        var page = getPageFromURL();
+        if (page) {
+            showPageFromURL(page);
+        }
     }
 });
 
@@ -655,6 +693,7 @@ function teacherLogin() {
             }
             if (found) {
                 currentTeacher = found;
+                localStorage.setItem('cleverment_teacher_session', JSON.stringify(currentTeacher));
                 logTeacherActivity(email, 'login', 'Teacher logged in (local backup)');
                 document.getElementById('teacherAuth').style.display = 'none';
                 document.getElementById('teacherDashboard').style.display = 'block';
@@ -670,7 +709,7 @@ function teacherLogin() {
         }
 
         if (teacher.paused === true) {
-            alert('Your account has been paused. Please contact the admin on Whatsapp: +2349069959358 to reactivate. YOU MAY NEED TO PAY A TOKEN OF ₦2,500 TO REACTIVATE 😊');
+            alert('Your account has been paused. Please contact the admin on Whatsapp: +2349069959358 to reactivate. YOU MAY NEED TO PAY A TOKEN OF ₦2,500 TO REACTIVATE 🤗');
             return;
         }
 
@@ -684,6 +723,7 @@ function teacherLogin() {
             name: teacher.name,
             email: teacher.email
         };
+        localStorage.setItem('cleverment_teacher_session', JSON.stringify(currentTeacher));
 
         logTeacherActivity(email, 'login', 'Teacher logged in');
 
@@ -699,6 +739,7 @@ function teacherLogin() {
 
 function teacherLogout() {
     currentTeacher = null;
+    localStorage.removeItem('cleverment_teacher_session');
     document.getElementById('teacherDashboard').style.display = 'none';
     document.getElementById('teacherAuth').style.display = 'block';
     showTeacherLoginForm();
@@ -1104,6 +1145,8 @@ function showAssessmentForm() {
 }
 
 function backToStudentAccess() {
+    studentStopTimer();
+    clearQuizState();
     document.getElementById('studentAssessmentView').style.display = 'none';
     document.getElementById('studentAccess').style.display = 'block';
     document.getElementById('assessmentCode').value = '';
@@ -1177,6 +1220,104 @@ function verifyAssessmentCode() {
 // ============================================================
 // STUDENT QUIZ FUNCTIONS
 // ============================================================
+
+// ============================================================
+// STUDENT QUIZ STATE PERSISTENCE (survive page refresh)
+// ============================================================
+
+function saveQuizState() {
+    if (!currentAssessment) return;
+    var state = {
+        currentAssessment: currentAssessment,
+        currentAssessmentCode: currentAssessmentCode,
+        studentQuestions: studentQuestions,
+        studentCurrentIndex: studentCurrentIndex,
+        studentAnswers: studentAnswers,
+        studentTimeRemaining: studentTimeRemaining,
+        studentTimeLimit: studentTimeLimit,
+        studentName: studentName,
+        studentClass: studentClass,
+        studentSubject: studentSubject,
+        studentIsTimeUp: studentIsTimeUp,
+        assessmentTeacherName: window.assessmentTeacherName || '',
+        assessmentTeacherSignature: window.assessmentTeacherSignature || ''
+    };
+    try {
+        localStorage.setItem('cleverment_quiz_state', JSON.stringify(state));
+    } catch (e) {
+        // Storage full or unavailable - fail silently, not critical
+    }
+}
+
+function clearQuizState() {
+    localStorage.removeItem('cleverment_quiz_state');
+}
+
+function restoreQuizState() {
+    var saved = localStorage.getItem('cleverment_quiz_state');
+    if (!saved) return false;
+
+    var state;
+    try {
+        state = JSON.parse(saved);
+    } catch (e) {
+        return false;
+    }
+    if (!state || !state.currentAssessment || !state.studentQuestions || state.studentQuestions.length === 0) {
+        return false;
+    }
+
+    currentAssessment = state.currentAssessment;
+    currentAssessmentCode = state.currentAssessmentCode;
+    studentQuestions = state.studentQuestions;
+    studentCurrentIndex = state.studentCurrentIndex || 0;
+    studentAnswers = state.studentAnswers || new Array(studentQuestions.length).fill(null);
+    studentTimeRemaining = state.studentTimeRemaining || 0;
+    studentTimeLimit = state.studentTimeLimit || 0;
+    studentName = state.studentName || '';
+    studentClass = state.studentClass || '';
+    studentSubject = state.studentSubject || '';
+    studentIsTimeUp = state.studentIsTimeUp || false;
+    window.assessmentTeacherName = state.assessmentTeacherName || '';
+    window.assessmentTeacherSignature = state.assessmentTeacherSignature || '';
+
+    document.querySelector('.header').style.display = 'block';
+    document.querySelector('.footer').style.display = 'block';
+    document.getElementById('landingPage').style.display = 'none';
+    document.getElementById('studentAccess').style.display = 'none';
+    document.getElementById('studentAssessmentView').style.display = 'block';
+    document.getElementById('studentInfoForm').style.display = 'none';
+    document.getElementById('studentQuizSection').style.display = 'block';
+    document.getElementById('studentResultsSection').style.display = 'none';
+    document.getElementById('studentCertificateSection').style.display = 'none';
+
+    document.getElementById('studentQuizTitle').textContent = studentSubject;
+    document.getElementById('studentQuizDisplay').textContent = 'Student: ' + studentName + ' | Class: ' + studentClass;
+
+    var display = document.getElementById('studentTimerDisplay');
+    if (studentTimeLimit > 0) {
+        var mins = Math.floor(studentTimeRemaining / 60);
+        var secs = studentTimeRemaining % 60;
+        display.textContent = String(Math.max(mins, 0)).padStart(2, '0') + ':' + String(Math.max(secs, 0)).padStart(2, '0');
+    } else {
+        display.textContent = '∞';
+    }
+    display.classList.remove('warning', 'expired');
+
+    studentCreateQuestionBoxes();
+    studentDisplayQuestion();
+    studentUpdateNavigationButtons();
+
+    if (studentTimeLimit > 0 && studentTimeRemaining <= 0) {
+        studentIsTimeUp = false; // reset so studentTimeUp() will run its normal flow once
+        studentTimeUp();
+    } else if (!studentIsTimeUp) {
+        studentStartTimer();
+    }
+
+    updateURL('student-assessment');
+    return true;
+}
 
 function startStudentQuiz() {
     var nameInput = document.getElementById('studentNameInput');
@@ -1261,6 +1402,7 @@ function startStudentQuiz() {
     studentUpdateNavigationButtons();
     studentStartTimer();
     updateURL('student-assessment');
+    saveQuizState();
 }
 
 function studentCreateQuestionBoxes() {
@@ -1360,12 +1502,14 @@ function studentSelectOption(index) {
     }
 
     studentUpdateQuestionBoxes();
+    saveQuizState();
 
     if (studentCurrentIndex < studentQuestions.length - 1) {
         setTimeout(function() {
             studentCurrentIndex++;
             studentDisplayQuestion();
             studentUpdateNavigationButtons();
+            saveQuizState();
         }, 300);
     }
 }
@@ -1375,6 +1519,7 @@ function studentPrevQuestion() {
         studentCurrentIndex--;
         studentDisplayQuestion();
         studentUpdateNavigationButtons();
+        saveQuizState();
     }
 }
 
@@ -1383,6 +1528,7 @@ function studentNextQuestion() {
         studentCurrentIndex++;
         studentDisplayQuestion();
         studentUpdateNavigationButtons();
+        saveQuizState();
     }
 }
 
@@ -1417,6 +1563,7 @@ function studentStartTimer() {
             display.classList.remove('warning');
             studentTimeUp();
         }
+        saveQuizState();
     }, 1000);
 }
 
@@ -1521,6 +1668,8 @@ function studentSubmitQuiz() {
             return;
         }
     }
+
+    clearQuizState();
 
     var correct = 0;
     var corrections = [];
@@ -2146,6 +2295,7 @@ function studentBackToResults() {
 
 function studentResetQuiz() {
     studentStopTimer();
+    clearQuizState();
     document.getElementById('studentResultsSection').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'none';
     document.getElementById('studentQuizSection').style.display = 'none';
@@ -2308,6 +2458,7 @@ function teacherClearResults() {
 function adminLogin() {
     var password = document.getElementById('adminPassword').value;
     if (password === ADMIN_PASSWORD) {
+        localStorage.setItem('cleverment_admin_session', 'true');
         document.getElementById('adminAuth').style.display = 'none';
         document.getElementById('adminDashboard').style.display = 'block';
         renderAdminDashboard();
@@ -2318,6 +2469,7 @@ function adminLogin() {
 }
 
 function adminLogout() {
+    localStorage.removeItem('cleverment_admin_session');
     document.getElementById('adminDashboard').style.display = 'none';
     document.getElementById('adminAuth').style.display = 'block';
     document.getElementById('adminPassword').value = '';
@@ -2662,10 +2814,22 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
         .then(function(registration) {
             console.log('Service Worker registered successfully!');
+            // Ask the browser to check for a newer sw.js on every load,
+            // so deployed updates are picked up quickly.
+            registration.update();
         })
         .catch(function(error) {
             console.log('Service Worker registration failed:', error);
         });
+
+    // If a new service worker takes control (i.e. we just got an update),
+    // reload once so the page uses the fresh files instead of stale ones.
+    var refreshingAfterSWUpdate = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (refreshingAfterSWUpdate) return;
+        refreshingAfterSWUpdate = true;
+        window.location.reload();
+    });
 }
 
 // ============================================================
