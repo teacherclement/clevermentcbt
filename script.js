@@ -1814,7 +1814,7 @@ function downloadCertificatePDF() {
     tempDiv.appendChild(cleanCert);
     document.body.appendChild(tempDiv);
     
-    // --- Generate PDF using html2canvas + jsPDF directly ---
+    // --- Generate PDF using html2canvas + jsPDF ---
     setTimeout(function() {
         html2canvas(cleanCert, {
             scale: 3,
@@ -1822,15 +1822,16 @@ function downloadCertificatePDF() {
             backgroundColor: '#ffffff',
             width: 297 * 3.779,
             height: 210 * 3.779,
-            logging: false,
-            onclone: function(clonedDoc) {
-                // Ensure all styles are applied
-            }
+            logging: false
         }).then(function(canvas) {
             var imgData = canvas.toDataURL('image/jpeg', 0.98);
             var pdf = new jsPDF('landscape', 'mm', 'a4');
             pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
             pdf.save('Certificate-' + studentName + '.pdf');
+            document.body.removeChild(tempDiv);
+        }).catch(function(error) {
+            console.error('PDF generation error:', error);
+            alert('Error generating PDF: ' + error.message);
             document.body.removeChild(tempDiv);
         });
     }, 500);
