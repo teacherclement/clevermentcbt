@@ -1624,7 +1624,7 @@ function formatDate(date) {
 // ============================================================
 
 function downloadCertificatePDF() {
-    // Create a temporary container that ONLY contains the certificate
+    // Create a temporary container
     var tempDiv = document.createElement('div');
     tempDiv.style.position = 'fixed';
     tempDiv.style.left = '-9999px';
@@ -1637,7 +1637,7 @@ function downloadCertificatePDF() {
     tempDiv.style.zIndex = '-1';
     tempDiv.style.overflow = 'hidden';
     
-    // Build a CLEAN certificate from scratch (no extra wrappers)
+    // Build the certificate from scratch
     var cleanCert = document.createElement('div');
     cleanCert.style.width = '297mm';
     cleanCert.style.height = '210mm';
@@ -1648,169 +1648,156 @@ function downloadCertificatePDF() {
     cleanCert.style.margin = '0';
     cleanCert.style.padding = '0';
     
-    // ===== BORDERS =====
-    // Outer Navy Border
-    var outerBorder = document.createElement('div');
-    outerBorder.style.cssText = 'position:absolute; top:7mm; left:7mm; right:7mm; bottom:7mm; border:3.5mm solid #1a1a2e; pointer-events:none; z-index:1;';
-    cleanCert.appendChild(outerBorder);
+    // ----- BORDERS -----
+    var border1 = document.createElement('div');
+    border1.style.cssText = 'position:absolute; top:7mm; left:7mm; right:7mm; bottom:7mm; border:3.5mm solid #1a1a2e; z-index:1;';
+    cleanCert.appendChild(border1);
     
-    // Gold Border
-    var goldBorder = document.createElement('div');
-    goldBorder.style.cssText = 'position:absolute; top:11mm; left:11mm; right:11mm; bottom:11mm; border:1.8mm solid #C9A84C; pointer-events:none; z-index:2;';
-    cleanCert.appendChild(goldBorder);
+    var border2 = document.createElement('div');
+    border2.style.cssText = 'position:absolute; top:11mm; left:11mm; right:11mm; bottom:11mm; border:1.8mm solid #C9A84C; z-index:2;';
+    cleanCert.appendChild(border2);
     
-    // Inner Navy Border
-    var innerBorder = document.createElement('div');
-    innerBorder.style.cssText = 'position:absolute; top:14mm; left:14mm; right:14mm; bottom:14mm; border:0.45mm solid #1a1a2e; pointer-events:none; z-index:3;';
-    cleanCert.appendChild(innerBorder);
+    var border3 = document.createElement('div');
+    border3.style.cssText = 'position:absolute; top:14mm; left:14mm; right:14mm; bottom:14mm; border:0.45mm solid #1a1a2e; z-index:3;';
+    cleanCert.appendChild(border3);
     
-    // ===== CORNERS =====
-    var cornerPositions = [
-        {top: '6mm', left: '6mm', borderWidth: '2mm 0 0 2mm'},
-        {top: '6mm', right: '6mm', borderWidth: '2mm 2mm 0 0'},
-        {bottom: '6mm', left: '6mm', borderWidth: '0 0 2mm 2mm'},
-        {bottom: '6mm', right: '6mm', borderWidth: '0 2mm 2mm 0'}
+    // ----- CORNERS -----
+    var corners = [
+        {top:'6mm', left:'6mm', bw:'2mm 0 0 2mm'},
+        {top:'6mm', right:'6mm', bw:'2mm 2mm 0 0'},
+        {bottom:'6mm', left:'6mm', bw:'0 0 2mm 2mm'},
+        {bottom:'6mm', right:'6mm', bw:'0 2mm 2mm 0'}
     ];
-    for (var i = 0; i < cornerPositions.length; i++) {
-        var corner = document.createElement('div');
-        var pos = cornerPositions[i];
-        corner.style.cssText = 'position:absolute; width:26mm; height:26mm; border-color:#C9A84C; border-style:solid; z-index:4;';
-        if (pos.top) corner.style.top = pos.top;
-        if (pos.left) corner.style.left = pos.left;
-        if (pos.right) corner.style.right = pos.right;
-        if (pos.bottom) corner.style.bottom = pos.bottom;
-        corner.style.borderWidth = pos.borderWidth;
-        cleanCert.appendChild(corner);
+    for (var i = 0; i < corners.length; i++) {
+        var c = document.createElement('div');
+        c.style.cssText = 'position:absolute; width:26mm; height:26mm; border-color:#C9A84C; border-style:solid; z-index:4;';
+        if (corners[i].top) c.style.top = corners[i].top;
+        if (corners[i].left) c.style.left = corners[i].left;
+        if (corners[i].right) c.style.right = corners[i].right;
+        if (corners[i].bottom) c.style.bottom = corners[i].bottom;
+        c.style.borderWidth = corners[i].bw;
+        cleanCert.appendChild(c);
     }
     
-    // ===== WATERMARK =====
-    var watermark = document.createElement('div');
-    watermark.style.cssText = 'position:absolute; width:145mm; height:145mm; border-radius:50%; border:0.5mm solid rgba(201,168,76,0.07); top:50%; left:50%; transform:translate(-50%, -50%); z-index:0;';
-    cleanCert.appendChild(watermark);
+    // ----- WATERMARK -----
+    var wm = document.createElement('div');
+    wm.style.cssText = 'position:absolute; width:145mm; height:145mm; border-radius:50%; border:0.5mm solid rgba(201,168,76,0.07); top:50%; left:50%; transform:translate(-50%, -50%); z-index:0;';
+    cleanCert.appendChild(wm);
     
-    // ===== CONTENT AREA =====
+    // ----- CONTENT -----
     var content = document.createElement('div');
     content.style.cssText = 'position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;';
     
-    // ===== LOGO =====
+    // Logo
     var logo = document.createElement('img');
     logo.src = 'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg';
-    logo.style.cssText = 'width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact;';
+    logo.style.cssText = 'width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
     content.appendChild(logo);
     
-    // ===== TITLE =====
-    var title = document.createElement('h1');
-    title.textContent = 'CERTIFICATE';
-    title.style.cssText = 'margin:0; font-size:32pt; line-height:1.05; letter-spacing:4px; color:#1a1a2e; font-weight:bold; text-transform:uppercase; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(title);
+    // Title
+    var h1 = document.createElement('div');
+    h1.textContent = 'CERTIFICATE';
+    h1.style.cssText = 'font-size:32pt; font-weight:bold; color:#1a1a2e; letter-spacing:4px; font-family:Georgia,serif;';
+    content.appendChild(h1);
     
-    // ===== SUBTITLE =====
-    var subtitle = document.createElement('div');
-    subtitle.textContent = 'Of Achievement';
-    subtitle.style.cssText = 'margin:1mm 0 3mm; font-size:18pt; line-height:1; letter-spacing:2px; color:#C9A84C; font-weight:bold; text-transform:capitalize; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(subtitle);
+    var h2 = document.createElement('div');
+    h2.textContent = 'Of Achievement';
+    h2.style.cssText = 'font-size:18pt; color:#C9A84C; letter-spacing:2px; font-weight:bold; font-family:Georgia,serif; margin:1mm 0 3mm;';
+    content.appendChild(h2);
     
-    // ===== GOLD DIVIDER =====
-    var divider = document.createElement('div');
-    divider.style.cssText = 'width:65mm; height:1.2mm; background:#C9A84C; margin:1mm auto 4mm; position:relative;';
-    var span1 = document.createElement('span');
-    span1.textContent = '◆';
-    span1.style.cssText = 'position:absolute; top:-5px; left:-12px; color:#C9A84C; font-size:9px;';
-    var span2 = document.createElement('span');
-    span2.textContent = '◆';
-    span2.style.cssText = 'position:absolute; top:-5px; right:-12px; color:#C9A84C; font-size:9px;';
-    divider.appendChild(span1);
-    divider.appendChild(span2);
-    content.appendChild(divider);
+    // Divider
+    var divLine = document.createElement('div');
+    divLine.style.cssText = 'width:65mm; height:1.2mm; background:#C9A84C; margin:0 auto 4mm; position:relative;';
+    var d1 = document.createElement('span');
+    d1.textContent = '◆';
+    d1.style.cssText = 'position:absolute; top:-5px; left:-12px; color:#C9A84C; font-size:9px;';
+    var d2 = document.createElement('span');
+    d2.textContent = '◆';
+    d2.style.cssText = 'position:absolute; top:-5px; right:-12px; color:#C9A84C; font-size:9px;';
+    divLine.appendChild(d1);
+    divLine.appendChild(d2);
+    content.appendChild(divLine);
     
-    // ===== CERTIFY TEXT =====
-    var certify = document.createElement('p');
-    certify.textContent = 'This is to certify that';
-    certify.style.cssText = 'font-size:14pt; letter-spacing:1px; margin:0 0 3mm; color:#555; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(certify);
+    // Certify
+    var p1 = document.createElement('div');
+    p1.textContent = 'This is to certify that';
+    p1.style.cssText = 'font-size:14pt; color:#555; font-family:Georgia,serif; margin:0 0 3mm;';
+    content.appendChild(p1);
     
-    // ===== NAME =====
+    // Name
     var nameEl = document.createElement('div');
-    nameEl.id = 'pdfCertName';
     nameEl.textContent = studentName || 'Student Name';
-    nameEl.style.cssText = 'font-size:29pt; line-height:1.1; font-weight:bold; color:#1a1a2e; margin:0; padding:0 18mm 2.5mm; min-width:120mm; border-bottom:1.2mm solid #C9A84C; letter-spacing:1px; font-family:Georgia, "Times New Roman", serif;';
+    nameEl.style.cssText = 'font-size:29pt; font-weight:bold; color:#1a1a2e; padding:0 18mm 2.5mm; min-width:120mm; border-bottom:1.2mm solid #C9A84C; font-family:Georgia,serif; margin:0;';
     content.appendChild(nameEl);
     
-    // ===== COMPLETION TEXT =====
-    var completion = document.createElement('p');
-    completion.textContent = 'has successfully completed the assessment in';
-    completion.style.cssText = 'margin:4mm 0 2mm; font-size:13.5pt; color:#555; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(completion);
+    // Completion
+    var p2 = document.createElement('div');
+    p2.textContent = 'has successfully completed the assessment in';
+    p2.style.cssText = 'font-size:13.5pt; color:#555; font-family:Georgia,serif; margin:4mm 0 2mm;';
+    content.appendChild(p2);
     
-    // ===== SUBJECT =====
-    var subjectEl = document.createElement('div');
-    subjectEl.id = 'pdfCertSubject';
-    subjectEl.textContent = studentSubject || 'Subject';
-    subjectEl.style.cssText = 'font-size:21pt; line-height:1.1; font-weight:bold; color:#1a1a2e; margin:0 0 3mm; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(subjectEl);
+    // Subject
+    var subEl = document.createElement('div');
+    subEl.textContent = studentSubject || 'Subject';
+    subEl.style.cssText = 'font-size:21pt; font-weight:bold; color:#1a1a2e; font-family:Georgia,serif; margin:0 0 3mm;';
+    content.appendChild(subEl);
     
-    // ===== SCORE TEXT =====
-    var scoreText = document.createElement('p');
-    scoreText.textContent = 'with an average score of';
-    scoreText.style.cssText = 'font-size:13.5pt; color:#555; margin:0 0 1mm; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(scoreText);
+    // Score text
+    var p3 = document.createElement('div');
+    p3.textContent = 'with an average score of';
+    p3.style.cssText = 'font-size:13.5pt; color:#555; font-family:Georgia,serif; margin:0 0 1mm;';
+    content.appendChild(p3);
     
-    // ===== SCORE =====
+    // Score
     var scoreEl = document.createElement('div');
-    var score = studentScore || 0;
-    var grade = getGrade(score);
-    scoreEl.textContent = score + '% - ' + grade;
-    scoreEl.style.cssText = 'font-size:19pt; font-weight:bold; color:#1a1a2e; white-space:nowrap; padding:0 2mm; font-family:Georgia, "Times New Roman", serif; margin:0;';
+    var grade = getGrade(studentScore || 0);
+    scoreEl.textContent = (studentScore || 0) + '% - ' + grade;
+    scoreEl.style.cssText = 'font-size:19pt; font-weight:bold; color:#1a1a2e; font-family:Georgia,serif; margin:0;';
     content.appendChild(scoreEl);
     
-    // ===== TEACHER + SIGNATURE =====
-    var bottomSection = document.createElement('div');
-    bottomSection.style.cssText = 'width:190mm; display:flex; justify-content:space-between; align-items:flex-end; margin-top:4mm; margin-bottom:6mm;';
+    // Bottom section
+    var bottom = document.createElement('div');
+    bottom.style.cssText = 'width:190mm; display:flex; justify-content:space-between; align-items:flex-end; margin-top:4mm;';
     
-    // Teacher
     var teacherDiv = document.createElement('div');
     teacherDiv.style.cssText = 'width:70mm; text-align:center;';
-    var teacherLabel = document.createElement('div');
-    teacherLabel.textContent = 'Teacher';
-    teacherLabel.style.cssText = 'font-size:11pt; color:#555; margin-bottom:2mm; font-family:Georgia, "Times New Roman", serif;';
-    teacherDiv.appendChild(teacherLabel);
-    var teacherNameEl = document.createElement('div');
-    var teacherName = window.assessmentTeacherName || 'Unknown Teacher';
-    teacherNameEl.textContent = teacherName;
-    teacherNameEl.style.cssText = 'font-size:13pt; font-weight:bold; padding-bottom:2mm; border-bottom:0.5mm solid #1a1a2e; font-family:Georgia, "Times New Roman", serif;';
-    teacherDiv.appendChild(teacherNameEl);
-    bottomSection.appendChild(teacherDiv);
+    var tLabel = document.createElement('div');
+    tLabel.textContent = 'Teacher';
+    tLabel.style.cssText = 'font-size:11pt; color:#555; font-family:Georgia,serif; margin-bottom:2mm;';
+    teacherDiv.appendChild(tLabel);
+    var tName = document.createElement('div');
+    tName.textContent = window.assessmentTeacherName || 'Unknown Teacher';
+    tName.style.cssText = 'font-size:13pt; font-weight:bold; padding-bottom:2mm; border-bottom:0.5mm solid #1a1a2e; font-family:Georgia,serif;';
+    teacherDiv.appendChild(tName);
+    bottom.appendChild(teacherDiv);
     
-    // Signature
     var sigDiv = document.createElement('div');
     sigDiv.style.cssText = 'width:70mm; text-align:center;';
-    var sigLabel = document.createElement('div');
-    sigLabel.textContent = 'Signature';
-    sigLabel.style.cssText = 'font-size:11pt; color:#555; margin-bottom:2mm; font-family:Georgia, "Times New Roman", serif;';
-    sigDiv.appendChild(sigLabel);
+    var sLabel = document.createElement('div');
+    sLabel.textContent = 'Signature';
+    sLabel.style.cssText = 'font-size:11pt; color:#555; font-family:Georgia,serif; margin-bottom:2mm;';
+    sigDiv.appendChild(sLabel);
     var sigImg = document.createElement('img');
-    var signatureUrl = window.assessmentTeacherSignature || '';
-    if (signatureUrl) {
-        sigImg.src = signatureUrl;
+    var sigUrl = window.assessmentTeacherSignature || '';
+    if (sigUrl) {
+        sigImg.src = sigUrl;
         sigImg.style.cssText = 'height:15mm; max-width:55mm; object-fit:contain; display:block; margin:0 auto 1mm;';
     } else {
         sigImg.style.display = 'none';
     }
     sigDiv.appendChild(sigImg);
-    var sigLine = document.createElement('div');
-    sigLine.style.cssText = 'border-bottom:0.5mm solid #1a1a2e; height:2mm;';
-    sigDiv.appendChild(sigLine);
-    bottomSection.appendChild(sigDiv);
+    var sLine = document.createElement('div');
+    sLine.style.cssText = 'border-bottom:0.5mm solid #1a1a2e; height:2mm;';
+    sigDiv.appendChild(sLine);
+    bottom.appendChild(sigDiv);
+    content.appendChild(bottom);
     
-    content.appendChild(bottomSection);
-    
-    // ===== FOOTER =====
+    // Footer
     var footer = document.createElement('div');
-    footer.style.cssText = 'position:absolute; z-index:20; bottom:17mm; left:20mm; right:20mm; display:flex; justify-content:space-between; align-items:center; border-top:0.5mm solid #C9A84C; padding-top:3mm; font-size:8.5pt; color:#555; font-family:Georgia, "Times New Roman", serif;';
+    footer.style.cssText = 'position:absolute; z-index:20; bottom:17mm; left:20mm; right:20mm; display:flex; justify-content:space-between; align-items:center; border-top:0.5mm solid #C9A84C; padding-top:3mm; font-size:8.5pt; color:#555; font-family:Georgia,serif;';
     
     var dateEl = document.createElement('div');
-    var dateStr = formatDate(new Date());
-    dateEl.innerHTML = 'Issued on: <strong style="color:#1a1a2e;">' + dateStr + '</strong>';
+    dateEl.innerHTML = 'Issued on: <strong style="color:#1a1a2e;">' + formatDate(new Date()) + '</strong>';
     footer.appendChild(dateEl);
     
     var idEl = document.createElement('div');
@@ -1819,8 +1806,7 @@ function downloadCertificatePDF() {
     footer.appendChild(idEl);
     
     var codeEl = document.createElement('div');
-    var codeStr = currentAssessmentCode || 'CODE-0000';
-    codeEl.innerHTML = 'Code: <strong style="color:#1a1a2e;">' + codeStr + '</strong>';
+    codeEl.innerHTML = 'Code: <strong style="color:#1a1a2e;">' + (currentAssessmentCode || 'CODE-0000') + '</strong>';
     footer.appendChild(codeEl);
     
     cleanCert.appendChild(content);
@@ -1828,29 +1814,23 @@ function downloadCertificatePDF() {
     tempDiv.appendChild(cleanCert);
     document.body.appendChild(tempDiv);
     
-    // ===== GENERATE PDF =====
+    // --- Generate PDF using html2canvas + jsPDF directly ---
     setTimeout(function() {
-        var opt = {
-            margin: 0,
-            filename: 'Certificate-' + studentName + '.pdf',
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { 
-                scale: 2, 
-                useCORS: true, 
-                letterRendering: true,
-                width: 297 * 3.779,
-                height: 210 * 3.779,
-                logging: false
-            },
-            jsPDF: { 
-                unit: 'mm', 
-                format: 'a4', 
-                orientation: 'landscape' 
-            },
-            pagebreak: { mode: 'avoid-all' }
-        };
-        
-        html2pdf().set(opt).from(cleanCert).save().then(function() {
+        html2canvas(cleanCert, {
+            scale: 3,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            width: 297 * 3.779,
+            height: 210 * 3.779,
+            logging: false,
+            onclone: function(clonedDoc) {
+                // Ensure all styles are applied
+            }
+        }).then(function(canvas) {
+            var imgData = canvas.toDataURL('image/jpeg', 0.98);
+            var pdf = new jsPDF('landscape', 'mm', 'a4');
+            pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
+            pdf.save('Certificate-' + studentName + '.pdf');
             document.body.removeChild(tempDiv);
         });
     }, 500);
@@ -1861,7 +1841,7 @@ function downloadCertificatePDF() {
 // ============================================================
 
 function downloadCertificateImage() {
-    // Create a temporary container that ONLY contains the certificate
+    // Create a temporary container
     var tempDiv = document.createElement('div');
     tempDiv.style.position = 'fixed';
     tempDiv.style.left = '-9999px';
@@ -1874,7 +1854,7 @@ function downloadCertificateImage() {
     tempDiv.style.zIndex = '-1';
     tempDiv.style.overflow = 'hidden';
     
-    // Build a CLEAN certificate from scratch (no extra wrappers)
+    // Build the certificate from scratch (same as above but for image)
     var cleanCert = document.createElement('div');
     cleanCert.style.width = '297mm';
     cleanCert.style.height = '210mm';
@@ -1885,164 +1865,145 @@ function downloadCertificateImage() {
     cleanCert.style.margin = '0';
     cleanCert.style.padding = '0';
     
-    // ===== BORDERS =====
-    var outerBorder = document.createElement('div');
-    outerBorder.style.cssText = 'position:absolute; top:7mm; left:7mm; right:7mm; bottom:7mm; border:3.5mm solid #1a1a2e; pointer-events:none; z-index:1;';
-    cleanCert.appendChild(outerBorder);
+    // ----- BORDERS -----
+    var border1 = document.createElement('div');
+    border1.style.cssText = 'position:absolute; top:7mm; left:7mm; right:7mm; bottom:7mm; border:3.5mm solid #1a1a2e; z-index:1;';
+    cleanCert.appendChild(border1);
     
-    var goldBorder = document.createElement('div');
-    goldBorder.style.cssText = 'position:absolute; top:11mm; left:11mm; right:11mm; bottom:11mm; border:1.8mm solid #C9A84C; pointer-events:none; z-index:2;';
-    cleanCert.appendChild(goldBorder);
+    var border2 = document.createElement('div');
+    border2.style.cssText = 'position:absolute; top:11mm; left:11mm; right:11mm; bottom:11mm; border:1.8mm solid #C9A84C; z-index:2;';
+    cleanCert.appendChild(border2);
     
-    var innerBorder = document.createElement('div');
-    innerBorder.style.cssText = 'position:absolute; top:14mm; left:14mm; right:14mm; bottom:14mm; border:0.45mm solid #1a1a2e; pointer-events:none; z-index:3;';
-    cleanCert.appendChild(innerBorder);
+    var border3 = document.createElement('div');
+    border3.style.cssText = 'position:absolute; top:14mm; left:14mm; right:14mm; bottom:14mm; border:0.45mm solid #1a1a2e; z-index:3;';
+    cleanCert.appendChild(border3);
     
-    // ===== CORNERS =====
-    var cornerPositions = [
-        {top: '6mm', left: '6mm', borderWidth: '2mm 0 0 2mm'},
-        {top: '6mm', right: '6mm', borderWidth: '2mm 2mm 0 0'},
-        {bottom: '6mm', left: '6mm', borderWidth: '0 0 2mm 2mm'},
-        {bottom: '6mm', right: '6mm', borderWidth: '0 2mm 2mm 0'}
+    // ----- CORNERS -----
+    var corners = [
+        {top:'6mm', left:'6mm', bw:'2mm 0 0 2mm'},
+        {top:'6mm', right:'6mm', bw:'2mm 2mm 0 0'},
+        {bottom:'6mm', left:'6mm', bw:'0 0 2mm 2mm'},
+        {bottom:'6mm', right:'6mm', bw:'0 2mm 2mm 0'}
     ];
-    for (var i = 0; i < cornerPositions.length; i++) {
-        var corner = document.createElement('div');
-        var pos = cornerPositions[i];
-        corner.style.cssText = 'position:absolute; width:26mm; height:26mm; border-color:#C9A84C; border-style:solid; z-index:4;';
-        if (pos.top) corner.style.top = pos.top;
-        if (pos.left) corner.style.left = pos.left;
-        if (pos.right) corner.style.right = pos.right;
-        if (pos.bottom) corner.style.bottom = pos.bottom;
-        corner.style.borderWidth = pos.borderWidth;
-        cleanCert.appendChild(corner);
+    for (var i = 0; i < corners.length; i++) {
+        var c = document.createElement('div');
+        c.style.cssText = 'position:absolute; width:26mm; height:26mm; border-color:#C9A84C; border-style:solid; z-index:4;';
+        if (corners[i].top) c.style.top = corners[i].top;
+        if (corners[i].left) c.style.left = corners[i].left;
+        if (corners[i].right) c.style.right = corners[i].right;
+        if (corners[i].bottom) c.style.bottom = corners[i].bottom;
+        c.style.borderWidth = corners[i].bw;
+        cleanCert.appendChild(c);
     }
     
-    // ===== WATERMARK =====
-    var watermark = document.createElement('div');
-    watermark.style.cssText = 'position:absolute; width:145mm; height:145mm; border-radius:50%; border:0.5mm solid rgba(201,168,76,0.07); top:50%; left:50%; transform:translate(-50%, -50%); z-index:0;';
-    cleanCert.appendChild(watermark);
+    // ----- WATERMARK -----
+    var wm = document.createElement('div');
+    wm.style.cssText = 'position:absolute; width:145mm; height:145mm; border-radius:50%; border:0.5mm solid rgba(201,168,76,0.07); top:50%; left:50%; transform:translate(-50%, -50%); z-index:0;';
+    cleanCert.appendChild(wm);
     
-    // ===== CONTENT AREA =====
+    // ----- CONTENT -----
     var content = document.createElement('div');
     content.style.cssText = 'position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;';
     
-    // ===== LOGO =====
     var logo = document.createElement('img');
     logo.src = 'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg';
-    logo.style.cssText = 'width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact;';
+    logo.style.cssText = 'width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
     content.appendChild(logo);
     
-    // ===== TITLE =====
-    var title = document.createElement('h1');
-    title.textContent = 'CERTIFICATE';
-    title.style.cssText = 'margin:0; font-size:32pt; line-height:1.05; letter-spacing:4px; color:#1a1a2e; font-weight:bold; text-transform:uppercase; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(title);
+    var h1 = document.createElement('div');
+    h1.textContent = 'CERTIFICATE';
+    h1.style.cssText = 'font-size:32pt; font-weight:bold; color:#1a1a2e; letter-spacing:4px; font-family:Georgia,serif;';
+    content.appendChild(h1);
     
-    // ===== SUBTITLE =====
-    var subtitle = document.createElement('div');
-    subtitle.textContent = 'Of Achievement';
-    subtitle.style.cssText = 'margin:1mm 0 3mm; font-size:18pt; line-height:1; letter-spacing:2px; color:#C9A84C; font-weight:bold; text-transform:capitalize; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(subtitle);
+    var h2 = document.createElement('div');
+    h2.textContent = 'Of Achievement';
+    h2.style.cssText = 'font-size:18pt; color:#C9A84C; letter-spacing:2px; font-weight:bold; font-family:Georgia,serif; margin:1mm 0 3mm;';
+    content.appendChild(h2);
     
-    // ===== GOLD DIVIDER =====
-    var divider = document.createElement('div');
-    divider.style.cssText = 'width:65mm; height:1.2mm; background:#C9A84C; margin:1mm auto 4mm; position:relative;';
-    var span1 = document.createElement('span');
-    span1.textContent = '◆';
-    span1.style.cssText = 'position:absolute; top:-5px; left:-12px; color:#C9A84C; font-size:9px;';
-    var span2 = document.createElement('span');
-    span2.textContent = '◆';
-    span2.style.cssText = 'position:absolute; top:-5px; right:-12px; color:#C9A84C; font-size:9px;';
-    divider.appendChild(span1);
-    divider.appendChild(span2);
-    content.appendChild(divider);
+    var divLine = document.createElement('div');
+    divLine.style.cssText = 'width:65mm; height:1.2mm; background:#C9A84C; margin:0 auto 4mm; position:relative;';
+    var d1 = document.createElement('span');
+    d1.textContent = '◆';
+    d1.style.cssText = 'position:absolute; top:-5px; left:-12px; color:#C9A84C; font-size:9px;';
+    var d2 = document.createElement('span');
+    d2.textContent = '◆';
+    d2.style.cssText = 'position:absolute; top:-5px; right:-12px; color:#C9A84C; font-size:9px;';
+    divLine.appendChild(d1);
+    divLine.appendChild(d2);
+    content.appendChild(divLine);
     
-    // ===== CERTIFY TEXT =====
-    var certify = document.createElement('p');
-    certify.textContent = 'This is to certify that';
-    certify.style.cssText = 'font-size:14pt; letter-spacing:1px; margin:0 0 3mm; color:#555; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(certify);
+    var p1 = document.createElement('div');
+    p1.textContent = 'This is to certify that';
+    p1.style.cssText = 'font-size:14pt; color:#555; font-family:Georgia,serif; margin:0 0 3mm;';
+    content.appendChild(p1);
     
-    // ===== NAME =====
     var nameEl = document.createElement('div');
-    nameEl.id = 'pdfCertName';
     nameEl.textContent = studentName || 'Student Name';
-    nameEl.style.cssText = 'font-size:29pt; line-height:1.1; font-weight:bold; color:#1a1a2e; margin:0; padding:0 18mm 2.5mm; min-width:120mm; border-bottom:1.2mm solid #C9A84C; letter-spacing:1px; font-family:Georgia, "Times New Roman", serif;';
+    nameEl.style.cssText = 'font-size:29pt; font-weight:bold; color:#1a1a2e; padding:0 18mm 2.5mm; min-width:120mm; border-bottom:1.2mm solid #C9A84C; font-family:Georgia,serif; margin:0;';
     content.appendChild(nameEl);
     
-    // ===== COMPLETION TEXT =====
-    var completion = document.createElement('p');
-    completion.textContent = 'has successfully completed the assessment in';
-    completion.style.cssText = 'margin:4mm 0 2mm; font-size:13.5pt; color:#555; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(completion);
+    var p2 = document.createElement('div');
+    p2.textContent = 'has successfully completed the assessment in';
+    p2.style.cssText = 'font-size:13.5pt; color:#555; font-family:Georgia,serif; margin:4mm 0 2mm;';
+    content.appendChild(p2);
     
-    // ===== SUBJECT =====
-    var subjectEl = document.createElement('div');
-    subjectEl.id = 'pdfCertSubject';
-    subjectEl.textContent = studentSubject || 'Subject';
-    subjectEl.style.cssText = 'font-size:21pt; line-height:1.1; font-weight:bold; color:#1a1a2e; margin:0 0 3mm; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(subjectEl);
+    var subEl = document.createElement('div');
+    subEl.textContent = studentSubject || 'Subject';
+    subEl.style.cssText = 'font-size:21pt; font-weight:bold; color:#1a1a2e; font-family:Georgia,serif; margin:0 0 3mm;';
+    content.appendChild(subEl);
     
-    // ===== SCORE TEXT =====
-    var scoreText = document.createElement('p');
-    scoreText.textContent = 'with an average score of';
-    scoreText.style.cssText = 'font-size:13.5pt; color:#555; margin:0 0 1mm; font-family:Georgia, "Times New Roman", serif;';
-    content.appendChild(scoreText);
+    var p3 = document.createElement('div');
+    p3.textContent = 'with an average score of';
+    p3.style.cssText = 'font-size:13.5pt; color:#555; font-family:Georgia,serif; margin:0 0 1mm;';
+    content.appendChild(p3);
     
-    // ===== SCORE =====
     var scoreEl = document.createElement('div');
-    var score = studentScore || 0;
-    var grade = getGrade(score);
-    scoreEl.textContent = score + '% - ' + grade;
-    scoreEl.style.cssText = 'font-size:19pt; font-weight:bold; color:#1a1a2e; white-space:nowrap; padding:0 2mm; font-family:Georgia, "Times New Roman", serif; margin:0;';
+    var grade = getGrade(studentScore || 0);
+    scoreEl.textContent = (studentScore || 0) + '% - ' + grade;
+    scoreEl.style.cssText = 'font-size:19pt; font-weight:bold; color:#1a1a2e; font-family:Georgia,serif; margin:0;';
     content.appendChild(scoreEl);
     
-    // ===== TEACHER + SIGNATURE =====
-    var bottomSection = document.createElement('div');
-    bottomSection.style.cssText = 'width:190mm; display:flex; justify-content:space-between; align-items:flex-end; margin-top:4mm; margin-bottom:6mm;';
+    var bottom = document.createElement('div');
+    bottom.style.cssText = 'width:190mm; display:flex; justify-content:space-between; align-items:flex-end; margin-top:4mm;';
     
     var teacherDiv = document.createElement('div');
     teacherDiv.style.cssText = 'width:70mm; text-align:center;';
-    var teacherLabel = document.createElement('div');
-    teacherLabel.textContent = 'Teacher';
-    teacherLabel.style.cssText = 'font-size:11pt; color:#555; margin-bottom:2mm; font-family:Georgia, "Times New Roman", serif;';
-    teacherDiv.appendChild(teacherLabel);
-    var teacherNameEl = document.createElement('div');
-    var teacherName = window.assessmentTeacherName || 'Unknown Teacher';
-    teacherNameEl.textContent = teacherName;
-    teacherNameEl.style.cssText = 'font-size:13pt; font-weight:bold; padding-bottom:2mm; border-bottom:0.5mm solid #1a1a2e; font-family:Georgia, "Times New Roman", serif;';
-    teacherDiv.appendChild(teacherNameEl);
-    bottomSection.appendChild(teacherDiv);
+    var tLabel = document.createElement('div');
+    tLabel.textContent = 'Teacher';
+    tLabel.style.cssText = 'font-size:11pt; color:#555; font-family:Georgia,serif; margin-bottom:2mm;';
+    teacherDiv.appendChild(tLabel);
+    var tName = document.createElement('div');
+    tName.textContent = window.assessmentTeacherName || 'Unknown Teacher';
+    tName.style.cssText = 'font-size:13pt; font-weight:bold; padding-bottom:2mm; border-bottom:0.5mm solid #1a1a2e; font-family:Georgia,serif;';
+    teacherDiv.appendChild(tName);
+    bottom.appendChild(teacherDiv);
     
     var sigDiv = document.createElement('div');
     sigDiv.style.cssText = 'width:70mm; text-align:center;';
-    var sigLabel = document.createElement('div');
-    sigLabel.textContent = 'Signature';
-    sigLabel.style.cssText = 'font-size:11pt; color:#555; margin-bottom:2mm; font-family:Georgia, "Times New Roman", serif;';
-    sigDiv.appendChild(sigLabel);
+    var sLabel = document.createElement('div');
+    sLabel.textContent = 'Signature';
+    sLabel.style.cssText = 'font-size:11pt; color:#555; font-family:Georgia,serif; margin-bottom:2mm;';
+    sigDiv.appendChild(sLabel);
     var sigImg = document.createElement('img');
-    var signatureUrl = window.assessmentTeacherSignature || '';
-    if (signatureUrl) {
-        sigImg.src = signatureUrl;
+    var sigUrl = window.assessmentTeacherSignature || '';
+    if (sigUrl) {
+        sigImg.src = sigUrl;
         sigImg.style.cssText = 'height:15mm; max-width:55mm; object-fit:contain; display:block; margin:0 auto 1mm;';
     } else {
         sigImg.style.display = 'none';
     }
     sigDiv.appendChild(sigImg);
-    var sigLine = document.createElement('div');
-    sigLine.style.cssText = 'border-bottom:0.5mm solid #1a1a2e; height:2mm;';
-    sigDiv.appendChild(sigLine);
-    bottomSection.appendChild(sigDiv);
+    var sLine = document.createElement('div');
+    sLine.style.cssText = 'border-bottom:0.5mm solid #1a1a2e; height:2mm;';
+    sigDiv.appendChild(sLine);
+    bottom.appendChild(sigDiv);
+    content.appendChild(bottom);
     
-    content.appendChild(bottomSection);
-    
-    // ===== FOOTER =====
     var footer = document.createElement('div');
-    footer.style.cssText = 'position:absolute; z-index:20; bottom:17mm; left:20mm; right:20mm; display:flex; justify-content:space-between; align-items:center; border-top:0.5mm solid #C9A84C; padding-top:3mm; font-size:8.5pt; color:#555; font-family:Georgia, "Times New Roman", serif;';
+    footer.style.cssText = 'position:absolute; z-index:20; bottom:17mm; left:20mm; right:20mm; display:flex; justify-content:space-between; align-items:center; border-top:0.5mm solid #C9A84C; padding-top:3mm; font-size:8.5pt; color:#555; font-family:Georgia,serif;';
     
     var dateEl = document.createElement('div');
-    var dateStr = formatDate(new Date());
-    dateEl.innerHTML = 'Issued on: <strong style="color:#1a1a2e;">' + dateStr + '</strong>';
+    dateEl.innerHTML = 'Issued on: <strong style="color:#1a1a2e;">' + formatDate(new Date()) + '</strong>';
     footer.appendChild(dateEl);
     
     var idEl = document.createElement('div');
@@ -2051,8 +2012,7 @@ function downloadCertificateImage() {
     footer.appendChild(idEl);
     
     var codeEl = document.createElement('div');
-    var codeStr = currentAssessmentCode || 'CODE-0000';
-    codeEl.innerHTML = 'Code: <strong style="color:#1a1a2e;">' + codeStr + '</strong>';
+    codeEl.innerHTML = 'Code: <strong style="color:#1a1a2e;">' + (currentAssessmentCode || 'CODE-0000') + '</strong>';
     footer.appendChild(codeEl);
     
     cleanCert.appendChild(content);
@@ -2060,7 +2020,7 @@ function downloadCertificateImage() {
     tempDiv.appendChild(cleanCert);
     document.body.appendChild(tempDiv);
     
-    // ===== GENERATE IMAGE =====
+    // --- Generate Image ---
     setTimeout(function() {
         html2canvas(cleanCert, {
             scale: 3,
