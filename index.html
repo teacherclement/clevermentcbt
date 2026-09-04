@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2d6cdf">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -121,14 +122,15 @@
         </div>
 
         <div id="studentResultsSection" style="display:none;">
-            <h2>Assessment Results</h2>
-            <div id="studentScoreDisplay"></div>
-            <div id="studentCorrectionsContainer"></div>
-            <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:16px;">
-                <button onclick="studentGenerateCertificate()" class="primary-btn" style="flex:1; background:#C9A84C;">Download Certificate</button>
-                <button onclick="studentResetQuiz()" class="secondary-btn" style="flex:1;">Take Another Assessment</button>
-            </div>
-        </div>
+    <h2>Assessment Results</h2>
+    <div id="studentScoreDisplay"></div>
+    <div id="studentCorrectionsContainer"></div>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:16px;">
+        <button onclick="downloadCertificatePDF()" class="primary-btn" style="flex:1; background:#C9A84C;">Download Certificate (PDF)</button>
+        <button onclick="downloadCertificateImage()" class="primary-btn" style="flex:1; background:#2d6cdf;">Download Certificate (Image)</button>
+        <button onclick="studentResetQuiz()" class="secondary-btn" style="flex:1;">Take Another Assessment</button>
+    </div>
+</div>
 
         <!-- ===== CERTIFICATE SECTION (Certificate Only - No Buttons) ===== -->
         <div id="studentCertificateSection" style="display:none; text-align:center; padding: 10px; margin-top: 20px;">

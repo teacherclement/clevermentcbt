@@ -1623,8 +1623,12 @@ function formatDate(date) {
     return day + suffix + ' ' + month + ' ' + year + ', ' + hours + ':' + minutes + ' ' + ampm;
 }
 
-function studentGenerateCertificate() {
-    // Hide header and footer
+// ============================================================
+// DOWNLOAD CERTIFICATE AS PDF (One Click)
+// ============================================================
+
+function downloadCertificatePDF() {
+    // First, show the certificate
     document.querySelector('.header').style.display = 'none';
     document.querySelector('.footer').style.display = 'none';
     document.getElementById('studentResultsSection').style.display = 'none';
@@ -1650,7 +1654,84 @@ function studentGenerateCertificate() {
         signatureImg.style.display = 'none';
     }
     
-    updateURL('certificate');
+    // Wait for certificate to render, then download PDF
+    setTimeout(function() {
+        var element = document.getElementById('studentCertificatePreview');
+        var opt = {
+            margin:       0,
+            filename:     'Certificate-' + studentName + '.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 3, useCORS: true, letterRendering: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
+        
+        html2pdf().set(opt).from(element).save().then(function() {
+            // Hide certificate and show results again
+            document.getElementById('studentCertificateSection').style.display = 'none';
+            document.querySelector('.header').style.display = 'block';
+            document.querySelector('.footer').style.display = 'block';
+            document.getElementById('studentResultsSection').style.display = 'block';
+        });
+    }, 500);
+}
+
+// ============================================================
+// DOWNLOAD CERTIFICATE AS IMAGE (One Click)
+// ============================================================
+
+function downloadCertificateImage() {
+    // First, show the certificate
+    document.querySelector('.header').style.display = 'none';
+    document.querySelector('.footer').style.display = 'none';
+    document.getElementById('studentResultsSection').style.display = 'none';
+    document.getElementById('studentCertificateSection').style.display = 'block';
+    
+    // Fill certificate data
+    document.getElementById('studentCertName').textContent = studentName;
+    document.getElementById('studentCertSubject').textContent = studentSubject;
+    document.getElementById('studentCertScore').textContent = studentScore + '% - ' + getGrade(studentScore);
+    document.getElementById('studentCertDate').textContent = formatDate(new Date());
+    document.getElementById('studentCertId').textContent = 'CERT-' + String(Date.now()).slice(-6);
+    document.getElementById('studentCertCode').textContent = currentAssessmentCode;
+    
+    var teacherName = window.assessmentTeacherName || 'Unknown Teacher';
+    document.getElementById('studentCertTeacher').textContent = teacherName;
+    
+    var signatureUrl = window.assessmentTeacherSignature || '';
+    var signatureImg = document.getElementById('studentCertSignature');
+    if (signatureUrl) {
+        signatureImg.src = signatureUrl;
+        signatureImg.style.display = 'block';
+    } else {
+        signatureImg.style.display = 'none';
+    }
+    
+    // Wait for certificate to render, then download image
+    setTimeout(function() {
+        var element = document.getElementById('studentCertificatePreview');
+        
+        html2canvas(element, {
+            scale: 3,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            width: 297 * 3.779, // A4 landscape in pixels
+            height: 210 * 3.779,
+            onclone: function(doc) {
+                // Ensure all styles are applied
+            }
+        }).then(function(canvas) {
+            var link = document.createElement('a');
+            link.download = 'Certificate-' + studentName + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            
+            // Hide certificate and show results again
+            document.getElementById('studentCertificateSection').style.display = 'none';
+            document.querySelector('.header').style.display = 'block';
+            document.querySelector('.footer').style.display = 'block';
+            document.getElementById('studentResultsSection').style.display = 'block';
+        });
+    }, 500);
 }
 
 function studentPrintCertificate() {
