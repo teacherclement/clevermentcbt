@@ -8,7 +8,64 @@ function getCodeFromURL() {
 }
 
 // ============================================================
-// SAVE AND RESTORE PAGE STATE
+// URL PARAMETER FUNCTIONS
+// ============================================================
+
+function getPageFromURL() {
+    var params = new URLSearchParams(window.location.search);
+    return params.get('page');
+}
+
+function updateURL(page) {
+    var newURL = window.location.pathname + '?page=' + page;
+    window.history.pushState({ page: page }, '', newURL);
+}
+
+function showPageFromURL(page) {
+    // Hide all sections first
+    var sections = ['landingPage', 'studentAccess', 'studentAssessmentView', 'teacherAuth', 'teacherDashboard', 'adminAuth', 'adminDashboard', 'studentCertificateSection', 'studentResultsSection'];
+    for (var i = 0; i < sections.length; i++) {
+        var el = document.getElementById(sections[i]);
+        if (el) el.style.display = 'none';
+    }
+    
+    // Show header and footer by default (will be hidden for certificate)
+    document.querySelector('.header').style.display = 'block';
+    document.querySelector('.footer').style.display = 'block';
+    
+    // Show the requested page
+    if (page === 'landing' || page === '') {
+        document.getElementById('landingPage').style.display = 'block';
+    } else if (page === 'student') {
+        document.getElementById('studentAccess').style.display = 'block';
+    } else if (page === 'student-assessment') {
+        document.getElementById('studentAssessmentView').style.display = 'block';
+        document.getElementById('studentInfoForm').style.display = 'block';
+    } else if (page === 'results') {
+        document.getElementById('studentResultsSection').style.display = 'block';
+    } else if (page === 'certificate') {
+        document.querySelector('.header').style.display = 'none';
+        document.querySelector('.footer').style.display = 'none';
+        document.getElementById('studentCertificateSection').style.display = 'block';
+    } else if (page === 'teacher') {
+        document.getElementById('teacherAuth').style.display = 'block';
+        showTeacherLoginForm();
+    } else if (page === 'teacher-dashboard') {
+        document.getElementById('teacherDashboard').style.display = 'block';
+        if (currentTeacher) {
+            renderTeacherDashboard();
+            renderCSVHistory();
+        }
+    } else if (page === 'admin') {
+        document.getElementById('adminAuth').style.display = 'block';
+    } else if (page === 'admin-dashboard') {
+        document.getElementById('adminDashboard').style.display = 'block';
+        renderAdminDashboard();
+    }
+}
+
+// ============================================================
+// SAVE AND RESTORE PAGE STATE (Legacy - kept for compatibility)
 // ============================================================
 
 function savePageState() {
@@ -268,6 +325,7 @@ function backToLanding() {
         if (el) el.style.display = 'none';
     }
     document.getElementById('landingPage').style.display = 'block';
+    updateURL('landing');
 }
 
 function showStudentAccess() {
@@ -279,6 +337,7 @@ function showStudentAccess() {
     document.getElementById('studentAccess').style.display = 'block';
     document.getElementById('assessmentCode').value = '';
     document.getElementById('assessmentCode').focus();
+    updateURL('student');
 }
 
 function showTeacherLogin() {
@@ -289,6 +348,7 @@ function showTeacherLogin() {
     }
     document.getElementById('teacherAuth').style.display = 'block';
     showTeacherLoginForm();
+    updateURL('teacher');
 }
 
 function showAdminLogin() {
@@ -299,6 +359,7 @@ function showAdminLogin() {
     }
     document.getElementById('adminAuth').style.display = 'block';
     document.getElementById('adminPassword').value = '';
+    updateURL('admin');
 }
 
 // ============================================================
@@ -445,6 +506,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             verifyAssessmentCode();
         }, 500);
+    }
+
+    // ===== RESTORE PAGE FROM URL =====
+    var page = getPageFromURL();
+    if (page) {
+        showPageFromURL(page);
     }
 });
 
@@ -599,6 +666,7 @@ function teacherLogin() {
                 document.getElementById('teacherDashboardEmail').textContent = found.email;
                 renderTeacherDashboard();
                 renderCSVHistory();
+                updateURL('teacher-dashboard');
             } else {
                 alert('Invalid email or password. Please try again.');
             }
@@ -629,6 +697,7 @@ function teacherLogin() {
         document.getElementById('teacherDashboardEmail').textContent = teacher.email;
         renderTeacherDashboard();
         renderCSVHistory();
+        updateURL('teacher-dashboard');
     });
 }
 
@@ -638,6 +707,7 @@ function teacherLogout() {
     document.getElementById('teacherAuth').style.display = 'block';
     showTeacherLoginForm();
     document.getElementById('teacherLoginPassword').value = '';
+    updateURL('teacher');
 }
 
 function loadTeachers() {}
@@ -1034,12 +1104,14 @@ function showAssessmentForm() {
     document.getElementById('studentNameInput').value = '';
     document.getElementById('studentClassInput').value = '';
     document.getElementById('studentNameInput').focus();
+    updateURL('student-assessment');
 }
 
 function backToStudentAccess() {
     document.getElementById('studentAssessmentView').style.display = 'none';
     document.getElementById('studentAccess').style.display = 'block';
     document.getElementById('assessmentCode').value = '';
+    updateURL('student');
 }
 
 function verifyAssessmentCode() {
@@ -1192,6 +1264,7 @@ function startStudentQuiz() {
     studentDisplayQuestion();
     studentUpdateNavigationButtons();
     studentStartTimer();
+    updateURL('student-assessment');
 }
 
 function studentCreateQuestionBoxes() {
@@ -1516,6 +1589,8 @@ function studentSubmitQuiz() {
         `;
         container.appendChild(div);
     }
+    
+    updateURL('results');
 }
 
 // ============================================================
@@ -1549,7 +1624,7 @@ function formatDate(date) {
 }
 
 function studentGenerateCertificate() {
-    // Hide everything except certificate section
+    // Hide header and footer
     document.querySelector('.header').style.display = 'none';
     document.querySelector('.footer').style.display = 'none';
     document.getElementById('studentResultsSection').style.display = 'none';
@@ -1574,6 +1649,8 @@ function studentGenerateCertificate() {
     } else {
         signatureImg.style.display = 'none';
     }
+    
+    updateURL('certificate');
 }
 
 function studentPrintCertificate() {
@@ -1672,6 +1749,7 @@ function studentBackToResults() {
     
     document.getElementById('studentCertificateSection').style.display = 'none';
     document.getElementById('studentResultsSection').style.display = 'block';
+    updateURL('results');
 }
 
 function studentResetQuiz() {
@@ -1691,6 +1769,7 @@ function studentResetQuiz() {
     studentIsTimeUp = false;
     document.getElementById('studentTimerDisplay').textContent = '00:00';
     document.getElementById('studentTimerDisplay').classList.remove('warning', 'expired');
+    updateURL('student');
 }
 
 // ============================================================
@@ -1840,6 +1919,7 @@ function adminLogin() {
         document.getElementById('adminAuth').style.display = 'none';
         document.getElementById('adminDashboard').style.display = 'block';
         renderAdminDashboard();
+        updateURL('admin-dashboard');
     } else {
         alert('Invalid admin password.');
     }
@@ -1849,6 +1929,7 @@ function adminLogout() {
     document.getElementById('adminDashboard').style.display = 'none';
     document.getElementById('adminAuth').style.display = 'block';
     document.getElementById('adminPassword').value = '';
+    updateURL('admin');
 }
 
 async function renderAdminDashboard() {
@@ -2196,7 +2277,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ============================================================
-// SAVE PAGE STATE (Step 2)
+// SAVE PAGE STATE (Legacy - kept for compatibility)
 // ============================================================
 
 window.addEventListener('beforeunload', function() {
