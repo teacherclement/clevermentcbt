@@ -8,6 +8,56 @@ function getCodeFromURL() {
 }
 
 // ============================================================
+// SAVE AND RESTORE PAGE STATE
+// ============================================================
+
+function savePageState() {
+    var currentPage = '';
+    if (document.getElementById('studentAccess').style.display === 'block') currentPage = 'studentAccess';
+    else if (document.getElementById('studentAssessmentView').style.display === 'block') currentPage = 'studentAssessmentView';
+    else if (document.getElementById('teacherAuth').style.display === 'block') currentPage = 'teacherAuth';
+    else if (document.getElementById('teacherDashboard').style.display === 'block') currentPage = 'teacherDashboard';
+    else if (document.getElementById('adminAuth').style.display === 'block') currentPage = 'adminAuth';
+    else if (document.getElementById('adminDashboard').style.display === 'block') currentPage = 'adminDashboard';
+    else if (document.getElementById('landingPage').style.display === 'block') currentPage = 'landingPage';
+    
+    if (currentPage) {
+        localStorage.setItem('cleverment_current_page', currentPage);
+    }
+}
+
+function restorePageState() {
+    var savedPage = localStorage.getItem('cleverment_current_page');
+    if (savedPage) {
+        // Hide all sections first
+        var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
+        for (var i = 0; i < sections.length; i++) {
+            var el = document.querySelector(sections[i]);
+            if (el) el.style.display = 'none';
+        }
+        // Show the saved page
+        var target = document.getElementById(savedPage);
+        if (target) {
+            target.style.display = 'block';
+            // If it's teacher dashboard, reload data
+            if (savedPage === 'teacherDashboard' && currentTeacher) {
+                renderTeacherDashboard();
+                renderCSVHistory();
+            }
+            // If it's admin dashboard, reload data
+            if (savedPage === 'adminDashboard') {
+                renderAdminDashboard();
+            }
+        }
+    }
+}
+
+// Save state whenever user navigates
+function saveStateAndNavigate(pageId) {
+    localStorage.setItem('cleverment_current_page', pageId);
+}
+
+// ============================================================
 // SUPABASE CONNECTION
 // ============================================================
 
@@ -1551,6 +1601,7 @@ function studentPrintCertificate() {
     
     // Open a new window for printing
     var printWindow = window.open('', '_blank', 'width=900,height=600');
+    printWindow.document.write('<style>body { margin: 0; padding: 0; background: white; } .certificate { margin: 0 auto; } .print-btn { display: none !important; }</style>');
     printWindow.document.write('<html><head><title>Certificate</title>');
     printWindow.document.write('<style>');
     printWindow.document.write(`
@@ -2165,3 +2216,48 @@ if ('serviceWorker' in navigator) {
             console.log('Service Worker registration failed:', error);
         });
 }
+
+// ============================================================
+// SAVE PAGE STATE (Step 2)
+// ============================================================
+
+// Save current page before refresh
+window.addEventListener('beforeunload', function() {
+    var currentPage = '';
+    if (document.getElementById('landingPage').style.display === 'block') currentPage = 'landingPage';
+    else if (document.getElementById('studentAccess').style.display === 'block') currentPage = 'studentAccess';
+    else if (document.getElementById('studentAssessmentView').style.display === 'block') currentPage = 'studentAssessmentView';
+    else if (document.getElementById('teacherAuth').style.display === 'block') currentPage = 'teacherAuth';
+    else if (document.getElementById('teacherDashboard').style.display === 'block') currentPage = 'teacherDashboard';
+    else if (document.getElementById('adminAuth').style.display === 'block') currentPage = 'adminAuth';
+    else if (document.getElementById('adminDashboard').style.display === 'block') currentPage = 'adminDashboard';
+    
+    if (currentPage) {
+        localStorage.setItem('cleverment_page', currentPage);
+    }
+});
+
+// Restore page after refresh
+window.addEventListener('load', function() {
+    var savedPage = localStorage.getItem('cleverment_page');
+    if (savedPage && savedPage !== 'landingPage') {
+        var sections = ['landingPage', 'studentAccess', 'studentAssessmentView', 'teacherAuth', 'teacherDashboard', 'adminAuth', 'adminDashboard'];
+        for (var i = 0; i < sections.length; i++) {
+            var el = document.getElementById(sections[i]);
+            if (el) el.style.display = 'none';
+        }
+        var target = document.getElementById(savedPage);
+        if (target) {
+            target.style.display = 'block';
+            // If teacher dashboard, reload data
+            if (savedPage === 'teacherDashboard' && currentTeacher) {
+                renderTeacherDashboard();
+                renderCSVHistory();
+            }
+            // If admin dashboard, reload data
+            if (savedPage === 'adminDashboard') {
+                renderAdminDashboard();
+            }
+        }
+    }
+});
