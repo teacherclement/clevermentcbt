@@ -6,6 +6,9 @@
     <title>CleverMent - Smart Assessment Platform</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -410,7 +413,7 @@
             <div class="form-group">
                 <label for="teacherCsvFile">Upload Questions (CSV)</label>
                 <input type="file" id="teacherCsvFile" accept=".csv" class="form-input">
-                <p class="helper-text" style="margin-top:4px;">CSV Format: Question, Option A, Option B, Option C, Option D, Correct Answer, Image URL (optional)</p>
+                <p class="helper-text" style="margin-top:4px;">CSV Format: Question, Option A, Option B, Option C, Option D, Correct Answer, Image URL (optional). For equations, wrap them in $...$ (e.g. $x^2 + 5x - 6 = 0$) or $$...$$ for a standalone equation. If a question or option contains a comma, wrap that whole cell in double quotes.</p>
             </div>
             <button onclick="teacherPublishAssessment()" class="primary-btn full-width">Publish Assessment</button>
         </div>
@@ -524,6 +527,18 @@
         </div>
 
         <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+                <h3 style="margin:0;">Manage Assessments (All Teachers)</h3>
+                <select id="adminAssessmentFilterTeacher" class="form-input" style="width:auto; min-width:180px;">
+                    <option value="all">All Teachers</option>
+                </select>
+            </div>
+            <div id="adminAssessmentList">
+                <p class="helper-text">No assessments published yet.</p>
+            </div>
+        </div>
+
+        <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
             <h3 style="margin-bottom:12px;">Teacher Activity Log</h3>
             <div style="max-height:300px; overflow-y:auto;">
                 <div id="adminActivityLog">
@@ -599,6 +614,20 @@
     <div class="footer" id="mainFooter">
         <p>&copy; 2026 <strong>CleverMent</strong> &mdash; Built by Teacher Clement</p>
         <p class="footer-sub">Empowering education for all levels</p>
+    </div>
+</div>
+
+<!-- Custom prompt modal: replaces window.prompt(), which does not
+     display in iOS standalone/home-screen PWA mode or many
+     embedded WebViews. -->
+<div id="customPromptOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:white; border-radius:12px; padding:24px; max-width:380px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25);">
+        <p id="customPromptMessage" style="margin:0 0 12px 0; font-weight:600; color:#1a1a2e;">Enter a value:</p>
+        <input type="text" id="customPromptInput" class="form-input" style="margin-bottom:16px;">
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button id="customPromptCancel" class="secondary-btn" style="padding:8px 18px;">Cancel</button>
+            <button id="customPromptOK" class="primary-btn" style="padding:8px 18px;">OK</button>
+        </div>
     </div>
 </div>
 
