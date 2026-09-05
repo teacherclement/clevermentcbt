@@ -310,6 +310,7 @@ var studentTimerInterval = null;
 var studentTimeRemaining = 0;
 var studentTimeLimit = 0;
 var studentName = '';
+var preloadedImageCache = {};
 var studentClass = '';
 var studentSubject = '';
 var studentIsTimeUp = false;
@@ -816,6 +817,25 @@ function showCustomPrompt(message, defaultValue) {
 // don't need $ delimiters.
 // ============================================================
 
+// ============================================================
+// QUESTION IMAGE PRELOADING (student quiz) - warms the browser's
+// image cache for every question in the assessment as soon as it
+// starts, instead of only fetching an image the moment its
+// question is reached. This is what fixed images taking up to a
+// minute to appear mid-quiz on slow connections.
+// ============================================================
+
+function studentPreloadImages() {
+    for (var i = 0; i < studentQuestions.length; i++) {
+        var url = studentQuestions[i].image;
+        if (url && url.trim() !== '' && !preloadedImageCache[url]) {
+            var img = new Image();
+            img.src = url;
+            preloadedImageCache[url] = img;
+        }
+    }
+}
+
 function renderMathIn(el) {
     if (!el || typeof renderMathInElement !== 'function') return;
     try {
@@ -1137,6 +1157,13 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         shuffle: shuffle,
         date: new Date().toLocaleString()
     });
+    // Cap this local backup - it's only used if the Supabase fetch
+    // fails, and each entry can carry a full question set plus a
+    // base64-encoded signature image, so it's the fastest thing in
+    // the app to fill up a browser's storage quota if left uncapped.
+    if (published.length > 20) {
+        published = published.slice(published.length - 20);
+    }
     localStorage.setItem('cleverment_published', JSON.stringify(published));
 
 
@@ -1235,6 +1262,7 @@ function showAssessmentForm() {
 function backToStudentAccess() {
     studentStopTimer();
     clearQuizState();
+    preloadedImageCache = {};
     document.getElementById('studentAssessmentView').style.display = 'none';
     document.getElementById('studentAccess').style.display = 'block';
     document.getElementById('assessmentCode').value = '';
@@ -1393,6 +1421,7 @@ function restoreQuizState() {
     display.classList.remove('warning', 'expired');
 
     studentCreateQuestionBoxes();
+    studentPreloadImages();
     studentDisplayQuestion();
     studentUpdateNavigationButtons();
 
@@ -1486,6 +1515,7 @@ function startStudentQuiz() {
     display.classList.remove('warning', 'expired');
 
     studentCreateQuestionBoxes();
+    studentPreloadImages();
     studentDisplayQuestion();
     studentUpdateNavigationButtons();
     studentStartTimer();
@@ -1540,12 +1570,36 @@ function studentDisplayQuestion() {
 
     var imageContainer = document.getElementById('studentQuestionImageContainer');
     var imageElement = document.getElementById('studentQuestionImage');
+    var imageLoading = document.getElementById('studentQuestionImageLoading');
     if (q.image && q.image.trim() !== '') {
         imageContainer.style.display = 'block';
-        imageElement.src = q.image;
         imageElement.alt = 'Question image';
+
+        if (preloadedImageCache[q.image] && preloadedImageCache[q.image].complete) {
+            // Already warmed up by studentPreloadImages() - shows instantly.
+            imageElement.style.display = 'block';
+            if (imageLoading) imageLoading.style.display = 'none';
+            imageElement.src = q.image;
+        } else {
+            imageElement.style.display = 'none';
+            if (imageLoading) {
+                imageLoading.style.display = 'block';
+                imageLoading.textContent = '';
+                var spinnerHTML = '<div style="width:28px; height:28px; margin:0 auto 8px; border:3px solid #eef2f6; border-top-color:#2d6cdf; border-radius:50%; animation:cm-spin 0.8s linear infinite;"></div>Loading image...';
+                imageLoading.innerHTML = spinnerHTML;
+            }
+            imageElement.onload = function() {
+                imageElement.style.display = 'block';
+                if (imageLoading) imageLoading.style.display = 'none';
+            };
+            imageElement.onerror = function() {
+                if (imageLoading) imageLoading.textContent = 'Image could not be loaded.';
+            };
+            imageElement.src = q.image;
+        }
     } else {
         imageContainer.style.display = 'none';
+        imageElement.style.display = 'block';
         imageElement.src = '';
     }
 
@@ -1708,6 +1762,12 @@ function saveResultLocal(result) {
         assessmentCode: result.assessmentCode,
         date: new Date().toLocaleString()
     });
+    // Cap this local backup so it can't grow forever and eventually
+    // hit the browser's storage quota. Supabase is the real source
+    // of truth now; this is only an offline-fallback safety net.
+    if (results.length > 300) {
+        results = results.slice(results.length - 300);
+    }
     localStorage.setItem('cleverment_all_results', JSON.stringify(results));
 }
 
@@ -2476,6 +2536,7 @@ function studentBackToResults() {
 function studentResetQuiz() {
     studentStopTimer();
     clearQuizState();
+    preloadedImageCache = {};
     document.getElementById('studentResultsSection').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'none';
     document.getElementById('studentQuizSection').style.display = 'none';

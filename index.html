@@ -114,6 +114,10 @@
             </div>
             <div id="studentQuestionContainer">
                 <div id="studentQuestionImageContainer" style="display:none; margin-bottom:16px; text-align:center;">
+                    <div id="studentQuestionImageLoading" style="display:none; padding:24px; color:#6b7a8f; font-size:13px;">
+                        <div style="width:28px; height:28px; margin:0 auto 8px; border:3px solid #eef2f6; border-top-color:#2d6cdf; border-radius:50%; animation:cm-spin 0.8s linear infinite;"></div>
+                        Loading image...
+                    </div>
                     <img id="studentQuestionImage" src="" alt="Question Image" style="max-width:100%; max-height:300px; border-radius:10px; border:1px solid #eef2f6;">
                 </div>
                 <p id="studentQuestionText"></p>
@@ -420,14 +424,14 @@
 
         <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">Your Published Assessments</h3>
-            <div id="teacherPublishedList">
+            <div id="teacherPublishedList" class="scrollable-panel">
                 <p class="helper-text">No assessments published yet.</p>
             </div>
         </div>
 
         <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">My CSV Upload History</h3>
-            <div id="csvHistoryList">
+            <div id="csvHistoryList" class="scrollable-panel">
                 <p class="helper-text">No CSV files uploaded yet.</p>
             </div>
         </div>
@@ -472,7 +476,7 @@
                 </div>
             </div>
 
-            <div id="teacherResultsTableContainer">
+            <div id="teacherResultsTableContainer" class="scrollable-panel">
                 <table id="teacherResultsTable">
                     <thead>
                         <tr>
@@ -520,7 +524,7 @@
 
         <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
             <h3 style="margin-bottom:12px;">Manage Teachers</h3>
-            <div id="adminTeacherList">
+            <div id="adminTeacherList" class="scrollable-panel">
                 <p class="helper-text">No teachers registered yet.</p>
             </div>
             <button onclick="adminDeleteAllTeachers()" class="secondary-btn" style="background:#dc3545; color:white; margin-top:12px; font-size:13px; padding:8px 16px;">Delete All Teachers</button>
@@ -533,7 +537,7 @@
                     <option value="all">All Teachers</option>
                 </select>
             </div>
-            <div id="adminAssessmentList">
+            <div id="adminAssessmentList" class="scrollable-panel">
                 <p class="helper-text">No assessments published yet.</p>
             </div>
         </div>
@@ -541,7 +545,7 @@
         <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
             <h3 style="margin-bottom:12px;">Teacher Activity Log</h3>
             <div style="max-height:300px; overflow-y:auto;">
-                <div id="adminActivityLog">
+                <div id="adminActivityLog" class="scrollable-panel">
                     <p class="helper-text">No activity recorded yet.</p>
                 </div>
             </div>
@@ -584,7 +588,7 @@
                 </div>
             </div>
 
-            <div id="adminResultsTableContainer">
+            <div id="adminResultsTableContainer" class="scrollable-panel">
                 <table id="adminResultsTable">
                     <thead>
                         <tr>

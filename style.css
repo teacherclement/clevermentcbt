@@ -1092,3 +1092,35 @@ button:disabled {
         print-color-adjust: exact !important;
     }
 }
+/* ============================================================
+   SCROLLABLE PANELS (dashboard lists/tables that grow over time)
+   ============================================================ */
+.scrollable-panel {
+    max-height: 420px;
+    overflow-y: auto;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+}
+
+.scrollable-panel::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.scrollable-panel::-webkit-scrollbar-thumb {
+    background: #c3ccd6;
+    border-radius: 4px;
+}
+
+.scrollable-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollable-panel table {
+    min-width: 700px;
+}
+
+@keyframes cm-spin {
+    to { transform: rotate(360deg); }
+}
