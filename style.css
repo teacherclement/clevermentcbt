@@ -784,7 +784,6 @@ button:disabled {
     background: white;
     border-radius: 12px;
     border: 1.5px solid #eef2f6;
-    overflow: hidden;
 }
 
 #teacherResultsTable,
@@ -842,11 +841,6 @@ button:disabled {
 }
 
 /* ===== Teacher Published List ===== */
-#teacherPublishedList {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
 #teacherPublishedList .helper-text {
     padding: 12px;
     background: #f8fafc;
@@ -855,11 +849,6 @@ button:disabled {
 }
 
 /* ===== Admin Teacher List ===== */
-#adminTeacherList {
-    max-height: 200px;
-    overflow-y: auto;
-}
-
 #adminTeacherList .helper-text {
     padding: 12px;
     background: #f8fafc;
