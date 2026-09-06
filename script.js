@@ -139,6 +139,20 @@ if (typeof supabase !== 'undefined' && supabase.createClient) {
 var supabase = supabaseClient;
 
 // ============================================================
+// EMAILJS CONNECTION (for teacher password reset emails)
+// ============================================================
+
+var EMAILJS_PUBLIC_KEY = 'TYGhhsvmb4Qa-ng08';
+var EMAILJS_SERVICE_ID = 'service_ukp1egq';
+var EMAILJS_TEMPLATE_ID = 'uf0nyrb';
+
+if (typeof emailjs !== 'undefined' && emailjs.init) {
+    emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+} else {
+    console.error('EmailJS failed to load - password reset emails will not send.');
+}
+
+// ============================================================
 // TEACHER ACTIVITY LOG
 // ============================================================
 
@@ -380,6 +394,9 @@ function showAdminLogin() {
 function showTeacherLoginForm() {
     document.getElementById('teacherLoginForm').style.display = 'block';
     document.getElementById('teacherSignupForm').style.display = 'none';
+    document.getElementById('teacherForgotPasswordForm').style.display = 'none';
+    document.getElementById('teacherResetPasswordForm').style.display = 'none';
+    document.getElementById('teacherAuthTabs').style.display = 'flex';
     document.getElementById('teacherLoginTab').className = 'primary-btn';
     document.getElementById('teacherSignupTab').className = 'secondary-btn';
 }
@@ -387,8 +404,19 @@ function showTeacherLoginForm() {
 function showTeacherSignupForm() {
     document.getElementById('teacherLoginForm').style.display = 'none';
     document.getElementById('teacherSignupForm').style.display = 'block';
+    document.getElementById('teacherForgotPasswordForm').style.display = 'none';
+    document.getElementById('teacherResetPasswordForm').style.display = 'none';
+    document.getElementById('teacherAuthTabs').style.display = 'flex';
     document.getElementById('teacherLoginTab').className = 'secondary-btn';
     document.getElementById('teacherSignupTab').className = 'primary-btn';
+}
+
+function showForgotPasswordForm() {
+    document.getElementById('teacherLoginForm').style.display = 'none';
+    document.getElementById('teacherSignupForm').style.display = 'none';
+    document.getElementById('teacherResetPasswordForm').style.display = 'none';
+    document.getElementById('teacherForgotPasswordForm').style.display = 'block';
+    document.getElementById('teacherAuthTabs').style.display = 'none';
 }
 
 // ============================================================
@@ -571,14 +599,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     }
 
-    var quizWasRestored = restoreQuizState();
+    checkForPasswordResetToken().then(function(handled) {
+        if (handled) return;
 
-    if (!quizWasRestored) {
-        var page = getPageFromURL();
-        if (page) {
-            showPageFromURL(page);
+        var quizWasRestored = restoreQuizState();
+
+        if (!quizWasRestored) {
+            var page = getPageFromURL();
+            if (page) {
+                showPageFromURL(page);
+            }
         }
-    }
+    });
 });
 
 // ============================================================
@@ -651,6 +683,169 @@ async function migrateTeacherPasswordIfNeeded(teacherId, plainPassword, currentS
             .eq('id', teacherId);
     } catch (e) {
         // Non-critical - it'll just try again on their next login.
+    }
+}
+
+// ============================================================
+// FORGOT PASSWORD (teachers) - generates a random, time-limited
+// token, emails a reset link via EmailJS, and validates that
+// token when the teacher opens the link.
+// ============================================================
+
+function generateResetToken() {
+    var bytes = new Uint8Array(24);
+    if (window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(bytes);
+    } else {
+        for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    }
+    var token = '';
+    for (var j = 0; j < bytes.length; j++) {
+        token += bytes[j].toString(16).padStart(2, '0');
+    }
+    return token;
+}
+
+async function requestPasswordReset() {
+    var emailInput = document.getElementById('teacherForgotEmail');
+    var btn = document.getElementById('teacherForgotSubmitBtn');
+    var email = emailInput.value.trim().toLowerCase();
+
+    if (!email) {
+        alert('Please enter your email.');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    try {
+        var teachers = await getAllTeachersFromDatabase();
+        var teacher = teachers.filter(function(t) { return t.email.toLowerCase() === email; })[0];
+
+        // Always show the same message whether or not the email exists,
+        // so this can't be used to check which emails have accounts.
+        if (teacher) {
+            var token = generateResetToken();
+            var expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour from now
+
+            var { error: updateError } = await supabase
+                .from('cleverment_teachers')
+                .update({ reset_token: token, reset_token_expiry: expiry })
+                .eq('id', teacher.id);
+
+            if (updateError) {
+                if (/column .*does not exist/i.test(updateError.message || '')) {
+                    alert('Password reset isn\'t set up yet on the database side. Please contact your admin.');
+                    btn.disabled = false;
+                    btn.textContent = 'Send Reset Link';
+                    return;
+                }
+                throw updateError;
+            }
+
+            var resetLink = window.location.origin + window.location.pathname + '?page=reset-password&token=' + token;
+
+            if (typeof emailjs !== 'undefined') {
+                await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+                    email: teacher.email,
+                    link: resetLink
+                });
+            }
+        }
+
+        alert('If an account exists with that email, a reset link has been sent. Please check your inbox (and spam folder).');
+        showTeacherLoginForm();
+    } catch (e) {
+        console.error('Password reset request failed:', e);
+        alert('Something went wrong sending the reset email. Please try again in a moment.');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Send Reset Link';
+}
+
+var pendingResetTeacherId = null;
+
+async function checkForPasswordResetToken() {
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get('token');
+    if (params.get('page') !== 'reset-password' || !token) return false;
+
+    document.getElementById('landingPage').style.display = 'none';
+    document.getElementById('teacherAuth').style.display = 'block';
+    document.getElementById('teacherLoginForm').style.display = 'none';
+    document.getElementById('teacherSignupForm').style.display = 'none';
+    document.getElementById('teacherForgotPasswordForm').style.display = 'none';
+    document.getElementById('teacherAuthTabs').style.display = 'none';
+
+    var resetSection = document.getElementById('teacherResetPasswordForm');
+
+    try {
+        var teachers = await getAllTeachersFromDatabase();
+        var teacher = teachers.filter(function(t) {
+            return t.reset_token === token && t.reset_token_expiry && new Date(t.reset_token_expiry) > new Date();
+        })[0];
+
+        if (!teacher) {
+            resetSection.innerHTML = '<h2>Reset Link Invalid</h2><p class="helper-text">This reset link is invalid or has expired. Please request a new one.</p><button onclick="showPageFromURL(\'teacher\')" class="primary-btn full-width" style="margin-top:12px;">Back to Login</button>';
+            resetSection.style.display = 'block';
+            return true;
+        }
+
+        pendingResetTeacherId = teacher.id;
+        resetSection.style.display = 'block';
+    } catch (e) {
+        resetSection.innerHTML = '<p class="helper-text">Could not verify this reset link right now. Please try again shortly.</p>';
+        resetSection.style.display = 'block';
+    }
+
+    return true;
+}
+
+async function submitNewPassword() {
+    var pass = document.getElementById('teacherNewPassword').value;
+    var confirmPass = document.getElementById('teacherNewPasswordConfirm').value;
+    var btn = document.getElementById('teacherResetSubmitBtn');
+
+    if (!pendingResetTeacherId) {
+        alert('This reset link is no longer valid. Please request a new one.');
+        return;
+    }
+    if (!pass || pass.length < 4) {
+        alert('Please enter a password (at least 4 characters).');
+        return;
+    }
+    if (pass !== confirmPass) {
+        alert('Passwords do not match.');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        var newHash = hashPassword(pass);
+        var { error } = await supabase
+            .from('cleverment_teachers')
+            .update({ password_hash: newHash, reset_token: null, reset_token_expiry: null })
+            .eq('id', pendingResetTeacherId);
+
+        if (error) {
+            alert('Supabase Error: ' + error.message);
+            btn.disabled = false;
+            btn.textContent = 'Set New Password';
+            return;
+        }
+
+        alert('Password updated! You can now log in with your new password.');
+        pendingResetTeacherId = null;
+        updateURL('teacher');
+        showPageFromURL('teacher');
+    } catch (e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Set New Password';
     }
 }
 
