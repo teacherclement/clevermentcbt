@@ -1608,6 +1608,143 @@ async function loadTeacherAnalytics() {
     renderMathIn(container);
 }
 
+function generateCertificatePDFBlob(data) {
+    return new Promise(function(resolve, reject) {
+        var tempDiv = document.createElement('div');
+        tempDiv.style.cssText = 'position:fixed; left:-9999px; top:0; width:297mm; height:210mm; margin:0; padding:0; background:white; z-index:-1; overflow:hidden;';
+        var cleanCert = buildCertificateElement(data);
+        tempDiv.appendChild(cleanCert);
+        document.body.appendChild(tempDiv);
+
+        waitForCertificateImages(cleanCert, 4000).then(function() {
+            return html2canvas(cleanCert, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                width: 297 * 3.779,
+                height: 210 * 3.779,
+                logging: false
+            });
+        }).then(function(canvas) {
+            var imgData = canvas.toDataURL('image/jpeg', 0.95);
+            var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+            if (!jsPDFCtor) {
+                throw new Error('jsPDF library not found.');
+            }
+            var pdf = new jsPDFCtor('landscape', 'mm', 'a4');
+            pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
+            var blob = pdf.output('blob');
+            document.body.removeChild(tempDiv);
+            resolve(blob);
+        }).catch(function(error) {
+            document.body.removeChild(tempDiv);
+            reject(error);
+        });
+    });
+}
+
+async function teacherDownloadAllCertificates() {
+    var select = document.getElementById('teacherAnalyticsSelect');
+    var btn = document.getElementById('teacherBulkCertBtn');
+    if (!select || !select.value) {
+        alert('Please select an assessment above first.');
+        return;
+    }
+
+    var code = select.value;
+    var assessment = teacherAssessmentsCache.filter(function(a) { return a.code === code; })[0];
+    if (!assessment) {
+        alert('Could not find that assessment. Try reopening the dashboard and picking it again.');
+        return;
+    }
+
+    var JSZipLib = window.JSZip;
+    if (!JSZipLib) {
+        alert('The zip library failed to load. Please check your internet connection and try again.');
+        return;
+    }
+
+    var results;
+    try {
+        var { data, error } = await supabase
+            .from('cleverment_results')
+            .select('student_name, score')
+            .eq('assessment_code', code);
+        if (error) {
+            alert('Supabase Error: ' + error.message);
+            return;
+        }
+        results = data || [];
+    } catch (e) {
+        alert('Error: ' + e.message);
+        return;
+    }
+
+    if (results.length === 0) {
+        alert('No submissions yet for this assessment.');
+        return;
+    }
+
+    if (!confirm('Generate certificates for all ' + results.length + ' student(s) who took this assessment? This may take a minute for a large class.')) {
+        return;
+    }
+
+    btn.disabled = true;
+    var zip = new JSZipLib();
+    var usedNames = {};
+    var failedCount = 0;
+
+    for (var i = 0; i < results.length; i++) {
+        btn.textContent = 'Generating ' + (i + 1) + ' of ' + results.length + '...';
+        var r = results[i];
+        var certData = {
+            studentName: r.student_name || 'Student',
+            subject: assessment.subject,
+            score: r.score,
+            teacherName: assessment.teacherName,
+            teacherSignature: assessment.teacherSignature,
+            code: assessment.code,
+            dateObj: new Date()
+        };
+        try {
+            var blob = await generateCertificatePDFBlob(certData);
+            var safeName = (r.student_name || 'Student').replace(/[\\/:*?"<>|]/g, '_').trim() || 'Student';
+            var filename = safeName;
+            if (usedNames.hasOwnProperty(filename)) {
+                usedNames[filename]++;
+                filename = filename + '_' + usedNames[filename];
+            } else {
+                usedNames[filename] = 0;
+            }
+            zip.file('Certificate-' + filename + '.pdf', blob);
+        } catch (e) {
+            console.error('Failed to generate certificate for', r.student_name, e);
+            failedCount++;
+        }
+    }
+
+    btn.textContent = 'Packaging ZIP...';
+    try {
+        var zipBlob = await zip.generateAsync({ type: 'blob' });
+        var url = URL.createObjectURL(zipBlob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = (assessment.subject + '_' + assessment.className + '_Certificates').replace(/[\\/:*?"<>|]/g, '_') + '.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        if (failedCount > 0) {
+            alert(failedCount + ' certificate(s) could not be generated and were skipped. The rest are in the ZIP.');
+        }
+    } catch (e) {
+        alert('Error creating the ZIP file: ' + e.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Download All Certificates (ZIP)';
+}
+
 function copyAssessmentCode(code) {
     navigator.clipboard.writeText(code).then(function() {
         alert('Assessment code copied: ' + code);
@@ -2542,24 +2679,11 @@ function formatDate(date) {
 }
 
 // ============================================================
-// DOWNLOAD CERTIFICATE AS PDF (One Click - CLEAN)
+// CERTIFICATE BUILDING (shared by single-student download and
+// the teacher's bulk ZIP download below)
 // ============================================================
 
-function downloadCertificatePDF() {
-    // Create a temporary container
-    var tempDiv = document.createElement('div');
-    tempDiv.style.position = 'fixed';
-    tempDiv.style.left = '-9999px';
-    tempDiv.style.top = '0';
-    tempDiv.style.width = '297mm';
-    tempDiv.style.height = '210mm';
-    tempDiv.style.margin = '0';
-    tempDiv.style.padding = '0';
-    tempDiv.style.background = 'white';
-    tempDiv.style.zIndex = '-1';
-    tempDiv.style.overflow = 'hidden';
-    
-    // Build the certificate from scratch
+function buildCertificateElement(data) {
     var cleanCert = document.createElement('div');
     cleanCert.style.width = '297mm';
     cleanCert.style.height = '210mm';
@@ -2569,20 +2693,20 @@ function downloadCertificatePDF() {
     cleanCert.style.boxSizing = 'border-box';
     cleanCert.style.margin = '0';
     cleanCert.style.padding = '0';
-    
+
     // ----- BORDERS -----
     var border1 = document.createElement('div');
     border1.style.cssText = 'position:absolute; top:7mm; left:7mm; right:7mm; bottom:7mm; border:3.5mm solid #1a1a2e; z-index:1;';
     cleanCert.appendChild(border1);
-    
+
     var border2 = document.createElement('div');
     border2.style.cssText = 'position:absolute; top:11mm; left:11mm; right:11mm; bottom:11mm; border:1.8mm solid #C9A84C; z-index:2;';
     cleanCert.appendChild(border2);
-    
+
     var border3 = document.createElement('div');
     border3.style.cssText = 'position:absolute; top:14mm; left:14mm; right:14mm; bottom:14mm; border:0.45mm solid #1a1a2e; z-index:3;';
     cleanCert.appendChild(border3);
-    
+
     // ----- CORNERS -----
     var corners = [
         {top:'6mm', left:'6mm', bw:'2mm 0 0 2mm'},
@@ -2600,34 +2724,31 @@ function downloadCertificatePDF() {
         c.style.borderWidth = corners[i].bw;
         cleanCert.appendChild(c);
     }
-    
+
     // ----- WATERMARK -----
     var wm = document.createElement('div');
     wm.style.cssText = 'position:absolute; width:145mm; height:145mm; border-radius:50%; border:0.5mm solid rgba(201,168,76,0.07); top:50%; left:50%; transform:translate(-50%, -50%); z-index:0;';
     cleanCert.appendChild(wm);
-    
+
     // ----- CONTENT -----
     var content = document.createElement('div');
     content.style.cssText = 'position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;';
-    
-    // Logo
+
     var logo = document.createElement('img');
     logo.src = 'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg';
     logo.style.cssText = 'width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
     content.appendChild(logo);
-    
-    // Title
+
     var h1 = document.createElement('div');
     h1.textContent = 'CERTIFICATE';
     h1.style.cssText = 'font-size:32pt; font-weight:bold; color:#1a1a2e; letter-spacing:4px; font-family:Georgia,serif;';
     content.appendChild(h1);
-    
+
     var h2 = document.createElement('div');
     h2.textContent = 'Of Achievement';
     h2.style.cssText = 'font-size:18pt; color:#C9A84C; letter-spacing:2px; font-weight:bold; font-family:Georgia,serif; margin:1mm 0 3mm;';
     content.appendChild(h2);
-    
-    // Divider
+
     var divLine = document.createElement('div');
     divLine.style.cssText = 'width:65mm; height:1.2mm; background:#C9A84C; margin:0 auto 4mm; position:relative;';
     var d1 = document.createElement('span');
@@ -2639,48 +2760,41 @@ function downloadCertificatePDF() {
     divLine.appendChild(d1);
     divLine.appendChild(d2);
     content.appendChild(divLine);
-    
-    // Certify
+
     var p1 = document.createElement('div');
     p1.textContent = 'This is to certify that';
     p1.style.cssText = 'font-size:14pt; color:#555; font-family:Georgia,serif; margin:0 0 3mm;';
     content.appendChild(p1);
-    
-    // Name
+
     var nameEl = document.createElement('div');
-    nameEl.textContent = studentName || 'Student Name';
+    nameEl.textContent = data.studentName || 'Student Name';
     nameEl.style.cssText = 'font-size:29pt; font-weight:bold; color:#1a1a2e; padding:0 18mm 2.5mm; min-width:120mm; border-bottom:1.2mm solid #C9A84C; font-family:Georgia,serif; margin:0;';
     content.appendChild(nameEl);
-    
-    // Completion
+
     var p2 = document.createElement('div');
     p2.textContent = 'has successfully completed the assessment in';
     p2.style.cssText = 'font-size:13.5pt; color:#555; font-family:Georgia,serif; margin:4mm 0 2mm;';
     content.appendChild(p2);
-    
-    // Subject
+
     var subEl = document.createElement('div');
-    subEl.textContent = studentSubject || 'Subject';
+    subEl.textContent = data.subject || 'Subject';
     subEl.style.cssText = 'font-size:21pt; font-weight:bold; color:#1a1a2e; font-family:Georgia,serif; margin:0 0 3mm;';
     content.appendChild(subEl);
-    
-    // Score text
+
     var p3 = document.createElement('div');
     p3.textContent = 'with an average score of';
     p3.style.cssText = 'font-size:13.5pt; color:#555; font-family:Georgia,serif; margin:0 0 1mm;';
     content.appendChild(p3);
-    
-    // Score
+
     var scoreEl = document.createElement('div');
-    var grade = getGrade(studentScore || 0);
-    scoreEl.textContent = (studentScore || 0) + '% - ' + grade;
+    var grade = getGrade(data.score || 0);
+    scoreEl.textContent = (data.score || 0) + '% - ' + grade;
     scoreEl.style.cssText = 'font-size:19pt; font-weight:bold; color:#1a1a2e; font-family:Georgia,serif; margin:0;';
     content.appendChild(scoreEl);
-    
-    // Bottom section
+
     var bottom = document.createElement('div');
     bottom.style.cssText = 'width:190mm; display:flex; justify-content:space-between; align-items:flex-end; margin-top:4mm;';
-    
+
     var teacherDiv = document.createElement('div');
     teacherDiv.style.cssText = 'width:70mm; text-align:center;';
     var tLabel = document.createElement('div');
@@ -2688,11 +2802,11 @@ function downloadCertificatePDF() {
     tLabel.style.cssText = 'font-size:11pt; color:#555; font-family:Georgia,serif; margin-bottom:2mm;';
     teacherDiv.appendChild(tLabel);
     var tName = document.createElement('div');
-    tName.textContent = window.assessmentTeacherName || 'Unknown Teacher';
+    tName.textContent = data.teacherName || 'Unknown Teacher';
     tName.style.cssText = 'font-size:13pt; font-weight:bold; padding-bottom:2mm; border-bottom:0.5mm solid #1a1a2e; font-family:Georgia,serif;';
     teacherDiv.appendChild(tName);
     bottom.appendChild(teacherDiv);
-    
+
     var sigDiv = document.createElement('div');
     sigDiv.style.cssText = 'width:70mm; text-align:center;';
     var sLabel = document.createElement('div');
@@ -2700,7 +2814,7 @@ function downloadCertificatePDF() {
     sLabel.style.cssText = 'font-size:11pt; color:#555; font-family:Georgia,serif; margin-bottom:2mm;';
     sigDiv.appendChild(sLabel);
     var sigImg = document.createElement('img');
-    var sigUrl = window.assessmentTeacherSignature || '';
+    var sigUrl = data.teacherSignature || '';
     if (sigUrl) {
         sigImg.src = sigUrl;
         sigImg.style.cssText = 'height:15mm; max-width:55mm; object-fit:contain; display:block; margin:0 auto 1mm;';
@@ -2713,54 +2827,89 @@ function downloadCertificatePDF() {
     sigDiv.appendChild(sLine);
     bottom.appendChild(sigDiv);
     content.appendChild(bottom);
-    
-    // Footer
+
     var footer = document.createElement('div');
     footer.style.cssText = 'position:absolute; z-index:20; bottom:17mm; left:20mm; right:20mm; display:flex; justify-content:space-between; align-items:center; border-top:0.5mm solid #C9A84C; padding-top:3mm; font-size:8.5pt; color:#555; font-family:Georgia,serif;';
-    
+
     var dateEl = document.createElement('div');
-    dateEl.innerHTML = 'Issued on: <strong style="color:#1a1a2e;">' + formatDate(new Date()) + '</strong>';
+    dateEl.innerHTML = 'Issued on: <strong style="color:#1a1a2e;">' + formatDate(data.dateObj || new Date()) + '</strong>';
     footer.appendChild(dateEl);
-    
+
     var idEl = document.createElement('div');
-    var certId = 'CERT-' + String(Date.now()).slice(-6);
+    var certId = 'CERT-' + String(Date.now()).slice(-6) + Math.floor(Math.random() * 90 + 10);
     idEl.innerHTML = 'Certificate ID: <strong style="color:#1a1a2e;">' + certId + '</strong>';
     footer.appendChild(idEl);
-    
+
     var codeEl = document.createElement('div');
-    codeEl.innerHTML = 'Code: <strong style="color:#1a1a2e;">' + (currentAssessmentCode || 'CODE-0000') + '</strong>';
+    codeEl.innerHTML = 'Code: <strong style="color:#1a1a2e;">' + (data.code || 'CODE-0000') + '</strong>';
     footer.appendChild(codeEl);
-    
+
     cleanCert.appendChild(content);
     cleanCert.appendChild(footer);
+    return cleanCert;
+}
+
+function waitForCertificateImages(container, timeoutMs) {
+    var imgs = container.querySelectorAll('img');
+    var promises = [];
+    for (var i = 0; i < imgs.length; i++) {
+        if (imgs[i].complete) continue;
+        promises.push(new Promise(function(resolve) {
+            imgs[i].onload = resolve;
+            imgs[i].onerror = resolve;
+        }));
+    }
+    if (promises.length === 0) return Promise.resolve();
+    return Promise.race([
+        Promise.all(promises),
+        new Promise(function(resolve) { setTimeout(resolve, timeoutMs || 4000); })
+    ]);
+}
+
+// ============================================================
+// DOWNLOAD CERTIFICATE AS PDF (One Click - CLEAN)
+// ============================================================
+
+function downloadCertificatePDF() {
+    var tempDiv = document.createElement('div');
+    tempDiv.style.cssText = 'position:fixed; left:-9999px; top:0; width:297mm; height:210mm; margin:0; padding:0; background:white; z-index:-1; overflow:hidden;';
+
+    var cleanCert = buildCertificateElement({
+        studentName: studentName,
+        subject: studentSubject,
+        score: studentScore,
+        teacherName: window.assessmentTeacherName,
+        teacherSignature: window.assessmentTeacherSignature,
+        code: currentAssessmentCode,
+        dateObj: new Date()
+    });
     tempDiv.appendChild(cleanCert);
     document.body.appendChild(tempDiv);
-    
-    // --- Generate PDF using html2canvas + jsPDF ---
-    setTimeout(function() {
-        html2canvas(cleanCert, {
+
+    waitForCertificateImages(cleanCert, 4000).then(function() {
+        return html2canvas(cleanCert, {
             scale: 3,
             useCORS: true,
             backgroundColor: '#ffffff',
             width: 297 * 3.779,
             height: 210 * 3.779,
             logging: false
-        }).then(function(canvas) {
-            var imgData = canvas.toDataURL('image/jpeg', 0.98);
-            var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
-            if (!jsPDFCtor) {
-                throw new Error('jsPDF library not found. Please check that jspdf.umd.min.js loaded correctly.');
-            }
-            var pdf = new jsPDFCtor('landscape', 'mm', 'a4');
-            pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
-            pdf.save('Certificate-' + studentName + '.pdf');
-            document.body.removeChild(tempDiv);
-        }).catch(function(error) {
-            console.error('PDF generation error:', error);
-            alert('Error generating PDF: ' + error.message);
-            document.body.removeChild(tempDiv);
         });
-    }, 500);
+    }).then(function(canvas) {
+        var imgData = canvas.toDataURL('image/jpeg', 0.98);
+        var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+        if (!jsPDFCtor) {
+            throw new Error('jsPDF library not found. Please check that jspdf.umd.min.js loaded correctly.');
+        }
+        var pdf = new jsPDFCtor('landscape', 'mm', 'a4');
+        pdf.addImage(imgData, 'JPEG', 0, 0, 297, 210);
+        pdf.save('Certificate-' + studentName + '.pdf');
+        document.body.removeChild(tempDiv);
+    }).catch(function(error) {
+        console.error('PDF generation error:', error);
+        alert('Error generating PDF: ' + error.message);
+        document.body.removeChild(tempDiv);
+    });
 }
 
 // ============================================================

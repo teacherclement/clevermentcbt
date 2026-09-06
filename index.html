@@ -14,6 +14,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2d6cdf">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -488,6 +489,7 @@
             <select id="teacherAnalyticsSelect" class="form-input" style="margin-bottom:12px;" onchange="loadTeacherAnalytics()">
                 <option value="">-- Select an assessment --</option>
             </select>
+            <button onclick="teacherDownloadAllCertificates()" id="teacherBulkCertBtn" class="secondary-btn full-width" style="margin-bottom:12px; background:#2d6cdf; color:white;">Download All Certificates (ZIP)</button>
             <div id="teacherAnalyticsContainer" class="scrollable-panel">
                 <p class="helper-text">Pick an assessment above to see its question breakdown.</p>
             </div>
