@@ -311,6 +311,7 @@ var studentTimeRemaining = 0;
 var studentTimeLimit = 0;
 var studentName = '';
 var preloadedImageCache = {};
+var studentTabSwitchCount = 0;
 var studentClass = '';
 var studentSubject = '';
 var studentIsTimeUp = false;
@@ -450,6 +451,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    var rosterClassSelect = document.getElementById('rosterClassSelect');
+    var rosterCustomWrapper = document.querySelector('.custom-class-wrapper-roster');
+    var rosterCustomInput = document.getElementById('rosterCustomClass');
+    if (rosterClassSelect) {
+        rosterClassSelect.addEventListener('change', async function() {
+            if (this.value === 'Other') {
+                rosterCustomWrapper.style.display = 'block';
+                rosterCustomInput.focus();
+                document.getElementById('rosterNamesTextarea').value = '';
+                return;
+            }
+            rosterCustomWrapper.style.display = 'none';
+            rosterCustomInput.value = '';
+            var className = this.value;
+            var textarea = document.getElementById('rosterNamesTextarea');
+            if (!className) {
+                textarea.value = '';
+                return;
+            }
+            textarea.value = 'Loading...';
+            var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
+            var names = await getRosterForClass(teacherEmail, className);
+            textarea.value = names ? names.join('\n') : '';
+        });
+    }
+
     var teacherSubjectSelect = document.getElementById('teacherSubjectSelect');
     var teacherSubjWrapper = document.querySelector('.custom-subject-wrapper-teacher');
     var teacherSubjInput = document.getElementById('teacherCustomSubject');
@@ -573,6 +600,60 @@ document.addEventListener('keydown', function(e) {
 // TEACHER AUTHENTICATION
 // ============================================================
 
+// ============================================================
+// PASSWORD HASHING (bcrypt) - teacher passwords used to be
+// stored in plain text in the "password_hash" column despite its
+// name. New signups are hashed properly. Existing accounts are
+// migrated automatically and silently the next time that teacher
+// logs in successfully, using the password they just typed in
+// (which is discarded afterward) - no manual migration needed.
+// ============================================================
+
+function getBcryptLib() {
+    return (window.dcodeIO && window.dcodeIO.bcrypt) || window.bcrypt || null;
+}
+
+function isBcryptHash(value) {
+    return typeof value === 'string' && /^\$2[aby]?\$\d{2}\$/.test(value);
+}
+
+function hashPassword(plainPassword) {
+    var bcryptLib = getBcryptLib();
+    if (!bcryptLib) {
+        console.error('bcrypt library failed to load - storing password unhashed as a last resort.');
+        return plainPassword;
+    }
+    var salt = bcryptLib.genSaltSync(10);
+    return bcryptLib.hashSync(plainPassword, salt);
+}
+
+function verifyPassword(plainPassword, storedValue) {
+    if (isBcryptHash(storedValue)) {
+        var bcryptLib = getBcryptLib();
+        if (!bcryptLib) return false;
+        try {
+            return bcryptLib.compareSync(plainPassword, storedValue);
+        } catch (e) {
+            return false;
+        }
+    }
+    // Legacy account: storedValue is still the old plain-text password.
+    return storedValue === plainPassword;
+}
+
+async function migrateTeacherPasswordIfNeeded(teacherId, plainPassword, currentStoredValue) {
+    if (isBcryptHash(currentStoredValue)) return;
+    try {
+        var newHash = hashPassword(plainPassword);
+        await supabase
+            .from('cleverment_teachers')
+            .update({ password_hash: newHash })
+            .eq('id', teacherId);
+    } catch (e) {
+        // Non-critical - it'll just try again on their next login.
+    }
+}
+
 function getTeachersLocal() {
     var stored = localStorage.getItem('cleverment_teachers');
     if (stored) {
@@ -592,7 +673,7 @@ async function saveTeacherToDatabase(teacher) {
             .insert([{
                 name: teacher.name,
                 email: teacher.email,
-                password_hash: teacher.password
+                password_hash: hashPassword(teacher.password)
             }]);
         if (error) {
             alert('Supabase Error: ' + error.message);
@@ -660,7 +741,7 @@ function teacherSignup() {
                     id: Date.now(),
                     name: name,
                     email: email,
-                    password: password,
+                    password: hashPassword(password),
                     date: new Date().toLocaleString()
                 });
                 saveTeachersLocal(teachers);
@@ -691,7 +772,7 @@ function teacherLogin() {
             var teachers = getTeachersLocal();
             var found = null;
             for (var i = 0; i < teachers.length; i++) {
-                if (teachers[i].email === email && teachers[i].password === password) {
+                if (teachers[i].email === email && verifyPassword(password, teachers[i].password)) {
                     found = teachers[i];
                     break;
                 }
@@ -719,10 +800,12 @@ function teacherLogin() {
             return;
         }
 
-        if (teacher.password_hash !== password) {
+        if (!verifyPassword(password, teacher.password_hash)) {
             alert('Invalid email or password. Please try again.');
             return;
         }
+
+        migrateTeacherPasswordIfNeeded(teacher.id, password, teacher.password_hash);
 
         currentTeacher = {
             id: teacher.id,
@@ -996,30 +1079,57 @@ function getPublishedAssessmentsLocal() {
     return [];
 }
 
-async function savePublishedAssessmentToDatabase(assessment) {
-    try {
-        var { data, error } = await supabase
-            .from('cleverment_assessments')
-            .insert([{
-                teacher_email: assessment.teacherEmail,
-                teacher_name: assessment.teacherName || 'Unknown Teacher',
-                teacher_signature: assessment.teacherSignature || '',
-                subject: assessment.subject,
-                class_name: assessment.className,
-                code: assessment.code,
-                questions: assessment.questions,
-                time_limit: assessment.timeLimit,
-                shuffle: assessment.shuffle
-            }]);
-        if (error) {
-            alert('Supabase Error: ' + error.message);
-            return false;
+// ============================================================
+// GENERIC INSERT-WITH-FALLBACK: several optional columns
+// (available_from, available_until, pass_mark, tab_switches,
+// answers) may not exist yet if a Supabase migration hasn't been
+// run. Rather than one-off retry logic per table, this strips
+// whichever specific column Postgres says is missing and retries,
+// one column at a time, so a submission or publish never fails
+// just because a newer feature's column isn't there yet.
+// ============================================================
+
+async function insertWithColumnFallback(table, payload) {
+    var attemptPayload = Object.assign({}, payload);
+    for (var attempt = 0; attempt < 6; attempt++) {
+        try {
+            var { data, error } = await supabase.from(table).insert([attemptPayload]);
+            if (!error) return { success: true };
+            var match = /column ["']?([a-zA-Z0-9_]+)["']? .*does not exist/i.exec(error.message || '');
+            if (match && Object.prototype.hasOwnProperty.call(attemptPayload, match[1])) {
+                delete attemptPayload[match[1]];
+                console.warn(table + ': column "' + match[1] + '" not found in Supabase - saved without it. Add that column to enable the related feature.');
+                continue;
+            }
+            return { success: false, error: error };
+        } catch (e) {
+            return { success: false, error: e };
         }
-        return true;
-    } catch(e) {
-        alert('Error: ' + e.message);
+    }
+    return { success: false, error: { message: 'Too many missing columns - could not save.' } };
+}
+
+async function savePublishedAssessmentToDatabase(assessment) {
+    var payload = {
+        teacher_email: assessment.teacherEmail,
+        teacher_name: assessment.teacherName || 'Unknown Teacher',
+        teacher_signature: assessment.teacherSignature || '',
+        subject: assessment.subject,
+        class_name: assessment.className,
+        code: assessment.code,
+        questions: assessment.questions,
+        time_limit: assessment.timeLimit,
+        shuffle: assessment.shuffle,
+        available_from: assessment.availableFrom,
+        available_until: assessment.availableUntil,
+        pass_mark: assessment.passMark
+    };
+    var result = await insertWithColumnFallback('cleverment_assessments', payload);
+    if (!result.success) {
+        alert('Supabase Error: ' + result.error.message);
         return false;
     }
+    return true;
 }
 
 async function getAssessmentByCodeFromDatabase(code) {
@@ -1075,6 +1185,13 @@ function teacherPublishAssessment() {
     var signatureInput = document.getElementById('teacherCertSignature');
     var teacherSignature = '';
 
+    var availableFromRaw = document.getElementById('teacherAvailableFrom').value;
+    var availableUntilRaw = document.getElementById('teacherAvailableUntil').value;
+    if (availableFromRaw && availableUntilRaw && new Date(availableUntilRaw) <= new Date(availableFromRaw)) {
+        alert('"Available Until" must be after "Available From".');
+        return;
+    }
+
     if (signatureInput.files && signatureInput.files[0]) {
         var reader = new FileReader();
         reader.onload = function(e) {
@@ -1120,6 +1237,12 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
 
     var timeLimit = parseInt(document.getElementById('teacherTimerSelect').value) * 60;
     var shuffle = document.getElementById('teacherShuffleQuestions').checked;
+    var passMarkRaw = parseInt(document.getElementById('teacherPassMark').value);
+    var passMark = (isNaN(passMarkRaw) || passMarkRaw < 0 || passMarkRaw > 100) ? 50 : passMarkRaw;
+    var availableFromRaw = document.getElementById('teacherAvailableFrom').value;
+    var availableUntilRaw = document.getElementById('teacherAvailableUntil').value;
+    var availableFrom = availableFromRaw ? new Date(availableFromRaw).toISOString() : null;
+    var availableUntil = availableUntilRaw ? new Date(availableUntilRaw).toISOString() : null;
 
     var code = subject.substring(0, 3).toUpperCase() + '-' + className.substring(0, 3).toUpperCase() + '-' + String(Date.now()).slice(-3);
 
@@ -1132,7 +1255,10 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         code: code,
         questions: JSON.parse(JSON.stringify(teacherQuestions)),
         timeLimit: timeLimit,
-        shuffle: shuffle
+        shuffle: shuffle,
+        passMark: passMark,
+        availableFrom: availableFrom,
+        availableUntil: availableUntil
     };
 
     await savePublishedAssessmentToDatabase(assessment);
@@ -1155,6 +1281,9 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         questions: JSON.parse(JSON.stringify(teacherQuestions)),
         timeLimit: timeLimit,
         shuffle: shuffle,
+        passMark: passMark,
+        availableFrom: availableFrom,
+        availableUntil: availableUntil,
         date: new Date().toLocaleString()
     });
     // Cap this local backup - it's only used if the Supabase fetch
@@ -1185,6 +1314,23 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
 // TEACHER: VIEW PUBLISHED ASSESSMENTS
 // ============================================================
 
+function getAvailabilityLabel(a) {
+    if (!a.availableFrom && !a.availableUntil) {
+        return { text: 'Always available', color: '#6b7a8f' };
+    }
+    var now = new Date();
+    if (a.availableFrom && now < new Date(a.availableFrom)) {
+        return { text: 'Opens ' + formatDate(new Date(a.availableFrom)), color: '#e67e22' };
+    }
+    if (a.availableUntil && now > new Date(a.availableUntil)) {
+        return { text: 'Closed since ' + formatDate(new Date(a.availableUntil)), color: '#dc3545' };
+    }
+    if (a.availableUntil) {
+        return { text: 'Live now - closes ' + formatDate(new Date(a.availableUntil)), color: '#2d9c5c' };
+    }
+    return { text: 'Live now', color: '#2d9c5c' };
+}
+
 async function renderTeacherPublishedList() {
     var container = document.getElementById('teacherPublishedList');
     if (!container) return;
@@ -1192,6 +1338,9 @@ async function renderTeacherPublishedList() {
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
     var allAssessments = await getAllAssessmentsFromDatabase();
     var filtered = allAssessments.filter(function(a) { return a.teacherEmail === teacherEmail; });
+    teacherAssessmentsCache = filtered;
+
+    populateTeacherAnalyticsSelect(filtered);
 
     if (filtered.length === 0) {
         container.innerHTML = '<p class="helper-text">No assessments published yet.</p>';
@@ -1202,8 +1351,10 @@ async function renderTeacherPublishedList() {
     for (var i = 0; i < filtered.length; i++) {
         var a = filtered[i];
         var timeDisplay = a.timeLimit > 0 ? Math.floor(a.timeLimit / 60) + ' min' : 'No limit';
+        var avail = getAvailabilityLabel(a);
         html += '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
-            '<div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span></div>' +
+            '<div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span><br>' +
+            '<span style="color:' + avail.color + '; font-size:12px; font-weight:600;">' + avail.text + '</span></div>' +
             '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
             '<span style="background:#eef6ff; padding:4px 12px; border-radius:6px; font-weight:600; font-size:13px; color:#2d6cdf;">Code: ' + a.code + '</span>' +
             '<button onclick="copyAssessmentCode(\'' + a.code + '\')" class="secondary-btn" style="font-size:12px; padding:4px 12px;">Copy Code</button>' +
@@ -1211,6 +1362,250 @@ async function renderTeacherPublishedList() {
             '</div></div>';
     }
     container.innerHTML = html;
+}
+
+// ============================================================
+// QUESTION ANALYTICS: aggregates every submission's per-question
+// answers (matched by question text, since shuffle means position
+// isn't stable across students) to show which questions students
+// get wrong most often for a given assessment code.
+// ============================================================
+
+// ============================================================
+// CLASS ROSTERS (for "who hasn't taken it yet" attendance check)
+// ============================================================
+
+async function getRosterForClass(teacherEmail, className) {
+    try {
+        var { data, error } = await supabase
+            .from('cleverment_rosters')
+            .select('*')
+            .eq('teacher_email', teacherEmail)
+            .eq('class_name', className)
+            .maybeSingle();
+        if (error || !data) return null;
+        return data.student_names || [];
+    } catch (e) {
+        return null;
+    }
+}
+
+async function saveClassRoster() {
+    var classSelect = document.getElementById('rosterClassSelect');
+    var customInput = document.getElementById('rosterCustomClass');
+    var className = classSelect.value === 'Other' ? customInput.value.trim() : classSelect.value;
+    if (!className) {
+        alert('Please select or enter a class.');
+        return;
+    }
+
+    var textarea = document.getElementById('rosterNamesTextarea');
+    var names = textarea.value.split('\n').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });
+    if (names.length === 0) {
+        alert('Please enter at least one student name.');
+        return;
+    }
+
+    var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
+
+    try {
+        var { data: existing, error: fetchError } = await supabase
+            .from('cleverment_rosters')
+            .select('id')
+            .eq('teacher_email', teacherEmail)
+            .eq('class_name', className)
+            .maybeSingle();
+
+        if (existing && existing.id) {
+            var { error: updateError } = await supabase
+                .from('cleverment_rosters')
+                .update({ student_names: names, updated_at: new Date().toISOString() })
+                .eq('id', existing.id);
+            if (updateError) {
+                alert('Supabase Error: ' + updateError.message);
+                return;
+            }
+        } else {
+            var { error: insertError } = await supabase
+                .from('cleverment_rosters')
+                .insert([{ teacher_email: teacherEmail, class_name: className, student_names: names }]);
+            if (insertError) {
+                alert('Supabase Error: ' + insertError.message);
+                return;
+            }
+        }
+        alert('Roster saved for ' + className + ' (' + names.length + ' student' + (names.length === 1 ? '' : 's') + ').');
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+function populateTeacherAnalyticsSelect(assessments) {
+    var select = document.getElementById('teacherAnalyticsSelect');
+    if (!select) return;
+    var currentVal = select.value;
+    select.innerHTML = '<option value="">-- Select an assessment --</option>';
+    for (var i = 0; i < assessments.length; i++) {
+        var a = assessments[i];
+        var opt = document.createElement('option');
+        opt.value = a.code;
+        opt.textContent = a.subject + ' - ' + a.className + ' (' + a.code + ')';
+        select.appendChild(opt);
+    }
+    if (currentVal && assessments.some(function(a) { return a.code === currentVal; })) {
+        select.value = currentVal;
+    }
+}
+
+async function getQuestionAnalyticsForCode(code) {
+    try {
+        var { data, error } = await supabase
+            .from('cleverment_results')
+            .select('answers')
+            .eq('assessment_code', code);
+        if (error) return null;
+
+        var stats = {};
+        var order = [];
+        var attemptsWithData = 0;
+
+        for (var i = 0; i < (data || []).length; i++) {
+            var answers = data[i].answers;
+            if (!answers || !Array.isArray(answers) || answers.length === 0) continue;
+            attemptsWithData++;
+            for (var j = 0; j < answers.length; j++) {
+                var qText = answers[j].question;
+                if (!qText) continue;
+                if (!stats[qText]) {
+                    stats[qText] = { wrong: 0, total: 0 };
+                    order.push(qText);
+                }
+                stats[qText].total++;
+                if (!answers[j].isCorrect) stats[qText].wrong++;
+            }
+        }
+
+        if (attemptsWithData === 0) {
+            return { hasData: false, questions: [], totalAttempts: (data || []).length };
+        }
+
+        var list = order.map(function(q) {
+            var s = stats[q];
+            return {
+                question: q,
+                wrong: s.wrong,
+                total: s.total,
+                wrongPct: Math.round((s.wrong / s.total) * 100)
+            };
+        });
+        list.sort(function(a, b) { return b.wrongPct - a.wrongPct; });
+
+        return { hasData: true, questions: list, totalAttempts: attemptsWithData };
+    } catch (e) {
+        return null;
+    }
+}
+
+async function getAttendanceForAssessment(assessment) {
+    var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
+    var roster = await getRosterForClass(teacherEmail, assessment.className);
+    if (!roster) return { hasRoster: false };
+
+    var submittedNames = [];
+    try {
+        var { data, error } = await supabase
+            .from('cleverment_results')
+            .select('student_name')
+            .eq('assessment_code', assessment.code);
+        if (!error && data) {
+            submittedNames = data.map(function(r) { return (r.student_name || '').trim().toLowerCase(); });
+        }
+    } catch (e) {
+        // If this fails, still show the roster with nothing marked as submitted
+        // rather than hiding the roster entirely.
+    }
+
+    var missing = roster.filter(function(name) {
+        return submittedNames.indexOf(name.trim().toLowerCase()) === -1;
+    });
+
+    return {
+        hasRoster: true,
+        total: roster.length,
+        submittedCount: roster.length - missing.length,
+        missing: missing
+    };
+}
+
+function renderAttendanceBlock(assessment, attendance) {
+    if (!attendance.hasRoster) {
+        return '<p class="helper-text" style="margin-bottom:14px;">No roster saved for "' + assessment.className + '" - add one above to see who\'s missing.</p>';
+    }
+    var html = '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:14px;">' +
+        '<p style="margin:0 0 8px 0; font-weight:700;">Attendance: ' + attendance.submittedCount + '/' + attendance.total + ' submitted</p>';
+    if (attendance.missing.length > 0) {
+        html += '<p style="margin:0 0 4px 0; font-size:13px; color:#6b7a8f;">Haven\'t taken it yet:</p>' +
+            '<p style="margin:0; font-size:13px; color:#dc3545;">' + attendance.missing.join(', ') + '</p>';
+    } else {
+        html += '<p style="margin:0; font-size:13px; color:#2d9c5c;">Everyone on the roster has submitted.</p>';
+    }
+    html += '</div>';
+    return html;
+}
+
+async function loadTeacherAnalytics() {
+    var select = document.getElementById('teacherAnalyticsSelect');
+    var container = document.getElementById('teacherAnalyticsContainer');
+    if (!select || !container) return;
+
+    var code = select.value;
+    if (!code) {
+        container.innerHTML = '<p class="helper-text">Pick an assessment above to see its question breakdown.</p>';
+        return;
+    }
+
+    container.innerHTML = '<p class="helper-text">Loading...</p>';
+
+    var assessment = teacherAssessmentsCache.filter(function(a) { return a.code === code; })[0];
+    var attendanceHtml = '';
+    if (assessment) {
+        var attendance = await getAttendanceForAssessment(assessment);
+        attendanceHtml = renderAttendanceBlock(assessment, attendance);
+    }
+
+    var analytics = await getQuestionAnalyticsForCode(code);
+
+    if (!analytics) {
+        container.innerHTML = attendanceHtml + '<p class="helper-text">Could not load question analytics right now. Please try again.</p>';
+        renderMathIn(container);
+        return;
+    }
+
+    if (!analytics.hasData) {
+        if (analytics.totalAttempts === 0) {
+            container.innerHTML = attendanceHtml + '<p class="helper-text">No one has taken this assessment yet.</p>';
+        } else {
+            container.innerHTML = attendanceHtml + '<p class="helper-text">No detailed answer data yet for this assessment\'s attempts. New submissions from now on will build this breakdown automatically (older submissions made before this feature won\'t have it).</p>';
+        }
+        renderMathIn(container);
+        return;
+    }
+
+    var html = attendanceHtml + '<p class="helper-text" style="margin-bottom:10px;">Based on ' + analytics.totalAttempts + ' attempt(s), worst-performing questions first:</p>';
+    for (var i = 0; i < analytics.questions.length; i++) {
+        var q = analytics.questions[i];
+        var barColor = q.wrongPct >= 60 ? '#dc3545' : (q.wrongPct >= 30 ? '#e67e22' : '#2d9c5c');
+        html += '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:8px;">' +
+            '<p style="margin:0 0 6px 0;"><strong>Q' + (i + 1) + ':</strong> ' + q.question + '</p>' +
+            '<div style="display:flex; align-items:center; gap:10px;">' +
+            '<div style="flex:1; background:#eef2f6; border-radius:6px; height:8px; overflow:hidden;">' +
+            '<div style="width:' + q.wrongPct + '%; background:' + barColor + '; height:100%;"></div>' +
+            '</div>' +
+            '<span style="font-size:13px; font-weight:600; color:' + barColor + '; white-space:nowrap;">' + q.wrong + '/' + q.total + ' wrong (' + q.wrongPct + '%)</span>' +
+            '</div></div>';
+    }
+    container.innerHTML = html;
+    renderMathIn(container);
 }
 
 function copyAssessmentCode(code) {
@@ -1269,6 +1664,23 @@ function backToStudentAccess() {
     updateURL('student');
 }
 
+function getAssessmentWindowBlockMessage(assessment) {
+    var now = new Date();
+    if (assessment.availableFrom) {
+        var from = new Date(assessment.availableFrom);
+        if (!isNaN(from.getTime()) && now < from) {
+            return 'This assessment is not open yet. It becomes available on ' + formatDate(from) + '.';
+        }
+    }
+    if (assessment.availableUntil) {
+        var until = new Date(assessment.availableUntil);
+        if (!isNaN(until.getTime()) && now > until) {
+            return 'This assessment window has closed. It was available until ' + formatDate(until) + '.';
+        }
+    }
+    return null;
+}
+
 function verifyAssessmentCode() {
     var codeFromURL = getCodeFromURL();
     var code = codeFromURL || document.getElementById('assessmentCode').value.trim().toUpperCase();
@@ -1290,12 +1702,23 @@ function verifyAssessmentCode() {
                 className: found.class_name,
                 questions: found.questions,
                 timeLimit: found.time_limit,
-                shuffle: found.shuffle
+                shuffle: found.shuffle,
+                passMark: (found.pass_mark !== null && found.pass_mark !== undefined) ? found.pass_mark : 50,
+                availableFrom: found.available_from || null,
+                availableUntil: found.available_until || null
             };
             currentAssessmentCode = code;
             window.assessmentTeacherName = found.teacher_name || 'Unknown Teacher';
             window.assessmentTeacherSignature = found.teacher_signature || '';
-            
+
+            var blockMsg = getAssessmentWindowBlockMessage(currentAssessment);
+            if (blockMsg) {
+                alert(blockMsg);
+                currentAssessment = null;
+                currentAssessmentCode = '';
+                return;
+            }
+
             if (codeFromURL) {
                 document.getElementById('studentAccess').style.display = 'none';
                 showAssessmentForm();
@@ -1320,6 +1743,15 @@ function verifyAssessmentCode() {
             currentAssessmentCode = code;
             window.assessmentTeacherName = foundLocal.teacherName || 'Unknown Teacher';
             window.assessmentTeacherSignature = foundLocal.teacherSignature || '';
+
+            var blockMsgLocal = getAssessmentWindowBlockMessage(currentAssessment);
+            if (blockMsgLocal) {
+                alert(blockMsgLocal);
+                currentAssessment = null;
+                currentAssessmentCode = '';
+                return;
+            }
+
             if (codeFromURL) {
                 document.getElementById('studentAccess').style.display = 'none';
                 showAssessmentForm();
@@ -1355,6 +1787,7 @@ function saveQuizState() {
         studentClass: studentClass,
         studentSubject: studentSubject,
         studentIsTimeUp: studentIsTimeUp,
+        studentTabSwitchCount: studentTabSwitchCount,
         assessmentTeacherName: window.assessmentTeacherName || '',
         assessmentTeacherSignature: window.assessmentTeacherSignature || ''
     };
@@ -1394,6 +1827,7 @@ function restoreQuizState() {
     studentClass = state.studentClass || '';
     studentSubject = state.studentSubject || '';
     studentIsTimeUp = state.studentIsTimeUp || false;
+    studentTabSwitchCount = state.studentTabSwitchCount || 0;
     window.assessmentTeacherName = state.assessmentTeacherName || '';
     window.assessmentTeacherSignature = state.assessmentTeacherSignature || '';
 
@@ -1406,6 +1840,8 @@ function restoreQuizState() {
     document.getElementById('studentQuizSection').style.display = 'block';
     document.getElementById('studentResultsSection').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'none';
+    var tabWarningRestore = document.getElementById('studentTabSwitchWarning');
+    if (tabWarningRestore) tabWarningRestore.style.display = studentTabSwitchCount > 0 ? 'block' : 'none';
 
     document.getElementById('studentQuizTitle').textContent = studentSubject;
     document.getElementById('studentQuizDisplay').textContent = 'Student: ' + studentName + ' | Class: ' + studentClass;
@@ -1436,7 +1872,69 @@ function restoreQuizState() {
     return true;
 }
 
-function startStudentQuiz() {
+// ============================================================
+// TAB-SWITCH DETECTION (student quiz) - doesn't block or
+// auto-submit, since visibility changes can have innocent causes
+// (a notification, a phone call). Instead it counts them and
+// reports the count to the teacher alongside the result, so a
+// teacher can use their judgment rather than the app guessing.
+// ============================================================
+
+function registerTabSwitch() {
+    var quizVisible = document.getElementById('studentQuizSection') &&
+        document.getElementById('studentQuizSection').style.display === 'block';
+    if (!quizVisible || studentIsTimeUp) return;
+
+    studentTabSwitchCount++;
+    var warning = document.getElementById('studentTabSwitchWarning');
+    if (warning) warning.style.display = 'block';
+    saveQuizState();
+}
+
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) registerTabSwitch();
+});
+
+function shuffleOptionsForQuestion(q) {
+    var letters = ['A', 'B', 'C', 'D'];
+    var correctIndex = letters.indexOf(q.correctAnswer);
+    if (correctIndex === -1 || correctIndex >= q.options.length) return q;
+
+    var indices = [];
+    for (var i = 0; i < q.options.length; i++) indices.push(i);
+    for (var k = indices.length - 1; k > 0; k--) {
+        var j = Math.floor(Math.random() * (k + 1));
+        var temp = indices[k]; indices[k] = indices[j]; indices[j] = temp;
+    }
+
+    var newOptions = [];
+    var newCorrectIndex = 0;
+    for (var m = 0; m < indices.length; m++) {
+        newOptions.push(q.options[indices[m]]);
+        if (indices[m] === correctIndex) newCorrectIndex = m;
+    }
+
+    q.options = newOptions;
+    q.correctAnswer = letters[newCorrectIndex];
+    return q;
+}
+
+async function hasAlreadyAttempted(assessmentCode, nameToCheck) {
+    try {
+        var { data, error } = await supabase
+            .from('cleverment_results')
+            .select('id')
+            .eq('assessment_code', assessmentCode)
+            .ilike('student_name', nameToCheck.trim())
+            .limit(1);
+        if (error) return false; // fail open - a check error should never block a legitimate student
+        return !!(data && data.length > 0);
+    } catch (e) {
+        return false;
+    }
+}
+
+async function startStudentQuiz() {
     var nameInput = document.getElementById('studentNameInput');
     var classSelect = document.getElementById('studentClassInput');
     var customInput = document.getElementById('studentCustomClass');
@@ -1469,6 +1967,28 @@ function startStudentQuiz() {
         return;
     }
 
+    var startBtn = document.getElementById('studentStartQuizBtn');
+    if (startBtn) {
+        startBtn.disabled = true;
+        startBtn.textContent = 'Checking...';
+    }
+
+    var alreadyAttempted = await hasAlreadyAttempted(currentAssessmentCode, studentName);
+
+    if (alreadyAttempted) {
+        alert('"' + studentName + '" has already submitted this assessment (Code: ' + currentAssessmentCode + '). Each student can only take a given assessment once. If this is a mistake, please contact your teacher.');
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start Assessment';
+        }
+        return;
+    }
+
+    if (startBtn) {
+        startBtn.disabled = false;
+        startBtn.textContent = 'Start Assessment';
+    }
+
     studentSubject = currentAssessment.subject;
     studentQuestions = JSON.parse(JSON.stringify(currentAssessment.questions));
     studentTimeLimit = currentAssessment.timeLimit || 0;
@@ -1490,16 +2010,23 @@ function startStudentQuiz() {
             shuffled.push(studentQuestions[indices[m]]);
         }
         studentQuestions = shuffled;
+
+        for (var n = 0; n < studentQuestions.length; n++) {
+            studentQuestions[n] = shuffleOptionsForQuestion(studentQuestions[n]);
+        }
     }
 
     studentCurrentIndex = 0;
     studentAnswers = new Array(studentQuestions.length).fill(null);
     studentIsTimeUp = false;
+    studentTabSwitchCount = 0;
 
     document.getElementById('studentInfoForm').style.display = 'none';
     document.getElementById('studentQuizSection').style.display = 'block';
     document.getElementById('studentResultsSection').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'none';
+    var tabWarning = document.getElementById('studentTabSwitchWarning');
+    if (tabWarning) tabWarning.style.display = 'none';
 
     document.getElementById('studentQuizTitle').textContent = studentSubject;
     document.getElementById('studentQuizDisplay').textContent = 'Student: ' + studentName + ' | Class: ' + studentClass;
@@ -1760,6 +2287,7 @@ function saveResultLocal(result) {
         correctAnswers: result.correctAnswers,
         timeTaken: result.timeTaken,
         assessmentCode: result.assessmentCode,
+        tabSwitches: result.tabSwitches || 0,
         date: new Date().toLocaleString()
     });
     // Cap this local backup so it can't grow forever and eventually
@@ -1780,29 +2308,25 @@ function getAllResultsLocal() {
 }
 
 async function saveResultToDatabase(result) {
-    try {
-        var { data, error } = await supabase
-            .from('cleverment_results')
-            .insert([{
-                teacher_email: result.teacherEmail,
-                student_name: result.studentName,
-                class_name: result.className,
-                subject: result.subject,
-                score: result.score,
-                correct_answers: result.correctAnswers,
-                total_questions: result.totalQuestions,
-                time_taken: result.timeTaken,
-                assessment_code: result.assessmentCode
-            }]);
-        if (error) {
-            alert('Supabase Error: ' + error.message);
-            return false;
-        }
-        return true;
-    } catch(e) {
-        alert('Error: ' + e.message);
+    var payload = {
+        teacher_email: result.teacherEmail,
+        student_name: result.studentName,
+        class_name: result.className,
+        subject: result.subject,
+        score: result.score,
+        correct_answers: result.correctAnswers,
+        total_questions: result.totalQuestions,
+        time_taken: result.timeTaken,
+        assessment_code: result.assessmentCode,
+        tab_switches: result.tabSwitches || 0,
+        answers: result.answers || null
+    };
+    var outcome = await insertWithColumnFallback('cleverment_results', payload);
+    if (!outcome.success) {
+        alert('Supabase Error: ' + outcome.error.message);
         return false;
     }
+    return true;
 }
 
 // ============================================================
@@ -1822,6 +2346,7 @@ function normalizeResultRow(r) {
         totalQuestions: r.total_questions,
         timeTaken: r.time_taken,
         assessmentCode: r.assessment_code,
+        tabSwitches: r.tab_switches || 0,
         date: r.created_at ? new Date(r.created_at).toLocaleString() : ''
     };
 }
@@ -1851,6 +2376,9 @@ function normalizeAssessmentRow(a) {
         questions: a.questions,
         timeLimit: a.time_limit,
         shuffle: a.shuffle,
+        passMark: (a.pass_mark !== null && a.pass_mark !== undefined) ? a.pass_mark : 50,
+        availableFrom: a.available_from || null,
+        availableUntil: a.available_until || null,
         date: a.created_at ? new Date(a.created_at).toLocaleString() : ''
     };
 }
@@ -1937,7 +2465,9 @@ function studentSubmitQuiz() {
         correctAnswers: correct,
         totalQuestions: studentQuestions.length,
         timeTaken: studentTimeTaken,
-        assessmentCode: currentAssessmentCode
+        assessmentCode: currentAssessmentCode,
+        tabSwitches: studentTabSwitchCount,
+        answers: corrections
     };
 
     saveResultToDatabase(result);
@@ -1948,10 +2478,13 @@ function studentSubmitQuiz() {
     document.getElementById('studentCertificateSection').style.display = 'none';
 
     var grade = getGrade(studentScore);
+    var passMark = (currentAssessment.passMark !== null && currentAssessment.passMark !== undefined) ? currentAssessment.passMark : 50;
+    var passed = studentScore >= passMark;
 
     document.getElementById('studentScoreDisplay').innerHTML = `
         <span class="grade">${grade}</span>
         ${studentScore}% (${correct}/${studentQuestions.length})<br>
+        <span style="display:inline-block; margin-top:6px; padding:4px 14px; border-radius:20px; font-weight:700; font-size:13px; background:${passed ? '#e6f7ec' : '#fdecec'}; color:${passed ? '#1f8a4c' : '#c0392b'};">${passed ? 'PASSED' : 'NOT PASSED'} (Pass mark: ${passMark}%)</span><br>
         <span class="result-details">
             Class: ${studentClass} | Student: ${studentName} | Subject: ${studentSubject} | Time: ${studentTimeTaken}
         </span>
@@ -2560,11 +3093,25 @@ function studentResetQuiz() {
 // ============================================================
 
 var teacherResultsCache = [];
+var teacherAssessmentsCache = [];
+
+async function attachPassMarks(results) {
+    var assessments = await getAllAssessmentsFromDatabase();
+    var codeToPassMark = {};
+    for (var i = 0; i < assessments.length; i++) {
+        codeToPassMark[assessments[i].code] = (assessments[i].passMark !== null && assessments[i].passMark !== undefined) ? assessments[i].passMark : 50;
+    }
+    for (var j = 0; j < results.length; j++) {
+        results[j].passMark = codeToPassMark.hasOwnProperty(results[j].assessmentCode) ? codeToPassMark[results[j].assessmentCode] : 50;
+    }
+    return results;
+}
 
 async function renderTeacherDashboard() {
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
     var allResults = await getAllResultsFromDatabase();
     var filtered = allResults.filter(function(r) { return r.teacherEmail === teacherEmail; });
+    filtered = await attachPassMarks(filtered);
     teacherResultsCache = filtered;
 
     var classSelect = document.getElementById('teacherAdminFilterClass');
@@ -2631,7 +3178,8 @@ function applyTeacherFilters() {
     var classesSet = {};
     for (var i = 0; i < filtered.length; i++) {
         totalScore += filtered[i].score;
-        if (filtered[i].score >= 50) passed++;
+        var pm = (filtered[i].passMark !== null && filtered[i].passMark !== undefined) ? filtered[i].passMark : 50;
+        if (filtered[i].score >= pm) passed++;
         classesSet[filtered[i].className] = true;
     }
 
@@ -2648,7 +3196,7 @@ function applyTeacherFilters() {
     var tbody = document.getElementById('teacherResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -2656,7 +3204,8 @@ function applyTeacherFilters() {
     for (var j = 0; j < filtered.length; j++) {
         var item = filtered[j];
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + item.date + '</td></tr>';
+        var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + item.date + '</td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -2665,10 +3214,10 @@ function teacherExportResults() {
     var filtered = teacherResultsCache;
     if (filtered.length === 0) { alert('No results to export.'); return; }
 
-    var headers = ['Class', 'Student', 'Subject', 'Score', 'Correct', 'Total', 'Time Taken', 'Date'];
+    var headers = ['Class', 'Student', 'Subject', 'Score', 'Correct', 'Total', 'Time Taken', 'Tab Switches', 'Date'];
     var csv = headers.join(',') + '\n';
     for (var i = 0; i < filtered.length; i++) {
-        var row = ['"' + filtered[i].className + '"', '"' + filtered[i].studentName + '"', '"' + filtered[i].subject + '"', filtered[i].score, filtered[i].correctAnswers, filtered[i].totalQuestions, filtered[i].timeTaken, '"' + filtered[i].date + '"'];
+        var row = ['"' + filtered[i].className + '"', '"' + filtered[i].studentName + '"', '"' + filtered[i].subject + '"', filtered[i].score, filtered[i].correctAnswers, filtered[i].totalQuestions, filtered[i].timeTaken, filtered[i].tabSwitches || 0, '"' + filtered[i].date + '"'];
         csv += row.join(',') + '\n';
     }
     var blob = new Blob([csv], { type: 'text/csv' });
@@ -2817,9 +3366,11 @@ function applyAdminAssessmentFilter() {
     for (var i = 0; i < filtered.length; i++) {
         var a = filtered[i];
         var timeDisplay = a.timeLimit > 0 ? Math.floor(a.timeLimit / 60) + ' min' : 'No limit';
+        var avail = getAvailabilityLabel(a);
         html += '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
             '<div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span><br>' +
-            '<span style="color:#6b7a8f; font-size:12px;">Teacher: ' + a.teacherEmail + (a.date ? ' | Published: ' + a.date : '') + '</span></div>' +
+            '<span style="color:#6b7a8f; font-size:12px;">Teacher: ' + a.teacherEmail + (a.date ? ' | Published: ' + a.date : '') + '</span><br>' +
+            '<span style="color:' + avail.color + '; font-size:12px; font-weight:600;">' + avail.text + '</span></div>' +
             '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
             '<span style="background:#eef6ff; padding:4px 12px; border-radius:6px; font-weight:600; font-size:13px; color:#2d6cdf;">Code: ' + a.code + '</span>' +
             '<button onclick="adminDeleteAssessment(' + a.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#dc3545; color:white;">Delete</button>' +
@@ -2900,6 +3451,7 @@ var adminResultsCache = [];
 
 async function renderAdminResults() {
     var results = await getAllResultsFromDatabase();
+    results = await attachPassMarks(results);
     adminResultsCache = results;
 
     var teacherSelect = document.getElementById('adminResultsFilterTeacher');
@@ -2978,7 +3530,8 @@ function applyAdminFilters() {
     var teachersSet = {};
     for (var i = 0; i < filtered.length; i++) {
         totalScore += filtered[i].score;
-        if (filtered[i].score >= 50) passed++;
+        var pmAdmin = (filtered[i].passMark !== null && filtered[i].passMark !== undefined) ? filtered[i].passMark : 50;
+        if (filtered[i].score >= pmAdmin) passed++;
         teachersSet[filtered[i].teacherEmail] = true;
     }
 
@@ -2995,7 +3548,7 @@ function applyAdminFilters() {
     var tbody = document.getElementById('adminResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -3003,7 +3556,8 @@ function applyAdminFilters() {
     for (var j = 0; j < filtered.length; j++) {
         var item = filtered[j];
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.date + '</td></tr>';
+        var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + item.date + '</td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -3012,10 +3566,10 @@ function adminExportAllResults() {
     var results = adminResultsCache;
     if (results.length === 0) { alert('No results to export.'); return; }
 
-    var headers = ['Teacher', 'Class', 'Student', 'Subject', 'Score', 'Correct', 'Total', 'Date'];
+    var headers = ['Teacher', 'Class', 'Student', 'Subject', 'Score', 'Correct', 'Total', 'Tab Switches', 'Date'];
     var csv = headers.join(',') + '\n';
     for (var i = 0; i < results.length; i++) {
-        var row = ['"' + results[i].teacherEmail + '"', '"' + results[i].className + '"', '"' + results[i].studentName + '"', '"' + results[i].subject + '"', results[i].score, results[i].correctAnswers, results[i].totalQuestions, '"' + results[i].date + '"'];
+        var row = ['"' + results[i].teacherEmail + '"', '"' + results[i].className + '"', '"' + results[i].studentName + '"', '"' + results[i].subject + '"', results[i].score, results[i].correctAnswers, results[i].totalQuestions, results[i].tabSwitches || 0, '"' + results[i].date + '"'];
         csv += row.join(',') + '\n';
     }
     var blob = new Blob([csv], { type: 'text/csv' });

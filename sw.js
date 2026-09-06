@@ -8,7 +8,7 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-v3';
+var CACHE_NAME = 'cleverment-v4';
 var urlsToCache = [
     '/',
     '/index.html',
@@ -19,6 +19,7 @@ var urlsToCache = [
     'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js',
     'https://unpkg.com/@supabase/supabase-js@2',
+    'https://cdnjs.cloudflare.com/ajax/libs/bcrypt.js/2.4.3/bcrypt.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
     'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',

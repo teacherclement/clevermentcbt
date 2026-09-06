@@ -10,6 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bcrypt.js/2.4.3/bcrypt.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -93,10 +94,13 @@
             <div class="custom-class-wrapper-student" style="display:none; margin-top:8px;">
                 <input type="text" id="studentCustomClass" placeholder="Enter custom class name" class="form-input">
             </div>
-            <button onclick="startStudentQuiz()" class="primary-btn full-width">Start Assessment</button>
+            <button onclick="startStudentQuiz()" id="studentStartQuizBtn" class="primary-btn full-width">Start Assessment</button>
         </div>
 
         <div id="studentQuizSection" style="display:none;">
+            <div id="studentTabSwitchWarning" style="display:none; background:#fff4e5; border:1.5px solid #f5c98f; color:#a15c00; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:12px;">
+                ⚠ Tab/window switch detected. This is being recorded and shared with your teacher.
+            </div>
             <div class="quiz-header">
                 <div>
                     <h2 id="studentQuizTitle">Assessment</h2>
@@ -383,8 +387,21 @@
                     <option value="120">120 minutes</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label for="teacherPassMark">Pass Mark (%)</label>
+                <input type="number" id="teacherPassMark" class="form-input" min="0" max="100" value="50">
+            </div>
+            <div class="form-group">
+                <label for="teacherAvailableFrom">Available From (optional)</label>
+                <input type="datetime-local" id="teacherAvailableFrom" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="teacherAvailableUntil">Available Until (optional)</label>
+                <input type="datetime-local" id="teacherAvailableUntil" class="form-input">
+                <p class="helper-text" style="margin-top:4px;">Leave both blank for an assessment that's open any time the code is used. Times are based on your device's local time zone.</p>
+            </div>
             <div class="form-group" style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-                <label for="teacherShuffleQuestions" style="margin-bottom:0; cursor:pointer;">Shuffle Questions</label>
+                <label for="teacherShuffleQuestions" style="margin-bottom:0; cursor:pointer;">Shuffle Questions &amp; Answer Options</label>
                 <input type="checkbox" id="teacherShuffleQuestions" style="width:18px; height:18px; cursor:pointer;">
                 <span style="font-size:13px; color:#6b7a8f;">Randomize question order for each student</span>
             </div>
@@ -426,6 +443,53 @@
             <h3 style="margin-bottom:12px;">Your Published Assessments</h3>
             <div id="teacherPublishedList" class="scrollable-panel">
                 <p class="helper-text">No assessments published yet.</p>
+            </div>
+        </div>
+
+        <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-bottom:12px;">Class Roster</h3>
+            <p class="helper-text" style="margin-bottom:10px;">Save the list of students expected in a class, so you can see who hasn't taken an assessment yet.</p>
+            <div class="form-group">
+                <label for="rosterClassSelect">Class</label>
+                <select id="rosterClassSelect" class="form-input">
+                    <option value="">-- Select Class --</option>
+                    <option value="Primary 1">Primary 1</option>
+                    <option value="Primary 2">Primary 2</option>
+                    <option value="Primary 3">Primary 3</option>
+                    <option value="Primary 4">Primary 4</option>
+                    <option value="Primary 5">Primary 5</option>
+                    <option value="Primary 6">Primary 6</option>
+                    <option value="JSS 1">JSS 1</option>
+                    <option value="JSS 2">JSS 2</option>
+                    <option value="JSS 3">JSS 3</option>
+                    <option value="SSS 1">SSS 1</option>
+                    <option value="SSS 2">SSS 2</option>
+                    <option value="SSS 3">SSS 3</option>
+                    <option value="University 100">University 100 Level</option>
+                    <option value="University 200">University 200 Level</option>
+                    <option value="University 300">University 300 Level</option>
+                    <option value="University 400">University 400 Level</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="custom-class-wrapper-roster" style="display:none; margin-top:8px; margin-bottom:16px;">
+                <input type="text" id="rosterCustomClass" placeholder="Enter custom class name" class="form-input">
+            </div>
+            <div class="form-group">
+                <label for="rosterNamesTextarea">Student Names (one per line)</label>
+                <textarea id="rosterNamesTextarea" class="form-input" rows="6" placeholder="Timilehin Ajayi&#10;Olaleye Damilola&#10;Donald Alayande"></textarea>
+            </div>
+            <button onclick="saveClassRoster()" class="primary-btn full-width" style="margin-top:8px;">Save Roster</button>
+        </div>
+
+        <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-bottom:12px;">Question Analytics &amp; Attendance</h3>
+            <p class="helper-text" style="margin-bottom:10px;">See which questions students struggle with most, and who hasn't taken this assessment yet (if you've saved a roster for its class).</p>
+            <select id="teacherAnalyticsSelect" class="form-input" style="margin-bottom:12px;" onchange="loadTeacherAnalytics()">
+                <option value="">-- Select an assessment --</option>
+            </select>
+            <div id="teacherAnalyticsContainer" class="scrollable-panel">
+                <p class="helper-text">Pick an assessment above to see its question breakdown.</p>
             </div>
         </div>
 
@@ -487,12 +551,13 @@
                             <th>Score</th>
                             <th>Questions</th>
                             <th>Time Taken</th>
+                            <th>Tab Switches</th>
                             <th>Date</th>
                         </tr>
                     </thead>
                     <tbody id="teacherResultsTableBody">
                         <tr>
-                            <td colspan="8" style="text-align:center; color:#6b7a8f; padding:40px;">
+                            <td colspan="9" style="text-align:center; color:#6b7a8f; padding:40px;">
                                 No results recorded yet.
                             </td>
                         </tr>
@@ -599,12 +664,13 @@
                             <th>Subject</th>
                             <th>Score</th>
                             <th>Questions</th>
+                            <th>Tab Switches</th>
                             <th>Date</th>
                         </tr>
                     </thead>
                     <tbody id="adminResultsTableBody">
                         <tr>
-                            <td colspan="8" style="text-align:center; color:#6b7a8f; padding:40px;">
+                            <td colspan="9" style="text-align:center; color:#6b7a8f; padding:40px;">
                                 No results recorded yet.
                             </td>
                         </tr>
