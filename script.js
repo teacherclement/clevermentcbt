@@ -54,6 +54,7 @@ function showPageFromURL(page) {
             document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email;
             renderTeacherDashboard();
             renderTeacherPublishedList();
+            populateTeacherQuestionBankSelect();
             renderCSVHistory();
         } else {
             document.getElementById('teacherAuth').style.display = 'block';
@@ -746,11 +747,25 @@ async function requestPasswordReset() {
 
             var resetLink = window.location.origin + window.location.pathname + '?page=reset-password&token=' + token;
 
-            if (typeof emailjs !== 'undefined') {
+            if (typeof emailjs === 'undefined') {
+                alert('The email-sending library failed to load (check your internet connection), so no reset email could be sent. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Send Reset Link';
+                return;
+            }
+
+            try {
                 await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
                     email: teacher.email,
                     link: resetLink
                 });
+            } catch (emailError) {
+                console.error('EmailJS send failed:', emailError);
+                var emailErrMsg = (emailError && (emailError.text || emailError.message)) || 'Unknown error';
+                alert('The reset link was created, but the email could not be sent (' + emailErrMsg + '). Please try again, or contact your admin if this keeps happening.');
+                btn.disabled = false;
+                btn.textContent = 'Send Reset Link';
+                return;
             }
         }
 
@@ -758,7 +773,7 @@ async function requestPasswordReset() {
         showTeacherLoginForm();
     } catch (e) {
         console.error('Password reset request failed:', e);
-        alert('Something went wrong sending the reset email. Please try again in a moment.');
+        alert('Something went wrong: ' + (e && e.message ? e.message : 'unknown error') + '. Please try again in a moment.');
     }
 
     btn.disabled = false;
@@ -982,6 +997,7 @@ function teacherLogin() {
                 document.getElementById('teacherDashboardEmail').textContent = found.email;
                 renderTeacherDashboard();
                 renderTeacherPublishedList();
+                populateTeacherQuestionBankSelect();
                 renderCSVHistory();
                 updateURL('teacher-dashboard');
             } else {
@@ -1017,6 +1033,7 @@ function teacherLogin() {
         document.getElementById('teacherDashboardEmail').textContent = teacher.email;
         renderTeacherDashboard();
         renderTeacherPublishedList();
+        populateTeacherQuestionBankSelect();
         renderCSVHistory();
         updateURL('teacher-dashboard');
     });
@@ -1129,23 +1146,34 @@ function renderMathIn(el) {
     }
 }
 
-function getQuestionBanks() {
-    var stored = localStorage.getItem('cleverment_banks');
-    if (stored) {
-        try { return JSON.parse(stored); } catch(e) { return {}; }
+var teacherQuestionBanksCache = [];
+
+async function getQuestionBanksFromDatabase() {
+    var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
+    try {
+        var { data, error } = await supabase
+            .from('cleverment_question_banks')
+            .select('*')
+            .eq('teacher_email', teacherEmail)
+            .order('created_at', { ascending: false });
+        if (error) return [];
+        return data || [];
+    } catch (e) {
+        return [];
     }
-    return {};
 }
 
-function populateTeacherQuestionBankSelect() {
+async function populateTeacherQuestionBankSelect() {
     var select = document.getElementById('teacherQuestionBankSelect');
-    var banks = getQuestionBanks();
-    var names = Object.keys(banks);
+    if (!select) return;
+    var banks = await getQuestionBanksFromDatabase();
+    teacherQuestionBanksCache = banks;
     select.innerHTML = '<option value="">-- Select a saved question set --</option>';
-    for (var i = 0; i < names.length; i++) {
+    for (var i = 0; i < banks.length; i++) {
         var option = document.createElement('option');
-        option.value = names[i];
-        option.textContent = names[i] + ' (' + banks[names[i]].length + ' questions)';
+        option.value = banks[i].name;
+        var qCount = (banks[i].questions && banks[i].questions.length) || 0;
+        option.textContent = banks[i].name + ' (' + qCount + ' questions)';
         select.appendChild(option);
     }
 }
@@ -1157,8 +1185,8 @@ function teacherLoadFromBank() {
         alert('Please select a question bank to load.');
         return;
     }
-    var banks = getQuestionBanks();
-    var data = banks[name];
+    var bank = teacherQuestionBanksCache.filter(function(b) { return b.name === name; })[0];
+    var data = bank ? bank.questions : null;
     if (data && data.length > 0) {
         teacherQuestions = JSON.parse(JSON.stringify(data));
         alert('Loaded ' + teacherQuestions.length + ' questions from "' + name + '". You can now publish this assessment.');
@@ -1170,6 +1198,30 @@ function teacherLoadFromBank() {
         }
     } else {
         alert('No questions found in this bank.');
+    }
+}
+
+async function saveTeacherQuestionBank(name, questions) {
+    var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
+    var existing = teacherQuestionBanksCache.filter(function(b) { return b.name === name; })[0];
+
+    try {
+        if (existing) {
+            var { error: updateError } = await supabase
+                .from('cleverment_question_banks')
+                .update({ questions: questions })
+                .eq('id', existing.id);
+            if (updateError) throw updateError;
+        } else {
+            var { error: insertError } = await supabase
+                .from('cleverment_question_banks')
+                .insert([{ teacher_email: teacherEmail, name: name, questions: questions }]);
+            if (insertError) throw insertError;
+        }
+        return true;
+    } catch (e) {
+        alert('Error saving question bank: ' + e.message);
+        return false;
     }
 }
 
@@ -1185,12 +1237,12 @@ async function teacherSaveToBank() {
                     teacherQuestions = parsed;
                     var name = await showCustomPrompt('Enter a name for this question bank:', 'My Question Bank');
                     if (name && name.trim() !== '') {
-                        var banks = getQuestionBanks();
-                        banks[name.trim()] = JSON.parse(JSON.stringify(teacherQuestions));
-                        localStorage.setItem('cleverment_banks', JSON.stringify(banks));
-                        populateTeacherQuestionBankSelect();
-                        alert('Question bank "' + name.trim() + '" saved with ' + teacherQuestions.length + ' questions.');
-                        teacherQuestions = [];
+                        var saved = await saveTeacherQuestionBank(name.trim(), JSON.parse(JSON.stringify(teacherQuestions)));
+                        if (saved) {
+                            await populateTeacherQuestionBankSelect();
+                            alert('Question bank "' + name.trim() + '" saved with ' + teacherQuestions.length + ' questions.');
+                            teacherQuestions = [];
+                        }
                     }
                 } else {
                     alert('No questions found in CSV. Please check the format.');
@@ -1205,25 +1257,37 @@ async function teacherSaveToBank() {
 
     var name = await showCustomPrompt('Enter a name for this question bank:', 'My Question Bank');
     if (name && name.trim() !== '') {
-        var banks = getQuestionBanks();
-        banks[name.trim()] = JSON.parse(JSON.stringify(teacherQuestions));
-        localStorage.setItem('cleverment_banks', JSON.stringify(banks));
-        populateTeacherQuestionBankSelect();
-        alert('Question bank "' + name.trim() + '" saved with ' + teacherQuestions.length + ' questions.');
-        teacherQuestions = [];
+        var saved = await saveTeacherQuestionBank(name.trim(), JSON.parse(JSON.stringify(teacherQuestions)));
+        if (saved) {
+            await populateTeacherQuestionBankSelect();
+            alert('Question bank "' + name.trim() + '" saved with ' + teacherQuestions.length + ' questions.');
+            teacherQuestions = [];
+        }
     }
 }
 
-function teacherDeleteBank() {
+async function teacherDeleteBank() {
     var select = document.getElementById('teacherQuestionBankSelect');
     var name = select.value;
     if (!name) { alert('Please select a question bank to delete.'); return; }
-    if (confirm('Delete question bank "' + name + '"? This cannot be undone.')) {
-        var banks = getQuestionBanks();
-        delete banks[name];
-        localStorage.setItem('cleverment_banks', JSON.stringify(banks));
-        populateTeacherQuestionBankSelect();
+    if (!confirm('Delete question bank "' + name + '"? This cannot be undone.')) return;
+
+    var bank = teacherQuestionBanksCache.filter(function(b) { return b.name === name; })[0];
+    if (!bank) { alert('Could not find that question bank.'); return; }
+
+    try {
+        var { error } = await supabase
+            .from('cleverment_question_banks')
+            .delete()
+            .eq('id', bank.id);
+        if (error) {
+            alert('Error: ' + error.message);
+            return;
+        }
+        await populateTeacherQuestionBankSelect();
         alert('Question bank "' + name + '" deleted.');
+    } catch (e) {
+        alert('Error: ' + e.message);
     }
 }
 
