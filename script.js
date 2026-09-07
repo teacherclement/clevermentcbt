@@ -145,7 +145,7 @@ var supabase = supabaseClient;
 
 var EMAILJS_PUBLIC_KEY = 'TYGhhsvmb4Qa-ng08';
 var EMAILJS_SERVICE_ID = 'service_ukp1egq';
-var EMAILJS_TEMPLATE_ID = 'uf0nyrb';
+var EMAILJS_TEMPLATE_ID = 'template_q8w0apk';
 
 if (typeof emailjs !== 'undefined' && emailjs.init) {
     emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
