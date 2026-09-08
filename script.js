@@ -335,6 +335,14 @@ var studentTimeLimit = 0;
 var studentName = '';
 var preloadedImageCache = {};
 var studentTabSwitchCount = 0;
+var studentProctorStrikes = 0;
+var proctorMediaStream = null;
+var proctorFaceCheckInterval = null;
+var proctorAudioCheckInterval = null;
+var proctorAudioContext = null;
+var proctorConsecutiveNoFace = 0;
+var proctorConsecutiveLoudNoise = 0;
+var faceApiReady = false;
 var studentClass = '';
 var studentSubject = '';
 var studentIsTimeUp = false;
@@ -1395,6 +1403,8 @@ async function savePublishedAssessmentToDatabase(assessment) {
         questions: assessment.questions,
         time_limit: assessment.timeLimit,
         shuffle: assessment.shuffle,
+        camera_monitoring: assessment.cameraMonitoring || false,
+        noise_monitoring: assessment.noiseMonitoring || false,
         available_from: assessment.availableFrom,
         available_until: assessment.availableUntil,
         pass_mark: assessment.passMark
@@ -1512,6 +1522,8 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
 
     var timeLimit = parseInt(document.getElementById('teacherTimerSelect').value) * 60;
     var shuffle = document.getElementById('teacherShuffleQuestions').checked;
+    var cameraMonitoring = document.getElementById('teacherCameraMonitoring').checked;
+    var noiseMonitoring = document.getElementById('teacherNoiseMonitoring').checked;
     var passMarkRaw = parseInt(document.getElementById('teacherPassMark').value);
     var passMark = (isNaN(passMarkRaw) || passMarkRaw < 0 || passMarkRaw > 100) ? 50 : passMarkRaw;
     var availableFromRaw = document.getElementById('teacherAvailableFrom').value;
@@ -1531,6 +1543,8 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         questions: JSON.parse(JSON.stringify(teacherQuestions)),
         timeLimit: timeLimit,
         shuffle: shuffle,
+        cameraMonitoring: cameraMonitoring,
+        noiseMonitoring: noiseMonitoring,
         passMark: passMark,
         availableFrom: availableFrom,
         availableUntil: availableUntil
@@ -1556,6 +1570,8 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         questions: JSON.parse(JSON.stringify(teacherQuestions)),
         timeLimit: timeLimit,
         shuffle: shuffle,
+        cameraMonitoring: cameraMonitoring,
+        noiseMonitoring: noiseMonitoring,
         passMark: passMark,
         availableFrom: availableFrom,
         availableUntil: availableUntil,
@@ -1588,6 +1604,14 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
 // ============================================================
 // TEACHER: VIEW PUBLISHED ASSESSMENTS
 // ============================================================
+
+function getMonitoringBadge(a) {
+    if (!a.cameraMonitoring && !a.noiseMonitoring) return '';
+    var parts = [];
+    if (a.cameraMonitoring) parts.push('📷 Camera');
+    if (a.noiseMonitoring) parts.push('🎙 Noise');
+    return ' <span style="background:#fdecec; color:#dc3545; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700;">' + parts.join(' + ') + ' Monitored</span>';
+}
 
 function getAvailabilityLabel(a) {
     if (!a.availableFrom && !a.availableUntil) {
@@ -1628,7 +1652,7 @@ async function renderTeacherPublishedList() {
         var timeDisplay = a.timeLimit > 0 ? Math.floor(a.timeLimit / 60) + ' min' : 'No limit';
         var avail = getAvailabilityLabel(a);
         html += '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
-            '<div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span><br>' +
+            '<div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span>' + getMonitoringBadge(a) + '<br>' +
             '<span style="color:' + avail.color + '; font-size:12px; font-weight:600;">' + avail.text + '</span></div>' +
             '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
             '<span style="background:#eef6ff; padding:4px 12px; border-radius:6px; font-weight:600; font-size:13px; color:#2d6cdf;">Code: ' + a.code + '</span>' +
@@ -2069,6 +2093,7 @@ function showAssessmentForm() {
 function backToStudentAccess() {
     studentStopTimer();
     clearQuizState();
+    stopProctorMonitoring();
     preloadedImageCache = {};
     document.getElementById('studentAssessmentView').style.display = 'none';
     document.getElementById('studentAccess').style.display = 'block';
@@ -2115,6 +2140,8 @@ function verifyAssessmentCode() {
                 questions: found.questions,
                 timeLimit: found.time_limit,
                 shuffle: found.shuffle,
+                cameraMonitoring: found.camera_monitoring || false,
+                noiseMonitoring: found.noise_monitoring || false,
                 passMark: (found.pass_mark !== null && found.pass_mark !== undefined) ? found.pass_mark : 50,
                 availableFrom: found.available_from || null,
                 availableUntil: found.available_until || null
@@ -2200,6 +2227,7 @@ function saveQuizState() {
         studentSubject: studentSubject,
         studentIsTimeUp: studentIsTimeUp,
         studentTabSwitchCount: studentTabSwitchCount,
+        studentProctorStrikes: studentProctorStrikes,
         assessmentTeacherName: window.assessmentTeacherName || '',
         assessmentTeacherSignature: window.assessmentTeacherSignature || ''
     };
@@ -2240,6 +2268,7 @@ function restoreQuizState() {
     studentSubject = state.studentSubject || '';
     studentIsTimeUp = state.studentIsTimeUp || false;
     studentTabSwitchCount = state.studentTabSwitchCount || 0;
+    studentProctorStrikes = state.studentProctorStrikes || 0;
     window.assessmentTeacherName = state.assessmentTeacherName || '';
     window.assessmentTeacherSignature = state.assessmentTeacherSignature || '';
 
@@ -2281,6 +2310,11 @@ function restoreQuizState() {
     }
 
     updateURL('student-assessment');
+
+    if (currentAssessment.cameraMonitoring || currentAssessment.noiseMonitoring) {
+        document.getElementById('proctorResumeOverlay').style.display = 'flex';
+    }
+
     return true;
 }
 
@@ -2306,6 +2340,250 @@ function registerTabSwitch() {
 document.addEventListener('visibilitychange', function() {
     if (document.hidden) registerTabSwitch();
 });
+
+// ============================================================
+// CAMERA & NOISE MONITORING (student quiz) - optional, per
+// assessment, toggled by the teacher. Nothing is ever recorded,
+// stored, or uploaded: face detection and noise level checks run
+// live in the browser and only their pass/fail result is ever
+// used. Two warnings, then the assessment auto-submits.
+// ============================================================
+
+var FACEAPI_JS_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js';
+var FACEAPI_MODELS_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights/';
+
+function loadFaceApiIfNeeded() {
+    return new Promise(function(resolve, reject) {
+        if (faceApiReady && typeof faceapi !== 'undefined') {
+            resolve();
+            return;
+        }
+        if (typeof faceapi !== 'undefined') {
+            faceapi.nets.tinyFaceDetector.loadFromUri(FACEAPI_MODELS_URL).then(function() {
+                faceApiReady = true;
+                resolve();
+            }).catch(reject);
+            return;
+        }
+        var script = document.createElement('script');
+        script.src = FACEAPI_JS_URL;
+        script.onload = function() {
+            faceapi.nets.tinyFaceDetector.loadFromUri(FACEAPI_MODELS_URL).then(function() {
+                faceApiReady = true;
+                resolve();
+            }).catch(reject);
+        };
+        script.onerror = function() {
+            reject(new Error('Could not load the face-detection library.'));
+        };
+        document.head.appendChild(script);
+    });
+}
+
+function showProctorWarningScreen() {
+    var cam = currentAssessment.cameraMonitoring;
+    var noise = currentAssessment.noiseMonitoring;
+    var rules = document.getElementById('proctorWarningRules');
+
+    if (cam && noise) {
+        rules.textContent = 'This assessment uses your camera and microphone to check that you stay visible and in a quiet place. Keep your face in view of the camera at all times, and make sure your surroundings are quiet.';
+    } else if (cam) {
+        rules.textContent = 'This assessment uses your camera to check that you stay visible. Keep your face in view of the camera at all times.';
+    } else {
+        rules.textContent = 'This assessment uses your microphone to check that you stay in a quiet place. Make sure your surroundings are quiet.';
+    }
+
+    document.getElementById('studentInfoForm').style.display = 'none';
+    document.getElementById('proctorWarningScreen').style.display = 'block';
+    document.getElementById('proctorPermissionError').style.display = 'none';
+    var btn = document.getElementById('proctorUnderstandBtn');
+    btn.disabled = false;
+    btn.textContent = 'I UNDERSTAND, START ASSESSMENT';
+}
+
+async function dismissProctorWarningAndBegin() {
+    var btn = document.getElementById('proctorUnderstandBtn');
+    var errorBox = document.getElementById('proctorPermissionError');
+    errorBox.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Requesting access...';
+
+    var needsCamera = currentAssessment.cameraMonitoring;
+    var needsAudio = currentAssessment.noiseMonitoring;
+
+    try {
+        if (needsCamera) {
+            btn.textContent = 'Loading face detector...';
+            await loadFaceApiIfNeeded();
+        }
+
+        var constraints = {};
+        if (needsCamera) constraints.video = { width: 320, height: 240 };
+        if (needsAudio) constraints.audio = true;
+
+        btn.textContent = 'Requesting camera/mic access...';
+        proctorMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        document.getElementById('proctorWarningScreen').style.display = 'none';
+        proceedToStartQuiz();
+    } catch (e) {
+        console.error('Proctor setup failed:', e);
+        errorBox.textContent = 'Camera/microphone access is required for this assessment. Please allow access when prompted, then try again. (' + (e.message || 'Permission denied') + ')';
+        errorBox.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'I UNDERSTAND, START ASSESSMENT';
+    }
+}
+
+function startProctorMonitoring() {
+    proctorConsecutiveNoFace = 0;
+    proctorConsecutiveLoudNoise = 0;
+
+    if (currentAssessment.cameraMonitoring && proctorMediaStream) {
+        var previewVideo = document.getElementById('proctorCameraPreview');
+        previewVideo.srcObject = proctorMediaStream;
+        document.getElementById('proctorCameraPreviewBox').style.display = 'block';
+
+        proctorFaceCheckInterval = setInterval(function() {
+            runFaceCheck(previewVideo);
+        }, 3000);
+    }
+
+    if (currentAssessment.noiseMonitoring && proctorMediaStream) {
+        document.getElementById('proctorAudioIndicator').style.display = 'block';
+        try {
+            var AudioCtx = window.AudioContext || window.webkitAudioContext;
+            proctorAudioContext = new AudioCtx();
+            var source = proctorAudioContext.createMediaStreamSource(proctorMediaStream);
+            var analyser = proctorAudioContext.createAnalyser();
+            analyser.fftSize = 512;
+            source.connect(analyser);
+            var dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            proctorAudioCheckInterval = setInterval(function() {
+                analyser.getByteTimeDomainData(dataArray);
+                var sum = 0;
+                for (var i = 0; i < dataArray.length; i++) {
+                    var val = (dataArray[i] - 128) / 128;
+                    sum += val * val;
+                }
+                var rms = Math.sqrt(sum / dataArray.length);
+                if (rms > 0.12) {
+                    proctorConsecutiveLoudNoise++;
+                    if (proctorConsecutiveLoudNoise >= 3) {
+                        proctorConsecutiveLoudNoise = 0;
+                        registerProctorViolation('Excessive background noise detected.');
+                    }
+                } else {
+                    proctorConsecutiveLoudNoise = 0;
+                }
+            }, 1000);
+        } catch (e) {
+            console.error('Noise monitoring could not start:', e);
+        }
+    }
+}
+
+async function runFaceCheck(videoEl) {
+    if (!faceApiReady || !videoEl || videoEl.readyState < 2) return;
+    try {
+        var detection = await faceapi.detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions());
+        if (!detection) {
+            proctorConsecutiveNoFace++;
+            if (proctorConsecutiveNoFace >= 2) {
+                proctorConsecutiveNoFace = 0;
+                registerProctorViolation('Your face was not visible in the camera.');
+            }
+        } else {
+            proctorConsecutiveNoFace = 0;
+        }
+    } catch (e) {
+        // A single failed detection frame isn't worth acting on.
+    }
+}
+
+function registerProctorViolation(reason) {
+    var quizVisible = document.getElementById('studentQuizSection') &&
+        document.getElementById('studentQuizSection').style.display === 'block';
+    if (!quizVisible || studentIsTimeUp) return;
+
+    studentProctorStrikes++;
+    saveQuizState();
+
+    if (studentProctorStrikes >= 3) {
+        endQuizForProctorViolation();
+        return;
+    }
+
+    showProctorViolationModal(reason, studentProctorStrikes);
+}
+
+function showProctorViolationModal(reason, strikeCount) {
+    var overlay = document.getElementById('proctorViolationOverlay');
+    document.getElementById('proctorViolationReason').textContent = reason;
+    document.getElementById('proctorViolationCount').textContent = 'Warning ' + strikeCount + ' of 2. One more violation and this assessment will end automatically.';
+    overlay.style.display = 'flex';
+}
+
+function dismissProctorViolationModal() {
+    document.getElementById('proctorViolationOverlay').style.display = 'none';
+}
+
+function stopProctorMonitoring() {
+    if (proctorFaceCheckInterval) {
+        clearInterval(proctorFaceCheckInterval);
+        proctorFaceCheckInterval = null;
+    }
+    if (proctorAudioCheckInterval) {
+        clearInterval(proctorAudioCheckInterval);
+        proctorAudioCheckInterval = null;
+    }
+    if (proctorAudioContext) {
+        try { proctorAudioContext.close(); } catch (e) {}
+        proctorAudioContext = null;
+    }
+    if (proctorMediaStream) {
+        proctorMediaStream.getTracks().forEach(function(track) { track.stop(); });
+        proctorMediaStream = null;
+    }
+    var previewBox = document.getElementById('proctorCameraPreviewBox');
+    if (previewBox) previewBox.style.display = 'none';
+    var audioIndicator = document.getElementById('proctorAudioIndicator');
+    if (audioIndicator) audioIndicator.style.display = 'none';
+}
+
+function endQuizForProctorViolation() {
+    stopProctorMonitoring();
+    studentStopTimer();
+    document.getElementById('proctorViolationOverlay').style.display = 'none';
+    alert('This assessment has been ended automatically after repeated monitoring violations (camera/noise). Your answers so far will be submitted.');
+    studentSubmitQuiz();
+}
+
+async function resumeProctorMonitoringAfterRefresh() {
+    var btn = document.getElementById('proctorResumeBtn');
+    btn.disabled = true;
+    btn.textContent = 'Requesting access...';
+
+    var needsCamera = currentAssessment.cameraMonitoring;
+    var needsAudio = currentAssessment.noiseMonitoring;
+
+    try {
+        if (needsCamera) await loadFaceApiIfNeeded();
+
+        var constraints = {};
+        if (needsCamera) constraints.video = { width: 320, height: 240 };
+        if (needsAudio) constraints.audio = true;
+
+        proctorMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        document.getElementById('proctorResumeOverlay').style.display = 'none';
+        startProctorMonitoring();
+    } catch (e) {
+        alert('Camera/microphone access is required to continue this assessment. Please allow access and try again.');
+        btn.disabled = false;
+        btn.textContent = 'Resume Monitoring & Continue';
+    }
+}
 
 function shuffleOptionsForQuestion(q) {
     var letters = ['A', 'B', 'C', 'D'];
@@ -2401,6 +2679,15 @@ async function startStudentQuiz() {
         startBtn.textContent = 'Start Assessment';
     }
 
+    if (currentAssessment.cameraMonitoring || currentAssessment.noiseMonitoring) {
+        showProctorWarningScreen();
+        return;
+    }
+
+    proceedToStartQuiz();
+}
+
+function proceedToStartQuiz() {
     studentSubject = currentAssessment.subject;
     studentQuestions = JSON.parse(JSON.stringify(currentAssessment.questions));
     studentTimeLimit = currentAssessment.timeLimit || 0;
@@ -2432,6 +2719,7 @@ async function startStudentQuiz() {
     studentAnswers = new Array(studentQuestions.length).fill(null);
     studentIsTimeUp = false;
     studentTabSwitchCount = 0;
+    studentProctorStrikes = 0;
 
     document.getElementById('studentInfoForm').style.display = 'none';
     document.getElementById('studentQuizSection').style.display = 'block';
@@ -2460,6 +2748,10 @@ async function startStudentQuiz() {
     studentStartTimer();
     updateURL('student-assessment');
     saveQuizState();
+
+    if (currentAssessment.cameraMonitoring || currentAssessment.noiseMonitoring) {
+        startProctorMonitoring();
+    }
 }
 
 function studentCreateQuestionBoxes() {
@@ -2700,6 +2992,7 @@ function saveResultLocal(result) {
         timeTaken: result.timeTaken,
         assessmentCode: result.assessmentCode,
         tabSwitches: result.tabSwitches || 0,
+        proctorViolations: result.proctorViolations || 0,
         date: new Date().toLocaleString()
     });
     // Cap this local backup so it can't grow forever and eventually
@@ -2731,6 +3024,7 @@ async function saveResultToDatabase(result) {
         time_taken: result.timeTaken,
         assessment_code: result.assessmentCode,
         tab_switches: result.tabSwitches || 0,
+        proctor_violations: result.proctorViolations || 0,
         answers: result.answers || null
     };
     var outcome = await insertWithColumnFallback('cleverment_results', payload);
@@ -2759,6 +3053,7 @@ function normalizeResultRow(r) {
         timeTaken: r.time_taken,
         assessmentCode: r.assessment_code,
         tabSwitches: r.tab_switches || 0,
+        proctorViolations: r.proctor_violations || 0,
         date: r.created_at ? new Date(r.created_at).toLocaleString() : ''
     };
 }
@@ -2788,6 +3083,8 @@ function normalizeAssessmentRow(a) {
         questions: a.questions,
         timeLimit: a.time_limit,
         shuffle: a.shuffle,
+        cameraMonitoring: a.camera_monitoring || false,
+        noiseMonitoring: a.noise_monitoring || false,
         passMark: (a.pass_mark !== null && a.pass_mark !== undefined) ? a.pass_mark : 50,
         availableFrom: a.available_from || null,
         availableUntil: a.available_until || null,
@@ -2842,6 +3139,7 @@ function studentSubmitQuiz() {
     }
 
     clearQuizState();
+    stopProctorMonitoring();
 
     var correct = 0;
     var corrections = [];
@@ -2879,6 +3177,7 @@ function studentSubmitQuiz() {
         timeTaken: studentTimeTaken,
         assessmentCode: currentAssessmentCode,
         tabSwitches: studentTabSwitchCount,
+        proctorViolations: studentProctorStrikes,
         answers: corrections
     };
 
@@ -3493,6 +3792,7 @@ function studentBackToResults() {
 function studentResetQuiz() {
     studentStopTimer();
     clearQuizState();
+    stopProctorMonitoring();
     preloadedImageCache = {};
     document.getElementById('studentResultsSection').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'none';
@@ -3620,7 +3920,7 @@ function applyTeacherFilters() {
     var tbody = document.getElementById('teacherResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -3629,7 +3929,8 @@ function applyTeacherFilters() {
         var item = filtered[j];
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + item.date + '</td></tr>';
+        var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -3870,7 +4171,7 @@ function applyAdminAssessmentFilter() {
         var timeDisplay = a.timeLimit > 0 ? Math.floor(a.timeLimit / 60) + ' min' : 'No limit';
         var avail = getAvailabilityLabel(a);
         html += '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
-            '<div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span><br>' +
+            '<div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span>' + getMonitoringBadge(a) + '<br>' +
             '<span style="color:#6b7a8f; font-size:12px;">Teacher: ' + a.teacherEmail + (a.date ? ' | Published: ' + a.date : '') + '</span><br>' +
             '<span style="color:' + avail.color + '; font-size:12px; font-weight:600;">' + avail.text + '</span></div>' +
             '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
@@ -4050,7 +4351,7 @@ function applyAdminFilters() {
     var tbody = document.getElementById('adminResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -4059,7 +4360,8 @@ function applyAdminFilters() {
         var item = filtered[j];
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + item.date + '</td></tr>';
+        var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
     }
     tbody.innerHTML = html;
 }

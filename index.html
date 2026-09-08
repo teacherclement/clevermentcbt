@@ -98,9 +98,25 @@
             <button onclick="startStudentQuiz()" id="studentStartQuizBtn" class="primary-btn full-width">Start Assessment</button>
         </div>
 
+        <div id="proctorWarningScreen" style="display:none;">
+            <div style="background:#fdecec; border:2px solid #dc3545; border-radius:12px; padding:20px;">
+                <h2 style="color:#dc3545; margin-bottom:12px;">⚠ Monitoring Notice</h2>
+                <p id="proctorWarningRules" style="color:#7a1f1f; font-weight:600; margin-bottom:12px;"></p>
+                <p style="color:#7a1f1f; margin-bottom:16px;">You will be warned <strong>twice</strong> if a violation is detected. After a third violation, this assessment will end automatically and be submitted as-is.</p>
+                <div id="proctorPermissionError" style="display:none; background:#fff; border:1.5px solid #dc3545; border-radius:8px; padding:10px 12px; margin-bottom:14px; color:#dc3545; font-size:13px;"></div>
+                <button onclick="dismissProctorWarningAndBegin()" id="proctorUnderstandBtn" class="primary-btn full-width" style="background:#dc3545;">I UNDERSTAND, START ASSESSMENT</button>
+            </div>
+        </div>
+
         <div id="studentQuizSection" style="display:none;">
             <div id="studentTabSwitchWarning" style="display:none; background:#fff4e5; border:1.5px solid #f5c98f; color:#a15c00; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:12px;">
                 ⚠ Tab/window switch detected. This is being recorded and shared with your teacher.
+            </div>
+            <div id="proctorCameraPreviewBox" style="display:none; position:fixed; bottom:16px; right:16px; z-index:500; width:90px; height:68px; border-radius:8px; overflow:hidden; border:2px solid #dc3545; box-shadow:0 2px 10px rgba(0,0,0,0.3);">
+                <video id="proctorCameraPreview" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+            </div>
+            <div id="proctorAudioIndicator" style="display:none; background:#eef6ff; border:1.5px solid #2d6cdf; color:#1a4a8a; padding:6px 14px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:12px;">
+                🎙 Noise monitoring active
             </div>
             <div class="quiz-header">
                 <div>
@@ -447,6 +463,21 @@
                 <span style="font-size:13px; color:#6b7a8f;">Randomize question order for each student</span>
             </div>
 
+            <div style="background:#fff8f0; border:1.5px solid #f5c98f; border-radius:10px; padding:14px 16px; margin-bottom:16px;">
+                <p style="font-weight:600; margin-bottom:8px; color:#a15c00;">Live Monitoring (optional)</p>
+                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                    <label for="teacherCameraMonitoring" style="margin-bottom:0; cursor:pointer;">Camera Monitoring</label>
+                    <input type="checkbox" id="teacherCameraMonitoring" style="width:18px; height:18px; cursor:pointer;">
+                    <span style="font-size:13px; color:#6b7a8f;">Warns and ends the assessment if a student's face isn't visible</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <label for="teacherNoiseMonitoring" style="margin-bottom:0; cursor:pointer;">Noise Monitoring</label>
+                    <input type="checkbox" id="teacherNoiseMonitoring" style="width:18px; height:18px; cursor:pointer;">
+                    <span style="font-size:13px; color:#6b7a8f;">Warns and ends the assessment if it detects loud background noise</span>
+                </div>
+                <p class="helper-text" style="margin-top:8px;">Students will need to allow camera/microphone access to take this assessment. Nothing is ever recorded or saved - checks happen live in the browser only.</p>
+            </div>
+
             <div class="form-group">
                 <label for="teacherCertName">Teacher's Name (for Certificate)</label>
                 <input type="text" id="teacherCertName" placeholder="Enter your full name as it should appear on certificates" class="form-input">
@@ -594,12 +625,13 @@
                             <th>Questions</th>
                             <th>Time Taken</th>
                             <th>Tab Switches</th>
+                            <th>Cam/Noise Flags</th>
                             <th>Date</th>
                         </tr>
                     </thead>
                     <tbody id="teacherResultsTableBody">
                         <tr>
-                            <td colspan="9" style="text-align:center; color:#6b7a8f; padding:40px;">
+                            <td colspan="10" style="text-align:center; color:#6b7a8f; padding:40px;">
                                 No results recorded yet.
                             </td>
                         </tr>
@@ -717,12 +749,13 @@
                             <th>Score</th>
                             <th>Questions</th>
                             <th>Tab Switches</th>
+                            <th>Cam/Noise Flags</th>
                             <th>Date</th>
                         </tr>
                     </thead>
                     <tbody id="adminResultsTableBody">
                         <tr>
-                            <td colspan="9" style="text-align:center; color:#6b7a8f; padding:40px;">
+                            <td colspan="10" style="text-align:center; color:#6b7a8f; padding:40px;">
                                 No results recorded yet.
                             </td>
                         </tr>
@@ -750,6 +783,25 @@
             <button id="customPromptCancel" class="secondary-btn" style="padding:8px 18px;">Cancel</button>
             <button id="customPromptOK" class="primary-btn" style="padding:8px 18px;">OK</button>
         </div>
+    </div>
+</div>
+
+<!-- Camera/noise monitoring violation warning (strikes 1 and 2) -->
+<div id="proctorViolationOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9998; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:white; border-radius:12px; padding:24px; max-width:380px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25); border-top:5px solid #dc3545;">
+        <p style="margin:0 0 8px 0; font-weight:700; color:#dc3545; font-size:18px;">⚠ Warning</p>
+        <p id="proctorViolationReason" style="margin:0 0 10px 0; color:#1a1a2e;"></p>
+        <p id="proctorViolationCount" style="margin:0 0 18px 0; color:#6b7a8f; font-size:13px;"></p>
+        <button onclick="dismissProctorViolationModal()" class="primary-btn full-width" style="background:#dc3545;">OK, I understand</button>
+    </div>
+</div>
+
+<!-- Shown if a page refresh drops the camera/mic stream mid-assessment -->
+<div id="proctorResumeOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9998; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:white; border-radius:12px; padding:24px; max-width:380px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25); border-top:5px solid #dc3545;">
+        <p style="margin:0 0 8px 0; font-weight:700; color:#1a1a2e; font-size:18px;">Monitoring Paused</p>
+        <p style="margin:0 0 18px 0; color:#6b7a8f; font-size:14px;">Your camera/microphone access was lost (this can happen after a page refresh). Click below to resume monitoring and continue your assessment.</p>
+        <button onclick="resumeProctorMonitoringAfterRefresh()" id="proctorResumeBtn" class="primary-btn full-width" style="background:#dc3545;">Resume Monitoring &amp; Continue</button>
     </div>
 </div>
 
