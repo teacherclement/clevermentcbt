@@ -147,6 +147,14 @@ var EMAILJS_PUBLIC_KEY = 'TYGhhsvmb4Qa-ng08';
 var EMAILJS_SERVICE_ID = 'service_ukp1egq';
 var EMAILJS_TEMPLATE_ID = 'template_q8w0apk';
 
+// ============================================================
+// BACKEND API (teacher/admin auth + Flutterwave payments)
+// Everything else in this file still talks to Supabase directly.
+// ============================================================
+
+var BACKEND_URL = 'https://clevermentcbt-backend.onrender.com';
+
+
 if (typeof emailjs !== 'undefined' && emailjs.init) {
     emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
 } else {
@@ -338,7 +346,6 @@ var studentTimeTaken = '';
 var teacherQuestions = [];
 var currentTeacher = null;
 var publishedAssessments = [];
-var ADMIN_PASSWORD = 'cleverment2026';
 
 // ============================================================
 // LANDING PAGE NAVIGATION
@@ -397,6 +404,8 @@ function showTeacherLoginForm() {
     document.getElementById('teacherSignupForm').style.display = 'none';
     document.getElementById('teacherForgotPasswordForm').style.display = 'none';
     document.getElementById('teacherResetPasswordForm').style.display = 'none';
+    document.getElementById('teacherReactivateForm').style.display = 'none';
+    document.getElementById('paymentCallbackSection').style.display = 'none';
     document.getElementById('teacherAuthTabs').style.display = 'flex';
     document.getElementById('teacherLoginTab').className = 'primary-btn';
     document.getElementById('teacherSignupTab').className = 'secondary-btn';
@@ -407,6 +416,8 @@ function showTeacherSignupForm() {
     document.getElementById('teacherSignupForm').style.display = 'block';
     document.getElementById('teacherForgotPasswordForm').style.display = 'none';
     document.getElementById('teacherResetPasswordForm').style.display = 'none';
+    document.getElementById('teacherReactivateForm').style.display = 'none';
+    document.getElementById('paymentCallbackSection').style.display = 'none';
     document.getElementById('teacherAuthTabs').style.display = 'flex';
     document.getElementById('teacherLoginTab').className = 'secondary-btn';
     document.getElementById('teacherSignupTab').className = 'primary-btn';
@@ -416,8 +427,123 @@ function showForgotPasswordForm() {
     document.getElementById('teacherLoginForm').style.display = 'none';
     document.getElementById('teacherSignupForm').style.display = 'none';
     document.getElementById('teacherResetPasswordForm').style.display = 'none';
+    document.getElementById('teacherReactivateForm').style.display = 'none';
+    document.getElementById('paymentCallbackSection').style.display = 'none';
     document.getElementById('teacherForgotPasswordForm').style.display = 'block';
     document.getElementById('teacherAuthTabs').style.display = 'none';
+}
+
+var pendingReactivationEmail = null;
+
+async function showReactivationForm() {
+    document.getElementById('teacherLoginForm').style.display = 'none';
+    document.getElementById('teacherSignupForm').style.display = 'none';
+    document.getElementById('teacherForgotPasswordForm').style.display = 'none';
+    document.getElementById('teacherResetPasswordForm').style.display = 'none';
+    document.getElementById('paymentCallbackSection').style.display = 'none';
+    document.getElementById('teacherReactivateForm').style.display = 'block';
+    document.getElementById('teacherAuthTabs').style.display = 'none';
+
+    try {
+        var { data } = await supabase
+            .from('cleverment_settings')
+            .select('value')
+            .eq('key', 'reactivation_fee')
+            .maybeSingle();
+        var fee = data && data.value ? Number(data.value) : 2500;
+        document.getElementById('reactivateFeeDisplay').textContent = '₦' + fee.toLocaleString();
+    } catch (e) {
+        // Leave the default ₦2,500 shown if this lookup fails.
+    }
+}
+
+async function startReactivationPayment() {
+    var token = localStorage.getItem('cleverment_teacher_token');
+    if (!token) {
+        alert('Please log in again to reactivate your account.');
+        showTeacherLoginForm();
+        return;
+    }
+
+    var btn = document.getElementById('teacherReactivateBtn');
+    btn.disabled = true;
+    btn.textContent = 'Preparing payment...';
+
+    try {
+        var res = await fetch(BACKEND_URL + '/api/payment/initiate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
+            }
+        });
+        var data = await res.json();
+
+        if (!res.ok) {
+            alert(data.error || 'Could not start payment. Please try again.');
+            btn.disabled = false;
+            btn.textContent = 'Pay Now to Reactivate';
+            return;
+        }
+
+        window.location.href = data.link;
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection and try again.');
+        btn.disabled = false;
+        btn.textContent = 'Pay Now to Reactivate';
+    }
+}
+
+async function checkForPaymentCallback() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('page') !== 'payment-callback') return false;
+
+    document.getElementById('landingPage').style.display = 'none';
+    document.getElementById('teacherAuth').style.display = 'block';
+    document.getElementById('teacherLoginForm').style.display = 'none';
+    document.getElementById('teacherSignupForm').style.display = 'none';
+    document.getElementById('teacherForgotPasswordForm').style.display = 'none';
+    document.getElementById('teacherResetPasswordForm').style.display = 'none';
+    document.getElementById('teacherReactivateForm').style.display = 'none';
+    document.getElementById('teacherAuthTabs').style.display = 'none';
+    document.getElementById('paymentCallbackSection').style.display = 'block';
+
+    var titleEl = document.getElementById('paymentCallbackTitle');
+    var msgEl = document.getElementById('paymentCallbackMessage');
+    var backBtn = document.getElementById('paymentCallbackBackBtn');
+
+    var status = params.get('status');
+    var transactionId = params.get('transaction_id');
+
+    if (status !== 'successful' || !transactionId) {
+        titleEl.textContent = 'Payment Not Completed';
+        msgEl.textContent = 'It looks like the payment was cancelled or did not go through. You can try again from the login screen.';
+        backBtn.style.display = 'block';
+        return true;
+    }
+
+    try {
+        var res = await fetch(BACKEND_URL + '/api/payment/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transactionId: transactionId })
+        });
+        var data = await res.json();
+
+        if (res.ok && data.success) {
+            titleEl.textContent = 'Payment Successful!';
+            msgEl.textContent = 'Your account has been reactivated. You can now log in as usual.';
+        } else {
+            titleEl.textContent = 'Could Not Verify Payment';
+            msgEl.textContent = (data.error || 'Something went wrong verifying your payment.') + ' If you were charged, please contact support.';
+        }
+    } catch (e) {
+        titleEl.textContent = 'Could Not Verify Payment';
+        msgEl.textContent = 'Could not reach the server to verify your payment. If you were charged, please try refreshing this page in a moment.';
+    }
+
+    backBtn.style.display = 'block';
+    return true;
 }
 
 // ============================================================
@@ -600,17 +726,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     }
 
-    checkForPasswordResetToken().then(function(handled) {
-        if (handled) return;
+    checkForPaymentCallback().then(function(paymentHandled) {
+        if (paymentHandled) return;
 
-        var quizWasRestored = restoreQuizState();
+        checkForPasswordResetToken().then(function(handled) {
+            if (handled) return;
 
-        if (!quizWasRestored) {
-            var page = getPageFromURL();
-            if (page) {
-                showPageFromURL(page);
+            var quizWasRestored = restoreQuizState();
+
+            if (!quizWasRestored) {
+                var page = getPageFromURL();
+                if (page) {
+                    showPageFromURL(page);
+                }
             }
-        }
+        });
     });
 });
 
@@ -632,60 +762,12 @@ document.addEventListener('keydown', function(e) {
 // ============================================================
 // TEACHER AUTHENTICATION
 // ============================================================
-
+// Signup, login, password reset, and admin login all now go
+// through the backend server (see BACKEND_URL above), which
+// handles password hashing and issues a session token. This
+// replaced the old client-side bcrypt setup entirely - nothing
+// password-related happens in the browser anymore.
 // ============================================================
-// PASSWORD HASHING (bcrypt) - teacher passwords used to be
-// stored in plain text in the "password_hash" column despite its
-// name. New signups are hashed properly. Existing accounts are
-// migrated automatically and silently the next time that teacher
-// logs in successfully, using the password they just typed in
-// (which is discarded afterward) - no manual migration needed.
-// ============================================================
-
-function getBcryptLib() {
-    return (window.dcodeIO && window.dcodeIO.bcrypt) || window.bcrypt || null;
-}
-
-function isBcryptHash(value) {
-    return typeof value === 'string' && /^\$2[aby]?\$\d{2}\$/.test(value);
-}
-
-function hashPassword(plainPassword) {
-    var bcryptLib = getBcryptLib();
-    if (!bcryptLib) {
-        console.error('bcrypt library failed to load - storing password unhashed as a last resort.');
-        return plainPassword;
-    }
-    var salt = bcryptLib.genSaltSync(10);
-    return bcryptLib.hashSync(plainPassword, salt);
-}
-
-function verifyPassword(plainPassword, storedValue) {
-    if (isBcryptHash(storedValue)) {
-        var bcryptLib = getBcryptLib();
-        if (!bcryptLib) return false;
-        try {
-            return bcryptLib.compareSync(plainPassword, storedValue);
-        } catch (e) {
-            return false;
-        }
-    }
-    // Legacy account: storedValue is still the old plain-text password.
-    return storedValue === plainPassword;
-}
-
-async function migrateTeacherPasswordIfNeeded(teacherId, plainPassword, currentStoredValue) {
-    if (isBcryptHash(currentStoredValue)) return;
-    try {
-        var newHash = hashPassword(plainPassword);
-        await supabase
-            .from('cleverment_teachers')
-            .update({ password_hash: newHash })
-            .eq('id', teacherId);
-    } catch (e) {
-        // Non-critical - it'll just try again on their next login.
-    }
-}
 
 // ============================================================
 // FORGOT PASSWORD (teachers) - generates a random, time-limited
@@ -721,31 +803,25 @@ async function requestPasswordReset() {
     btn.textContent = 'Sending...';
 
     try {
-        var teachers = await getAllTeachersFromDatabase();
-        var teacher = teachers.filter(function(t) { return t.email.toLowerCase() === email; })[0];
+        var res = await fetch(BACKEND_URL + '/api/auth/teacher/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+        var data = await res.json();
 
-        // Always show the same message whether or not the email exists,
-        // so this can't be used to check which emails have accounts.
-        if (teacher) {
-            var token = generateResetToken();
-            var expiry = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour from now
+        if (!res.ok) {
+            alert(data.error || 'Something went wrong. Please try again.');
+            btn.disabled = false;
+            btn.textContent = 'Send Reset Link';
+            return;
+        }
 
-            var { error: updateError } = await supabase
-                .from('cleverment_teachers')
-                .update({ reset_token: token, reset_token_expiry: expiry })
-                .eq('id', teacher.id);
-
-            if (updateError) {
-                if (/column .*does not exist/i.test(updateError.message || '')) {
-                    alert('Password reset isn\'t set up yet on the database side. Please contact your admin.');
-                    btn.disabled = false;
-                    btn.textContent = 'Send Reset Link';
-                    return;
-                }
-                throw updateError;
-            }
-
-            var resetLink = window.location.origin + window.location.pathname + '?page=reset-password&token=' + token;
+        // The backend only includes resetToken/email when an account
+        // actually exists - if it doesn't, we still show the same
+        // generic success message below either way.
+        if (data.resetToken) {
+            var resetLink = window.location.origin + window.location.pathname + '?page=reset-password&token=' + data.resetToken;
 
             if (typeof emailjs === 'undefined') {
                 alert('The email-sending library failed to load (check your internet connection), so no reset email could be sent. Please try again.');
@@ -756,7 +832,7 @@ async function requestPasswordReset() {
 
             try {
                 await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-                    email: teacher.email,
+                    email: data.email,
                     link: resetLink
                 });
             } catch (emailError) {
@@ -773,14 +849,14 @@ async function requestPasswordReset() {
         showTeacherLoginForm();
     } catch (e) {
         console.error('Password reset request failed:', e);
-        alert('Something went wrong: ' + (e && e.message ? e.message : 'unknown error') + '. Please try again in a moment.');
+        alert('Could not reach the server. Please check your connection and try again.');
     }
 
     btn.disabled = false;
     btn.textContent = 'Send Reset Link';
 }
 
-var pendingResetTeacherId = null;
+var pendingResetToken = null;
 
 async function checkForPasswordResetToken() {
     var params = new URLSearchParams(window.location.search);
@@ -792,29 +868,12 @@ async function checkForPasswordResetToken() {
     document.getElementById('teacherLoginForm').style.display = 'none';
     document.getElementById('teacherSignupForm').style.display = 'none';
     document.getElementById('teacherForgotPasswordForm').style.display = 'none';
+    document.getElementById('teacherReactivateForm').style.display = 'none';
+    document.getElementById('paymentCallbackSection').style.display = 'none';
     document.getElementById('teacherAuthTabs').style.display = 'none';
 
-    var resetSection = document.getElementById('teacherResetPasswordForm');
-
-    try {
-        var teachers = await getAllTeachersFromDatabase();
-        var teacher = teachers.filter(function(t) {
-            return t.reset_token === token && t.reset_token_expiry && new Date(t.reset_token_expiry) > new Date();
-        })[0];
-
-        if (!teacher) {
-            resetSection.innerHTML = '<h2>Reset Link Invalid</h2><p class="helper-text">This reset link is invalid or has expired. Please request a new one.</p><button onclick="showPageFromURL(\'teacher\')" class="primary-btn full-width" style="margin-top:12px;">Back to Login</button>';
-            resetSection.style.display = 'block';
-            return true;
-        }
-
-        pendingResetTeacherId = teacher.id;
-        resetSection.style.display = 'block';
-    } catch (e) {
-        resetSection.innerHTML = '<p class="helper-text">Could not verify this reset link right now. Please try again shortly.</p>';
-        resetSection.style.display = 'block';
-    }
-
+    pendingResetToken = token;
+    document.getElementById('teacherResetPasswordForm').style.display = 'block';
     return true;
 }
 
@@ -823,12 +882,12 @@ async function submitNewPassword() {
     var confirmPass = document.getElementById('teacherNewPasswordConfirm').value;
     var btn = document.getElementById('teacherResetSubmitBtn');
 
-    if (!pendingResetTeacherId) {
+    if (!pendingResetToken) {
         alert('This reset link is no longer valid. Please request a new one.');
         return;
     }
-    if (!pass || pass.length < 4) {
-        alert('Please enter a password (at least 4 characters).');
+    if (!pass || pass.length < 6) {
+        alert('Please enter a password (at least 6 characters).');
         return;
     }
     if (pass !== confirmPass) {
@@ -840,25 +899,28 @@ async function submitNewPassword() {
     btn.textContent = 'Saving...';
 
     try {
-        var newHash = hashPassword(pass);
-        var { error } = await supabase
-            .from('cleverment_teachers')
-            .update({ password_hash: newHash, reset_token: null, reset_token_expiry: null })
-            .eq('id', pendingResetTeacherId);
+        var res = await fetch(BACKEND_URL + '/api/auth/teacher/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: pendingResetToken, newPassword: pass })
+        });
+        var data = await res.json();
 
-        if (error) {
-            alert('Supabase Error: ' + error.message);
+        if (!res.ok) {
+            alert(data.error || 'Could not reset your password. Please request a new link.');
             btn.disabled = false;
             btn.textContent = 'Set New Password';
             return;
         }
 
         alert('Password updated! You can now log in with your new password.');
-        pendingResetTeacherId = null;
+        pendingResetToken = null;
         updateURL('teacher');
         showPageFromURL('teacher');
     } catch (e) {
-        alert('Error: ' + e.message);
+        alert('Could not reach the server. Please check your connection and try again.');
+        btn.disabled = false;
+        btn.textContent = 'Set New Password';
         btn.disabled = false;
         btn.textContent = 'Set New Password';
     }
@@ -874,26 +936,6 @@ function getTeachersLocal() {
 
 function saveTeachersLocal(teachers) {
     localStorage.setItem('cleverment_teachers', JSON.stringify(teachers));
-}
-
-async function saveTeacherToDatabase(teacher) {
-    try {
-        var { data, error } = await supabase
-            .from('cleverment_teachers')
-            .insert([{
-                name: teacher.name,
-                email: teacher.email,
-                password_hash: hashPassword(teacher.password)
-            }]);
-        if (error) {
-            alert('Supabase Error: ' + error.message);
-            return false;
-        }
-        return true;
-    } catch(e) {
-        alert('Error: ' + e.message);
-        return false;
-    }
 }
 
 async function getTeacherFromDatabase(email) {
@@ -919,7 +961,7 @@ async function getAllTeachersFromDatabase() {
     } catch(e) { return []; }
 }
 
-function teacherSignup() {
+async function teacherSignup() {
     var name = document.getElementById('teacherSignupName').value.trim();
     var email = document.getElementById('teacherSignupEmail').value.trim();
     var password = document.getElementById('teacherSignupPassword').value;
@@ -930,45 +972,35 @@ function teacherSignup() {
     if (password.length < 6) { alert('Password must be at least 6 characters.'); return; }
     if (password !== confirm) { alert('Passwords do not match.'); return; }
 
-    getTeacherFromDatabase(email).then(function(existing) {
-        if (existing) {
-            alert('A teacher with this email already exists. Please login.');
+    try {
+        var res = await fetch(BACKEND_URL + '/api/auth/teacher/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, email: email, password: password })
+        });
+        var data = await res.json();
+
+        if (!res.ok) {
+            alert(data.error || 'Could not create your account. Please try again.');
             return;
         }
 
-        var teacher = {
-            name: name,
-            email: email,
-            password: password
-        };
+        alert('Account created successfully! You can now login.');
+        logTeacherActivity(email, 'signup', 'Teacher account created');
 
-        saveTeacherToDatabase(teacher).then(function(success) {
-            if (success) {
-                alert('Account created successfully! You can now login.');
-                logTeacherActivity(email, 'signup', 'Teacher account created');
-                var teachers = getTeachersLocal();
-                teachers.push({
-                    id: Date.now(),
-                    name: name,
-                    email: email,
-                    password: hashPassword(password),
-                    date: new Date().toLocaleString()
-                });
-                saveTeachersLocal(teachers);
-                
-                showTeacherLoginForm();
-                document.getElementById('teacherLoginEmail').value = email;
-                document.getElementById('teacherLoginPassword').value = '';
-                document.getElementById('teacherSignupName').value = '';
-                document.getElementById('teacherSignupEmail').value = '';
-                document.getElementById('teacherSignupPassword').value = '';
-                document.getElementById('teacherSignupConfirm').value = '';
-            }
-        });
-    });
+        showTeacherLoginForm();
+        document.getElementById('teacherLoginEmail').value = email;
+        document.getElementById('teacherLoginPassword').value = '';
+        document.getElementById('teacherSignupName').value = '';
+        document.getElementById('teacherSignupEmail').value = '';
+        document.getElementById('teacherSignupPassword').value = '';
+        document.getElementById('teacherSignupConfirm').value = '';
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection and try again (the server may take up to a minute to wake up if it has been idle).');
+    }
 }
 
-function teacherLogin() {
+async function teacherLogin() {
     var email = document.getElementById('teacherLoginEmail').value.trim();
     var password = document.getElementById('teacherLoginPassword').value;
 
@@ -977,71 +1009,55 @@ function teacherLogin() {
         return;
     }
 
-    getTeacherFromDatabase(email).then(function(teacher) {
-        if (!teacher) {
-            var teachers = getTeachersLocal();
-            var found = null;
-            for (var i = 0; i < teachers.length; i++) {
-                if (teachers[i].email === email && verifyPassword(password, teachers[i].password)) {
-                    found = teachers[i];
-                    break;
-                }
-            }
-            if (found) {
-                currentTeacher = found;
-                localStorage.setItem('cleverment_teacher_session', JSON.stringify(currentTeacher));
-                logTeacherActivity(email, 'login', 'Teacher logged in (local backup)');
-                document.getElementById('teacherAuth').style.display = 'none';
-                document.getElementById('teacherDashboard').style.display = 'block';
-                document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + found.name + '!';
-                document.getElementById('teacherDashboardEmail').textContent = found.email;
-                renderTeacherDashboard();
-                renderTeacherPublishedList();
-                populateTeacherQuestionBankSelect();
-                renderCSVHistory();
-                updateURL('teacher-dashboard');
-            } else {
-                alert('Invalid email or password. Please try again.');
-            }
+    var loginBtn = document.querySelector('#teacherLoginForm button.primary-btn');
+    if (loginBtn) loginBtn.textContent = 'Logging in...';
+
+    try {
+        var res = await fetch(BACKEND_URL + '/api/auth/teacher/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: password })
+        });
+        var data = await res.json();
+
+        if (!res.ok) {
+            alert(data.error || 'Invalid email or password.');
             return;
         }
 
-        if (teacher.paused === true) {
-            alert('Your account has been paused. Please contact the admin on Whatsapp: +2349069959358 to reactivate. YOU MAY NEED TO PAY A TOKEN OF ₦2,500');
+        if (data.paused) {
+            localStorage.setItem('cleverment_teacher_token', data.token);
+            pendingReactivationEmail = email;
+            showReactivationForm();
             return;
         }
 
-        if (!verifyPassword(password, teacher.password_hash)) {
-            alert('Invalid email or password. Please try again.');
-            return;
-        }
-
-        migrateTeacherPasswordIfNeeded(teacher.id, password, teacher.password_hash);
-
-        currentTeacher = {
-            id: teacher.id,
-            name: teacher.name,
-            email: teacher.email
-        };
+        currentTeacher = data.teacher;
         localStorage.setItem('cleverment_teacher_session', JSON.stringify(currentTeacher));
+        localStorage.setItem('cleverment_teacher_token', data.token);
 
         logTeacherActivity(email, 'login', 'Teacher logged in');
 
         document.getElementById('teacherAuth').style.display = 'none';
         document.getElementById('teacherDashboard').style.display = 'block';
-        document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + teacher.name + '!';
-        document.getElementById('teacherDashboardEmail').textContent = teacher.email;
+        document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + currentTeacher.name + '!';
+        document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email;
         renderTeacherDashboard();
         renderTeacherPublishedList();
         populateTeacherQuestionBankSelect();
         renderCSVHistory();
         updateURL('teacher-dashboard');
-    });
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection and try again (the server may take up to a minute to wake up if it has been idle).');
+    } finally {
+        if (loginBtn) loginBtn.textContent = 'Login';
+    }
 }
 
 function teacherLogout() {
     currentTeacher = null;
     localStorage.removeItem('cleverment_teacher_session');
+    localStorage.removeItem('cleverment_teacher_token');
     document.getElementById('teacherDashboard').style.display = 'none';
     document.getElementById('teacherAuth').style.display = 'block';
     showTeacherLoginForm();
@@ -3665,21 +3681,45 @@ async function teacherClearResults() {
 // ADMIN FUNCTIONS
 // ============================================================
 
-function adminLogin() {
+async function adminLogin() {
     var password = document.getElementById('adminPassword').value;
-    if (password === ADMIN_PASSWORD) {
+    if (!password) {
+        alert('Please enter the admin password.');
+        return;
+    }
+
+    var loginBtn = document.querySelector('#adminAuth button.primary-btn');
+    if (loginBtn) loginBtn.textContent = 'Logging in...';
+
+    try {
+        var res = await fetch(BACKEND_URL + '/api/auth/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: password })
+        });
+        var data = await res.json();
+
+        if (!res.ok) {
+            alert(data.error || 'Incorrect admin password.');
+            return;
+        }
+
         localStorage.setItem('cleverment_admin_session', 'true');
+        localStorage.setItem('cleverment_admin_token', data.token);
         document.getElementById('adminAuth').style.display = 'none';
         document.getElementById('adminDashboard').style.display = 'block';
         renderAdminDashboard();
         updateURL('admin-dashboard');
-    } else {
-        alert('Invalid admin password.');
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection and try again (the server may take up to a minute to wake up if it has been idle).');
+    } finally {
+        if (loginBtn) loginBtn.textContent = 'Login';
     }
 }
 
 function adminLogout() {
     localStorage.removeItem('cleverment_admin_session');
+    localStorage.removeItem('cleverment_admin_token');
     document.getElementById('adminDashboard').style.display = 'none';
     document.getElementById('adminAuth').style.display = 'block';
     document.getElementById('adminPassword').value = '';
@@ -3687,11 +3727,65 @@ function adminLogout() {
 }
 
 async function renderAdminDashboard() {
+    renderAdminReactivationFee();
     renderAdminTeacherList();
     renderAdminAssessmentList();
     renderAdminResults();
     renderAdminActivityLog();
     renderAdminFileList();
+}
+
+async function renderAdminReactivationFee() {
+    var input = document.getElementById('adminReactivationFeeInput');
+    if (!input) return;
+    try {
+        var { data } = await supabase
+            .from('cleverment_settings')
+            .select('value')
+            .eq('key', 'reactivation_fee')
+            .maybeSingle();
+        input.value = data && data.value ? data.value : 2500;
+    } catch (e) {
+        input.value = 2500;
+    }
+}
+
+async function saveReactivationFee() {
+    var input = document.getElementById('adminReactivationFeeInput');
+    var fee = parseInt(input.value, 10);
+    if (isNaN(fee) || fee < 0) {
+        alert('Please enter a valid amount.');
+        return;
+    }
+    try {
+        var { data: existing } = await supabase
+            .from('cleverment_settings')
+            .select('key')
+            .eq('key', 'reactivation_fee')
+            .maybeSingle();
+
+        var error;
+        if (existing) {
+            var res = await supabase
+                .from('cleverment_settings')
+                .update({ value: String(fee) })
+                .eq('key', 'reactivation_fee');
+            error = res.error;
+        } else {
+            var res2 = await supabase
+                .from('cleverment_settings')
+                .insert([{ key: 'reactivation_fee', value: String(fee) }]);
+            error = res2.error;
+        }
+
+        if (error) {
+            alert('Error: ' + error.message);
+            return;
+        }
+        alert('Reactivation fee updated to ₦' + fee.toLocaleString() + '.');
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
 }
 
 async function renderAdminTeacherList() {

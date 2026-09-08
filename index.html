@@ -11,7 +11,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bcryptjs/2.4.3/bcrypt.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -298,6 +297,19 @@
                 <input type="password" id="teacherNewPasswordConfirm" placeholder="Re-enter the new password" class="form-input">
             </div>
             <button onclick="submitNewPassword()" id="teacherResetSubmitBtn" class="primary-btn full-width">Set New Password</button>
+        </div>
+        <div id="teacherReactivateForm" style="display:none;">
+            <h2>Account Paused</h2>
+            <p class="helper-text" style="margin-bottom:14px;">Your account has been paused. Pay <strong id="reactivateFeeDisplay">₦2,500</strong> to reactivate it instantly.</p>
+            <button onclick="startReactivationPayment()" id="teacherReactivateBtn" class="primary-btn full-width" style="background:#2d9c5c;">Pay Now to Reactivate</button>
+            <p class="helper-text" style="margin-top:8px; text-align:center;">
+                <a href="#" onclick="showTeacherLoginForm(); return false;" style="color:#2d6cdf; text-decoration:none; font-weight:600;">← Back to Login</a>
+            </p>
+        </div>
+        <div id="paymentCallbackSection" style="display:none;">
+            <h2 id="paymentCallbackTitle">Checking your payment...</h2>
+            <p class="helper-text" id="paymentCallbackMessage">Please wait a moment.</p>
+            <button onclick="showPageFromURL('teacher')" id="paymentCallbackBackBtn" class="primary-btn full-width" style="display:none; margin-top:12px;">Back to Login</button>
         </div>
         <div id="teacherSignupForm" style="display:none;">
             <h2>Create Teacher Account</h2>
@@ -615,6 +627,16 @@
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
             <h2>Admin Dashboard</h2>
             <button onclick="adminLogout()" class="secondary-btn" style="font-size:13px; padding:6px 16px;">Logout</button>
+        </div>
+
+        <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
+            <h3 style="margin-bottom:12px;">Account Reactivation Fee</h3>
+            <p class="helper-text" style="margin-bottom:10px;">This is the amount a paused teacher is charged via Flutterwave to reactivate their own account.</p>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <span style="font-weight:600;">₦</span>
+                <input type="number" id="adminReactivationFeeInput" class="form-input" style="max-width:160px;" min="0" placeholder="2500">
+                <button onclick="saveReactivationFee()" class="primary-btn" style="padding:10px 20px;">Save</button>
+            </div>
         </div>
 
         <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
