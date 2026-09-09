@@ -333,6 +333,7 @@ var studentTimerInterval = null;
 var studentTimeRemaining = 0;
 var studentTimeLimit = 0;
 var studentName = '';
+var studentAdmissionNumber = '';
 var preloadedImageCache = {};
 var studentTabSwitchCount = 0;
 var studentProctorStrikes = 0;
@@ -343,6 +344,7 @@ var proctorAudioContext = null;
 var proctorConsecutiveNoFace = 0;
 var proctorConsecutiveLoudNoise = 0;
 var faceApiReady = false;
+var studentEndReason = 'normal';
 var studentClass = '';
 var studentSubject = '';
 var studentIsTimeUp = false;
@@ -582,21 +584,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (e) {
             currentTeacher = null;
         }
-    }
-
-    var classSelect = document.getElementById('studentClassInput');
-    var customWrapper = document.querySelector('.custom-class-wrapper-student');
-    var customInput = document.getElementById('studentCustomClass');
-    if (classSelect) {
-        classSelect.addEventListener('change', function() {
-            if (this.value === 'Other') {
-                customWrapper.style.display = 'block';
-                customInput.focus();
-            } else {
-                customWrapper.style.display = 'none';
-                customInput.value = '';
-            }
-        });
     }
 
     var teacherClassSelect = document.getElementById('teacherClassSelect');
@@ -1405,6 +1392,7 @@ async function savePublishedAssessmentToDatabase(assessment) {
         shuffle: assessment.shuffle,
         camera_monitoring: assessment.cameraMonitoring || false,
         noise_monitoring: assessment.noiseMonitoring || false,
+        show_results: assessment.showResults !== false,
         available_from: assessment.availableFrom,
         available_until: assessment.availableUntil,
         pass_mark: assessment.passMark
@@ -1524,6 +1512,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
     var shuffle = document.getElementById('teacherShuffleQuestions').checked;
     var cameraMonitoring = document.getElementById('teacherCameraMonitoring').checked;
     var noiseMonitoring = document.getElementById('teacherNoiseMonitoring').checked;
+    var showResults = document.getElementById('teacherShowResults').checked;
     var passMarkRaw = parseInt(document.getElementById('teacherPassMark').value);
     var passMark = (isNaN(passMarkRaw) || passMarkRaw < 0 || passMarkRaw > 100) ? 50 : passMarkRaw;
     var availableFromRaw = document.getElementById('teacherAvailableFrom').value;
@@ -1545,6 +1534,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         shuffle: shuffle,
         cameraMonitoring: cameraMonitoring,
         noiseMonitoring: noiseMonitoring,
+        showResults: showResults,
         passMark: passMark,
         availableFrom: availableFrom,
         availableUntil: availableUntil
@@ -1572,6 +1562,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         shuffle: shuffle,
         cameraMonitoring: cameraMonitoring,
         noiseMonitoring: noiseMonitoring,
+        showResults: showResults,
         passMark: passMark,
         availableFrom: availableFrom,
         availableUntil: availableUntil,
@@ -2085,7 +2076,7 @@ function showAssessmentForm() {
     document.getElementById('studentAssessmentTitle').textContent = 'Assessment: ' + currentAssessment.subject;
     document.getElementById('studentAssessmentSubject').textContent = 'Class: ' + currentAssessment.className + ' | ' + currentAssessment.questions.length + ' questions';
     document.getElementById('studentNameInput').value = '';
-    document.getElementById('studentClassInput').value = '';
+    document.getElementById('studentAdmissionNumber').value = '';
     document.getElementById('studentNameInput').focus();
     updateURL('student-assessment');
 }
@@ -2142,6 +2133,7 @@ function verifyAssessmentCode() {
                 shuffle: found.shuffle,
                 cameraMonitoring: found.camera_monitoring || false,
                 noiseMonitoring: found.noise_monitoring || false,
+                showResults: found.show_results !== false,
                 passMark: (found.pass_mark !== null && found.pass_mark !== undefined) ? found.pass_mark : 50,
                 availableFrom: found.available_from || null,
                 availableUntil: found.available_until || null
@@ -2223,6 +2215,7 @@ function saveQuizState() {
         studentTimeRemaining: studentTimeRemaining,
         studentTimeLimit: studentTimeLimit,
         studentName: studentName,
+        studentAdmissionNumber: studentAdmissionNumber,
         studentClass: studentClass,
         studentSubject: studentSubject,
         studentIsTimeUp: studentIsTimeUp,
@@ -2264,6 +2257,7 @@ function restoreQuizState() {
     studentTimeRemaining = state.studentTimeRemaining || 0;
     studentTimeLimit = state.studentTimeLimit || 0;
     studentName = state.studentName || '';
+    studentAdmissionNumber = state.studentAdmissionNumber || '';
     studentClass = state.studentClass || '';
     studentSubject = state.studentSubject || '';
     studentIsTimeUp = state.studentIsTimeUp || false;
@@ -2487,10 +2481,18 @@ function startProctorMonitoring() {
 async function runFaceCheck(videoEl) {
     if (!faceApiReady || !videoEl || videoEl.readyState < 2) return;
     try {
-        var detection = await faceapi.detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions());
+        // A larger inputSize and a lower scoreThreshold make detection more
+        // forgiving in dim lighting or with a low-quality camera - tuned
+        // down from the defaults after real-world testing showed too many
+        // false "no face" flags in normal, slightly dim rooms.
+        var options = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.25 });
+        var detection = await faceapi.detectSingleFace(videoEl, options);
         if (!detection) {
             proctorConsecutiveNoFace++;
-            if (proctorConsecutiveNoFace >= 2) {
+            // Requires ~4 consecutive misses (about 12 seconds at the
+            // current 3-second check interval) before it counts as a
+            // real violation, not just one bad frame.
+            if (proctorConsecutiveNoFace >= 4) {
                 proctorConsecutiveNoFace = 0;
                 registerProctorViolation('Your face was not visible in the camera.');
             }
@@ -2555,8 +2557,8 @@ function stopProctorMonitoring() {
 function endQuizForProctorViolation() {
     stopProctorMonitoring();
     studentStopTimer();
+    studentEndReason = 'misconduct';
     document.getElementById('proctorViolationOverlay').style.display = 'none';
-    alert('This assessment has been ended automatically after repeated monitoring violations (camera/noise). Your answers so far will be submitted.');
     studentSubmitQuiz();
 }
 
@@ -2609,13 +2611,13 @@ function shuffleOptionsForQuestion(q) {
     return q;
 }
 
-async function hasAlreadyAttempted(assessmentCode, nameToCheck) {
+async function hasAlreadyAttempted(assessmentCode, admissionNumberToCheck) {
     try {
         var { data, error } = await supabase
             .from('cleverment_results')
             .select('id')
             .eq('assessment_code', assessmentCode)
-            .ilike('student_name', nameToCheck.trim())
+            .ilike('admission_number', admissionNumberToCheck.trim())
             .limit(1);
         if (error) return false; // fail open - a check error should never block a legitimate student
         return !!(data && data.length > 0);
@@ -2626,8 +2628,7 @@ async function hasAlreadyAttempted(assessmentCode, nameToCheck) {
 
 async function startStudentQuiz() {
     var nameInput = document.getElementById('studentNameInput');
-    var classSelect = document.getElementById('studentClassInput');
-    var customInput = document.getElementById('studentCustomClass');
+    var admissionInput = document.getElementById('studentAdmissionNumber');
 
     studentName = nameInput.value.trim();
     if (!studentName) {
@@ -2636,20 +2637,11 @@ async function startStudentQuiz() {
         return;
     }
 
-    if (classSelect.value === 'Other') {
-        studentClass = customInput.value.trim();
-        if (!studentClass) {
-            alert('Please enter your class name!');
-            customInput.focus();
-            return;
-        }
-    } else {
-        studentClass = classSelect.value.trim();
-        if (!studentClass) {
-            alert('Please select your class!');
-            classSelect.focus();
-            return;
-        }
+    studentAdmissionNumber = admissionInput.value.trim();
+    if (!studentAdmissionNumber) {
+        alert('Please enter your admission number!');
+        admissionInput.focus();
+        return;
     }
 
     if (!currentAssessment) {
@@ -2657,16 +2649,18 @@ async function startStudentQuiz() {
         return;
     }
 
+    studentClass = currentAssessment.className;
+
     var startBtn = document.getElementById('studentStartQuizBtn');
     if (startBtn) {
         startBtn.disabled = true;
         startBtn.textContent = 'Checking...';
     }
 
-    var alreadyAttempted = await hasAlreadyAttempted(currentAssessmentCode, studentName);
+    var alreadyAttempted = await hasAlreadyAttempted(currentAssessmentCode, studentAdmissionNumber);
 
     if (alreadyAttempted) {
-        alert('"' + studentName + '" has already submitted this assessment (Code: ' + currentAssessmentCode + '). Each student can only take a given assessment once. If this is a mistake, please contact your teacher.');
+        alert('A student with admission number "' + studentAdmissionNumber + '" has already submitted this assessment (Code: ' + currentAssessmentCode + '). Each student can only take a given assessment once. If this is a mistake, please contact your teacher.');
         if (startBtn) {
             startBtn.disabled = false;
             startBtn.textContent = 'Start Assessment';
@@ -2720,6 +2714,7 @@ function proceedToStartQuiz() {
     studentIsTimeUp = false;
     studentTabSwitchCount = 0;
     studentProctorStrikes = 0;
+    studentEndReason = 'normal';
 
     document.getElementById('studentInfoForm').style.display = 'none';
     document.getElementById('studentQuizSection').style.display = 'block';
@@ -2960,6 +2955,7 @@ function studentGetTimeTaken() {
 function studentTimeUp() {
     if (studentIsTimeUp) return;
     studentIsTimeUp = true;
+    studentEndReason = 'timeup';
     studentStopTimer();
     var overlay = document.createElement('div');
     overlay.className = 'time-up-overlay';
@@ -2985,6 +2981,7 @@ function saveResultLocal(result) {
         teacherEmail: result.teacherEmail,
         className: result.className,
         studentName: result.studentName,
+        admissionNumber: result.admissionNumber || '',
         subject: result.subject,
         score: result.score,
         totalQuestions: result.totalQuestions,
@@ -3016,6 +3013,7 @@ async function saveResultToDatabase(result) {
     var payload = {
         teacher_email: result.teacherEmail,
         student_name: result.studentName,
+        admission_number: result.admissionNumber || '',
         class_name: result.className,
         subject: result.subject,
         score: result.score,
@@ -3045,6 +3043,7 @@ function normalizeResultRow(r) {
         id: r.id,
         teacherEmail: r.teacher_email,
         studentName: r.student_name,
+        admissionNumber: r.admission_number || '',
         className: r.class_name,
         subject: r.subject,
         score: r.score,
@@ -3085,6 +3084,7 @@ function normalizeAssessmentRow(a) {
         shuffle: a.shuffle,
         cameraMonitoring: a.camera_monitoring || false,
         noiseMonitoring: a.noise_monitoring || false,
+        showResults: a.show_results !== false,
         passMark: (a.pass_mark !== null && a.pass_mark !== undefined) ? a.pass_mark : 50,
         availableFrom: a.available_from || null,
         availableUntil: a.available_until || null,
@@ -3169,6 +3169,7 @@ function studentSubmitQuiz() {
     var result = {
         teacherEmail: currentAssessment.teacherEmail || 'unknown',
         studentName: studentName,
+        admissionNumber: studentAdmissionNumber,
         className: studentClass,
         subject: studentSubject,
         score: studentScore,
@@ -3185,8 +3186,28 @@ function studentSubmitQuiz() {
     saveResultLocal(result);
 
     document.getElementById('studentQuizSection').style.display = 'none';
+
+    var showResults = currentAssessment.showResults !== false; // defaults to true for older assessments
+
+    if (!showResults) {
+        renderSimpleSubmittedScreen();
+        updateURL('results');
+        return;
+    }
+
     document.getElementById('studentResultsSection').style.display = 'block';
     document.getElementById('studentCertificateSection').style.display = 'none';
+
+    var endBanner = document.getElementById('studentEndReasonBanner');
+    if (studentEndReason === 'misconduct') {
+        endBanner.textContent = 'This assessment was submitted due to misconduct (a monitoring violation).';
+        endBanner.style.display = 'block';
+    } else if (studentEndReason === 'timeup') {
+        endBanner.textContent = 'Time was up - this assessment was submitted automatically.';
+        endBanner.style.display = 'block';
+    } else {
+        endBanner.style.display = 'none';
+    }
 
     var grade = getGrade(studentScore);
     var passMark = (currentAssessment.passMark !== null && currentAssessment.passMark !== undefined) ? currentAssessment.passMark : 50;
@@ -3218,6 +3239,18 @@ function studentSubmitQuiz() {
     }
     
     updateURL('results');
+}
+
+function renderSimpleSubmittedScreen() {
+    var msgEl = document.getElementById('studentSimpleSubmittedMessage');
+    if (studentEndReason === 'misconduct') {
+        msgEl.textContent = 'Assessment has been submitted due to misconduct.';
+    } else if (studentEndReason === 'timeup') {
+        msgEl.textContent = 'Time was up - your assessment has been submitted automatically.';
+    } else {
+        msgEl.textContent = 'Assessment Submitted Successfully.';
+    }
+    document.getElementById('studentSimpleSubmittedScreen').style.display = 'block';
 }
 
 // ============================================================
@@ -3795,13 +3828,13 @@ function studentResetQuiz() {
     stopProctorMonitoring();
     preloadedImageCache = {};
     document.getElementById('studentResultsSection').style.display = 'none';
+    document.getElementById('studentSimpleSubmittedScreen').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'none';
     document.getElementById('studentQuizSection').style.display = 'none';
+    document.getElementById('proctorWarningScreen').style.display = 'none';
     document.getElementById('studentInfoForm').style.display = 'block';
     document.getElementById('studentNameInput').value = '';
-    document.getElementById('studentClassInput').value = '';
-    document.getElementById('studentCustomClass').value = '';
-    document.querySelector('.custom-class-wrapper-student').style.display = 'none';
+    document.getElementById('studentAdmissionNumber').value = '';
     studentQuestions = [];
     studentAnswers = [];
     studentCurrentIndex = 0;
@@ -3920,7 +3953,7 @@ function applyTeacherFilters() {
     var tbody = document.getElementById('teacherResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -3930,7 +3963,7 @@ function applyTeacherFilters() {
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -3939,10 +3972,10 @@ function teacherExportResults() {
     var filtered = teacherResultsCache;
     if (filtered.length === 0) { alert('No results to export.'); return; }
 
-    var headers = ['Class', 'Student', 'Subject', 'Score', 'Correct', 'Total', 'Time Taken', 'Tab Switches', 'Date'];
+    var headers = ['Class', 'Student', 'Admission No.', 'Subject', 'Score', 'Correct', 'Total', 'Time Taken', 'Tab Switches', 'Date'];
     var csv = headers.join(',') + '\n';
     for (var i = 0; i < filtered.length; i++) {
-        var row = ['"' + filtered[i].className + '"', '"' + filtered[i].studentName + '"', '"' + filtered[i].subject + '"', filtered[i].score, filtered[i].correctAnswers, filtered[i].totalQuestions, filtered[i].timeTaken, filtered[i].tabSwitches || 0, '"' + filtered[i].date + '"'];
+        var row = ['"' + filtered[i].className + '"', '"' + filtered[i].studentName + '"', '"' + (filtered[i].admissionNumber || '') + '"', '"' + filtered[i].subject + '"', filtered[i].score, filtered[i].correctAnswers, filtered[i].totalQuestions, filtered[i].timeTaken, filtered[i].tabSwitches || 0, '"' + filtered[i].date + '"'];
         csv += row.join(',') + '\n';
     }
     var blob = new Blob([csv], { type: 'text/csv' });
@@ -4351,7 +4384,7 @@ function applyAdminFilters() {
     var tbody = document.getElementById('adminResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -4361,7 +4394,7 @@ function applyAdminFilters() {
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -4370,10 +4403,10 @@ function adminExportAllResults() {
     var results = adminResultsCache;
     if (results.length === 0) { alert('No results to export.'); return; }
 
-    var headers = ['Teacher', 'Class', 'Student', 'Subject', 'Score', 'Correct', 'Total', 'Tab Switches', 'Date'];
+    var headers = ['Teacher', 'Class', 'Student', 'Admission No.', 'Subject', 'Score', 'Correct', 'Total', 'Tab Switches', 'Date'];
     var csv = headers.join(',') + '\n';
     for (var i = 0; i < results.length; i++) {
-        var row = ['"' + results[i].teacherEmail + '"', '"' + results[i].className + '"', '"' + results[i].studentName + '"', '"' + results[i].subject + '"', results[i].score, results[i].correctAnswers, results[i].totalQuestions, results[i].tabSwitches || 0, '"' + results[i].date + '"'];
+        var row = ['"' + results[i].teacherEmail + '"', '"' + results[i].className + '"', '"' + results[i].studentName + '"', '"' + (results[i].admissionNumber || '') + '"', '"' + results[i].subject + '"', results[i].score, results[i].correctAnswers, results[i].totalQuestions, results[i].tabSwitches || 0, '"' + results[i].date + '"'];
         csv += row.join(',') + '\n';
     }
     var blob = new Blob([csv], { type: 'text/csv' });
