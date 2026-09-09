@@ -606,24 +606,25 @@ document.addEventListener('DOMContentLoaded', function() {
     var rosterCustomInput = document.getElementById('rosterCustomClass');
     if (rosterClassSelect) {
         rosterClassSelect.addEventListener('change', async function() {
+            var statusEl = document.getElementById('rosterUploadStatus');
+            statusEl.style.display = 'none';
+
             if (this.value === 'Other') {
                 rosterCustomWrapper.style.display = 'block';
                 rosterCustomInput.focus();
-                document.getElementById('rosterNamesTextarea').value = '';
                 return;
             }
             rosterCustomWrapper.style.display = 'none';
             rosterCustomInput.value = '';
             var className = this.value;
-            var textarea = document.getElementById('rosterNamesTextarea');
-            if (!className) {
-                textarea.value = '';
-                return;
-            }
-            textarea.value = 'Loading...';
+            if (!className) return;
+
             var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
-            var names = await getRosterForClass(teacherEmail, className);
-            textarea.value = names ? names.join('\n') : '';
+            var roster = await getRosterForClass(teacherEmail, className);
+            if (roster && roster.length > 0) {
+                statusEl.textContent = 'Current roster for ' + className + ': ' + roster.length + ' student(s). Uploading a new file will replace this.';
+                statusEl.style.display = 'block';
+            }
         });
     }
 
@@ -1674,32 +1675,48 @@ async function getRosterForClass(teacherEmail, className) {
             .eq('class_name', className)
             .maybeSingle();
         if (error || !data) return null;
-        return data.student_names || [];
+        var entries = data.student_names || [];
+        // Normalize: older rosters (before admission numbers existed) were
+        // saved as plain strings. Treat those as needing re-upload rather
+        // than guessing an admission number for them.
+        return entries.filter(function(e) { return e && typeof e === 'object' && e.admissionNumber; });
     } catch (e) {
         return null;
     }
 }
 
-async function saveClassRoster() {
+function downloadRosterTemplate() {
     var classSelect = document.getElementById('rosterClassSelect');
     var customInput = document.getElementById('rosterCustomClass');
     var className = classSelect.value === 'Other' ? customInput.value.trim() : classSelect.value;
     if (!className) {
-        alert('Please select or enter a class.');
+        alert('Please select or enter a class first.');
+        return;
+    }
+    if (typeof XLSX === 'undefined') {
+        alert('The spreadsheet library failed to load. Please check your connection and try again.');
         return;
     }
 
-    var textarea = document.getElementById('rosterNamesTextarea');
-    var names = textarea.value.split('\n').map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 0; });
-    if (names.length === 0) {
-        alert('Please enter at least one student name.');
-        return;
-    }
+    var worksheetData = [
+        ['CleverMent Class Roster Template - ' + className],
+        ['Fill in one row per student below. Do not change the column headers.'],
+        [],
+        ['Name', 'Admission Number']
+    ];
+    var ws = XLSX.utils.aoa_to_sheet(worksheetData);
+    ws['!cols'] = [{ wch: 30 }, { wch: 20 }];
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } }];
 
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Roster');
+    XLSX.writeFile(wb, className.replace(/[\\/:*?"<>|]/g, '_') + '_Roster_Template.xlsx');
+}
+
+async function saveClassRosterEntries(className, entries) {
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
-
     try {
-        var { data: existing, error: fetchError } = await supabase
+        var { data: existing } = await supabase
             .from('cleverment_rosters')
             .select('id')
             .eq('teacher_email', teacherEmail)
@@ -1709,25 +1726,89 @@ async function saveClassRoster() {
         if (existing && existing.id) {
             var { error: updateError } = await supabase
                 .from('cleverment_rosters')
-                .update({ student_names: names, updated_at: new Date().toISOString() })
+                .update({ student_names: entries, updated_at: new Date().toISOString() })
                 .eq('id', existing.id);
             if (updateError) {
                 alert('Supabase Error: ' + updateError.message);
-                return;
+                return false;
             }
         } else {
             var { error: insertError } = await supabase
                 .from('cleverment_rosters')
-                .insert([{ teacher_email: teacherEmail, class_name: className, student_names: names }]);
+                .insert([{ teacher_email: teacherEmail, class_name: className, student_names: entries }]);
             if (insertError) {
                 alert('Supabase Error: ' + insertError.message);
-                return;
+                return false;
             }
         }
-        alert('Roster saved for ' + className + ' (' + names.length + ' student' + (names.length === 1 ? '' : 's') + ').');
+        return true;
     } catch (e) {
         alert('Error: ' + e.message);
+        return false;
     }
+}
+
+function handleRosterFileUpload() {
+    var classSelect = document.getElementById('rosterClassSelect');
+    var customInput = document.getElementById('rosterCustomClass');
+    var className = classSelect.value === 'Other' ? customInput.value.trim() : classSelect.value;
+    if (!className) {
+        alert('Please select or enter a class first.');
+        return;
+    }
+
+    var fileInput = document.getElementById('rosterFileInput');
+    var file = fileInput.files[0];
+    if (!file) {
+        alert('Please choose a filled-in roster file first.');
+        return;
+    }
+    if (typeof XLSX === 'undefined') {
+        alert('The spreadsheet library failed to load. Please check your connection and try again.');
+        return;
+    }
+
+    var statusEl = document.getElementById('rosterUploadStatus');
+    statusEl.textContent = 'Reading file...';
+    statusEl.style.display = 'block';
+
+    var reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            var data = new Uint8Array(e.target.result);
+            var workbook = XLSX.read(data, { type: 'array' });
+            var sheet = workbook.Sheets[workbook.SheetNames[0]];
+            var rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+            var entries = [];
+            for (var i = 0; i < rows.length; i++) {
+                var row = rows[i];
+                if (!row || row.length === 0) continue;
+                var name = (row[0] || '').toString().trim();
+                var admissionNumber = (row[1] || '').toString().trim();
+                if (!name || !admissionNumber) continue;
+                if (name.toLowerCase() === 'name') continue; // skip header row wherever it lands
+                entries.push({ name: name, admissionNumber: admissionNumber });
+            }
+
+            if (entries.length === 0) {
+                statusEl.textContent = 'No valid rows found. Make sure both Name and Admission Number columns are filled in.';
+                return;
+            }
+
+            statusEl.textContent = 'Saving ' + entries.length + ' student(s)...';
+            var saved = await saveClassRosterEntries(className, entries);
+            if (saved) {
+                statusEl.textContent = 'Roster saved for ' + className + ': ' + entries.length + ' student(s). Students not on this list cannot take assessments published for this class.';
+                fileInput.value = '';
+            } else {
+                statusEl.textContent = 'Could not save the roster. Please try again.';
+            }
+        } catch (err) {
+            statusEl.textContent = 'Could not read that file. Please make sure it\'s the downloaded template with your edits.';
+        }
+    };
+    reader.readAsArrayBuffer(file);
 }
 
 function populateTeacherAnalyticsSelect(assessments) {
@@ -1799,24 +1880,24 @@ async function getQuestionAnalyticsForCode(code) {
 async function getAttendanceForAssessment(assessment) {
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
     var roster = await getRosterForClass(teacherEmail, assessment.className);
-    if (!roster) return { hasRoster: false };
+    if (!roster || roster.length === 0) return { hasRoster: false };
 
-    var submittedNames = [];
+    var submittedAdmissionNumbers = [];
     try {
         var { data, error } = await supabase
             .from('cleverment_results')
-            .select('student_name')
+            .select('admission_number')
             .eq('assessment_code', assessment.code);
         if (!error && data) {
-            submittedNames = data.map(function(r) { return (r.student_name || '').trim().toLowerCase(); });
+            submittedAdmissionNumbers = data.map(function(r) { return (r.admission_number || '').trim().toLowerCase(); });
         }
     } catch (e) {
         // If this fails, still show the roster with nothing marked as submitted
         // rather than hiding the roster entirely.
     }
 
-    var missing = roster.filter(function(name) {
-        return submittedNames.indexOf(name.trim().toLowerCase()) === -1;
+    var missing = roster.filter(function(entry) {
+        return submittedAdmissionNumbers.indexOf((entry.admissionNumber || '').trim().toLowerCase()) === -1;
     });
 
     return {
@@ -1829,13 +1910,14 @@ async function getAttendanceForAssessment(assessment) {
 
 function renderAttendanceBlock(assessment, attendance) {
     if (!attendance.hasRoster) {
-        return '<p class="helper-text" style="margin-bottom:14px;">No roster saved for "' + assessment.className + '" - add one above to see who\'s missing.</p>';
+        return '<p class="helper-text" style="margin-bottom:14px;">No roster uploaded for "' + assessment.className + '" - add one above so only listed students can take this assessment, and to see who\'s missing.</p>';
     }
     var html = '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:14px;">' +
         '<p style="margin:0 0 8px 0; font-weight:700;">Attendance: ' + attendance.submittedCount + '/' + attendance.total + ' submitted</p>';
     if (attendance.missing.length > 0) {
+        var names = attendance.missing.map(function(e) { return e.name + ' (' + e.admissionNumber + ')'; });
         html += '<p style="margin:0 0 4px 0; font-size:13px; color:#6b7a8f;">Haven\'t taken it yet:</p>' +
-            '<p style="margin:0; font-size:13px; color:#dc3545;">' + attendance.missing.join(', ') + '</p>';
+            '<p style="margin:0; font-size:13px; color:#dc3545;">' + names.join(', ') + '</p>';
     } else {
         html += '<p style="margin:0; font-size:13px; color:#2d9c5c;">Everyone on the roster has submitted.</p>';
     }
@@ -2481,18 +2563,17 @@ function startProctorMonitoring() {
 async function runFaceCheck(videoEl) {
     if (!faceApiReady || !videoEl || videoEl.readyState < 2) return;
     try {
-        // A larger inputSize and a lower scoreThreshold make detection more
-        // forgiving in dim lighting or with a low-quality camera - tuned
-        // down from the defaults after real-world testing showed too many
-        // false "no face" flags in normal, slightly dim rooms.
-        var options = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.25 });
+        // Very forgiving settings after real-world testing showed the
+        // previous tuning was still too sensitive in normal dim rooms.
+        // This trades some strictness for far fewer false positives.
+        var options = new faceapi.TinyFaceDetectorOptions({ inputSize: 608, scoreThreshold: 0.1 });
         var detection = await faceapi.detectSingleFace(videoEl, options);
         if (!detection) {
             proctorConsecutiveNoFace++;
-            // Requires ~4 consecutive misses (about 12 seconds at the
+            // Requires 8 consecutive misses (about 24 seconds at the
             // current 3-second check interval) before it counts as a
-            // real violation, not just one bad frame.
-            if (proctorConsecutiveNoFace >= 4) {
+            // real violation.
+            if (proctorConsecutiveNoFace >= 8) {
                 proctorConsecutiveNoFace = 0;
                 registerProctorViolation('Your face was not visible in the camera.');
             }
@@ -2611,6 +2692,19 @@ function shuffleOptionsForQuestion(q) {
     return q;
 }
 
+// If a roster has been uploaded for this teacher+class, only admission
+// numbers on that roster may take the assessment. If no roster exists
+// for this class at all, everyone is allowed through (unrestricted) -
+// rostering is opt-in, not a default requirement.
+async function checkStudentOnRoster(teacherEmail, className, admissionNumber) {
+    var roster = await getRosterForClass(teacherEmail, className);
+    if (!roster || roster.length === 0) return true; // no roster set up - no restriction
+    var normalized = admissionNumber.trim().toLowerCase();
+    return roster.some(function(entry) {
+        return (entry.admissionNumber || '').trim().toLowerCase() === normalized;
+    });
+}
+
 async function hasAlreadyAttempted(assessmentCode, admissionNumberToCheck) {
     try {
         var { data, error } = await supabase
@@ -2655,6 +2749,16 @@ async function startStudentQuiz() {
     if (startBtn) {
         startBtn.disabled = true;
         startBtn.textContent = 'Checking...';
+    }
+
+    var rosterCheck = await checkStudentOnRoster(currentAssessment.teacherEmail, currentAssessment.className, studentAdmissionNumber);
+    if (rosterCheck === false) {
+        alert('Admission number "' + studentAdmissionNumber + '" was not found on the class roster for ' + currentAssessment.className + '. Please check your admission number, or contact your teacher if you believe this is a mistake.');
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.textContent = 'Start Assessment';
+        }
+        return;
     }
 
     var alreadyAttempted = await hasAlreadyAttempted(currentAssessmentCode, studentAdmissionNumber);
@@ -3129,7 +3233,7 @@ function studentSubmitQuiz() {
     studentStopTimer();
 
     var unanswered = studentAnswers.some(function(ans) { return ans === null; });
-    if (unanswered && !studentIsTimeUp) {
+    if (unanswered && !studentIsTimeUp && studentEndReason !== 'misconduct') {
         var count = studentAnswers.filter(function(ans) { return ans === null; }).length;
         var confirmSubmit = confirm('You have ' + count + ' unanswered question(s). Submit anyway?');
         if (!confirmSubmit) {

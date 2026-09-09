@@ -14,8 +14,6 @@ var urlsToCache = [
     '/index.html',
     '/style.css',
     '/script.js',
-    '/faq.html',
-    '/faq.js',
     'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap',
     'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css',
     'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js',
@@ -26,6 +24,7 @@ var urlsToCache = [
     'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
     'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg'
 ];
 

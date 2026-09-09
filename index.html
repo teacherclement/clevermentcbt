@@ -15,6 +15,7 @@
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#2d6cdf">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -146,7 +147,6 @@
         <div id="studentSimpleSubmittedScreen" style="display:none; text-align:center; padding:40px 20px;">
             <div style="font-size:48px; margin-bottom:12px;">✅</div>
             <h2 id="studentSimpleSubmittedMessage" style="margin-bottom:20px;">Assessment Submitted Successfully.</h2>
-            <p class="helper-text" style="margin-bottom:20px;">Your teacher will share your results with you separately.</p>
             <button onclick="studentResetQuiz()" class="secondary-btn">Take Another Assessment</button>
         </div>
 
@@ -512,7 +512,7 @@
 
         <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">Class Roster</h3>
-            <p class="helper-text" style="margin-bottom:10px;">Save the list of students expected in a class, so you can see who hasn't taken an assessment yet.</p>
+            <p class="helper-text" style="margin-bottom:10px;">Upload the list of students expected in a class (with admission numbers) so only those students can take assessments published for this class, and so you can see who hasn't submitted yet.</p>
             <div class="form-group">
                 <label for="rosterClassSelect">Class</label>
                 <select id="rosterClassSelect" class="form-input">
@@ -539,11 +539,14 @@
             <div class="custom-class-wrapper-roster" style="display:none; margin-top:8px; margin-bottom:16px;">
                 <input type="text" id="rosterCustomClass" placeholder="Enter custom class name" class="form-input">
             </div>
+            <button onclick="downloadRosterTemplate()" class="secondary-btn full-width" style="margin-bottom:12px;">1. Download Roster Template for This Class</button>
+            <p class="helper-text" style="margin-bottom:12px;">Fill in each student's Name and Admission Number in the downloaded spreadsheet, then upload it back below.</p>
             <div class="form-group">
-                <label for="rosterNamesTextarea">Student Names (one per line)</label>
-                <textarea id="rosterNamesTextarea" class="form-input" rows="6" placeholder="Timilehin Ajayi&#10;Olaleye Damilola&#10;Donald Alayande"></textarea>
+                <label for="rosterFileInput">2. Upload Filled-In Roster</label>
+                <input type="file" id="rosterFileInput" accept=".xlsx,.xls,.csv" class="form-input">
             </div>
-            <button onclick="saveClassRoster()" class="primary-btn full-width" style="margin-top:8px;">Save Roster</button>
+            <button onclick="handleRosterFileUpload()" class="primary-btn full-width">Upload Roster</button>
+            <p id="rosterUploadStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
         </div>
 
         <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
