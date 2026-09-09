@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CleverMent - FAQs & Help Center</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2d6cdf">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg">
+</head>
+<body>
+<div class="container">
+    <div class="header" id="mainHeader">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <a href="index.html" style="text-decoration:none; display:flex; align-items:center; gap:10px;">
+                <img src="https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg" alt="CleverMent Logo" class="logo-image" style="max-height:60px;">
+            </a>
+            <a href="index.html" class="secondary-btn" style="font-size:13px; padding:8px 18px; text-decoration:none;">← Back to Home</a>
+        </div>
+        <p class="tagline">Intelligent Assessment. Instant Feedback.</p>
+    </div>
+
+    <div id="faqPage">
+        <div class="faq-hero">
+            <h1>Help Center & FAQs</h1>
+            <p>Everything you need to know about using CleverMent as a Teacher or Student</p>
+        </div>
+
+        <div class="faq-search-wrapper">
+            <input type="text" id="faqSearchInput" placeholder="Search FAQs... e.g., CSV format, camera, certificate" class="form-input" oninput="filterFAQs()">
+            <span class="faq-search-icon">🔍</span>
+        </div>
+
+        <div class="faq-tabs">
+            <button id="tabTeacher" class="faq-tab-btn active" onclick="switchFaqTab('teacher')">
+                👩‍🏫 For Teachers
+            </button>
+            <button id="tabStudent" class="faq-tab-btn" onclick="switchFaqTab('student')">
+                🎓 For Students
+            </button>
+            <button id="tabGeneral" class="faq-tab-btn" onclick="switchFaqTab('general')">
+                ❓ General & Troubleshooting
+            </button>
+        </div>
+
+        <div class="faq-content-area">
+            <!-- TEACHER FAQs -->
+            <div id="faqTeacherSection" class="faq-section">
+                <!-- Content injected by JS -->
+            </div>
+
+            <!-- STUDENT FAQs -->
+            <div id="faqStudentSection" class="faq-section" style="display:none;">
+                <!-- Content injected by JS -->
+            </div>
+
+            <!-- GENERAL / TROUBLESHOOTING -->
+            <div id="faqGeneralSection" class="faq-section" style="display:none;">
+                <!-- Content injected by JS -->
+            </div>
+        </div>
+
+        <div style="margin-top:40px; text-align:center; padding:20px; background:#f8fafc; border-radius:12px;">
+            <h3 style="margin-bottom:8px;">Still need help?</h3>
+            <p style="color:#6b7a8f; margin-bottom:12px;">Contact the admin or your teacher for support</p>
+            <a href="index.html" class="primary-btn" style="text-decoration:none; display:inline-block;">Go to Dashboard</a>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2026 <strong>CleverMent</strong> &mdash; Built by Teacher Clement</p>
+        <p class="footer-sub">Empowering education for all levels</p>
+    </div>
+</div>
+
+<script src="faq.js"></script>
+</body>
+</html>
