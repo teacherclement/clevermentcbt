@@ -1113,3 +1113,193 @@ button:disabled {
 @keyframes cm-spin {
     to { transform: rotate(360deg); }
 }
+
+
+/* ============================================================
+   FAQ PAGE STYLES - Small but visible button + robust FAQ
+   ============================================================ */
+.faq-landing-btn {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 20px;
+    background:white;
+    border:1.5px solid #2d6cdf;
+    color:#2d6cdf;
+    border-radius:20px;
+    font-size:13px;
+    font-weight:600;
+    text-decoration:none;
+    cursor:pointer;
+    transition:all 0.2s ease;
+    box-shadow:0 2px 8px rgba(45,108,223,0.08);
+}
+.faq-landing-btn:hover {
+    background:#2d6cdf;
+    color:white;
+    transform:translateY(-2px);
+    box-shadow:0 6px 18px rgba(45,108,223,0.2);
+}
+.faq-landing-icon {
+    font-size:14px;
+}
+
+.faq-hero {
+    text-align:center;
+    padding:20px 0 16px 0;
+    margin-bottom:16px;
+}
+.faq-hero h1 {
+    font-size:30px;
+    margin-bottom:6px;
+    color:#1a1a2e;
+}
+.faq-hero p {
+    color:#6b7a8f;
+    font-size:14px;
+}
+
+.faq-search-wrapper {
+    position:relative;
+    max-width:600px;
+    margin:0 auto 20px auto;
+}
+.faq-search-wrapper .form-input {
+    padding-left:42px;
+    font-size:15px;
+    background:#f8fafc;
+}
+.faq-search-icon {
+    position:absolute;
+    left:14px;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:16px;
+    color:#8a9aa8;
+    pointer-events:none;
+}
+
+.faq-tabs {
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-bottom:20px;
+    background:#f8fafc;
+    padding:8px;
+    border-radius:12px;
+    border:1.5px solid #eef2f6;
+}
+.faq-tab-btn {
+    flex:1;
+    min-width:140px;
+    max-width:220px;
+    padding:10px 18px;
+    border-radius:8px;
+    background:white;
+    color:#6b7a8f;
+    border:1.5px solid #eef2f6;
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+    transition:all 0.2s ease;
+}
+.faq-tab-btn.active {
+    background:#2d6cdf;
+    color:white;
+    border-color:#2d6cdf;
+    box-shadow:0 4px 12px rgba(45,108,223,0.25);
+    transform:translateY(-1px);
+}
+.faq-tab-btn:hover:not(.active) {
+    background:#eef2f6;
+    color:#1a1a2e;
+}
+
+.faq-content-area {
+    min-height:300px;
+}
+
+.faq-category-block {
+    margin-bottom:24px;
+}
+.faq-category-title {
+    font-size:15px;
+    font-weight:700;
+    color:#2d6cdf;
+    background:#f0f7ff;
+    padding:8px 14px;
+    border-radius:8px;
+    border-left:4px solid #2d6cdf;
+    margin-bottom:10px;
+}
+
+.faq-item {
+    background:white;
+    border:1.5px solid #eef2f6;
+    border-radius:10px;
+    margin-bottom:8px;
+    overflow:hidden;
+    transition:all 0.2s ease;
+}
+.faq-item:hover {
+    border-color:#c3d9ff;
+    box-shadow:0 2px 8px rgba(45,108,223,0.06);
+}
+.faq-question {
+    width:100%;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding:14px 18px;
+    background:white;
+    border:none;
+    text-align:left;
+    font-size:14.5px;
+    font-weight:600;
+    color:#1a1a2e;
+    cursor:pointer;
+}
+.faq-question:hover {
+    background:#f8fafc;
+}
+.faq-icon {
+    font-size:18px;
+    font-weight:700;
+    color:#2d6cdf;
+    min-width:20px;
+    text-align:center;
+    transition:transform 0.2s ease;
+}
+.faq-answer {
+    padding:0 18px 16px 18px;
+    font-size:14px;
+    line-height:1.6;
+    color:#3a4a5f;
+    background:#fcfdff;
+    border-top:1px solid #f0f2f6;
+}
+.faq-answer p { margin:8px 0; }
+.faq-answer ul, .faq-answer ol { margin:8px 0 8px 20px; }
+.faq-answer li { margin:4px 0; }
+.faq-answer code {
+    background:#f0f2f6;
+    padding:2px 6px;
+    border-radius:4px;
+    font-size:12.5px;
+    color:#2d6cdf;
+    font-weight:600;
+}
+.faq-answer table { font-size:13px; }
+
+#adminFAQList .faq-admin-item {
+    background:white;
+    border:1.5px solid #eef2f6;
+    border-radius:8px;
+    padding:12px 14px;
+    margin-bottom:8px;
+}
+#adminFAQList .faq-admin-item:hover {
+    border-color:#c3d9ff;
+}
