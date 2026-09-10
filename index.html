@@ -34,6 +34,28 @@
         <p class="tagline">Intelligent Assessment. Instant Feedback.</p>
     </div>
 
+    <!-- Floating help button - visible everywhere except during an active quiz -->
+    <button id="needHelpBtn" onclick="openFaqPage()" style="position:fixed; bottom:16px; left:16px; z-index:500; background:#2d6cdf; color:white; border:none; border-radius:24px; padding:10px 18px; font-weight:700; font-size:14px; box-shadow:0 2px 10px rgba(0,0,0,0.25); cursor:pointer;">❓ Need Help?</button>
+
+    <!-- ===== FAQ PAGE ===== -->
+    <div id="faqPage" style="display:none;">
+        <button onclick="closeFaqPage()" class="secondary-btn" style="font-size:13px; padding:6px 16px; margin-bottom:16px;">← Back</button>
+        <h2>Frequently Asked Questions</h2>
+        <p style="color:#6b7a8f; margin-bottom:16px;">Search for a topic, or browse by category below.</p>
+        <div class="form-group">
+            <input type="text" id="faqSearchInput" oninput="filterFaqs()" placeholder="Search questions, e.g. 'CSV format', 'camera', 'certificate'..." class="form-input">
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
+            <button id="faqTabTeacher" onclick="setFaqCategory('teacher')" class="primary-btn" style="flex:1; min-width:140px;">For Teachers</button>
+            <button id="faqTabStudent" onclick="setFaqCategory('student')" class="secondary-btn" style="flex:1; min-width:140px;">For Students</button>
+        </div>
+        <div id="faqAccordionContainer"></div>
+        <div style="margin-top:20px; background:#eef6ff; border:1.5px solid #2d6cdf; border-radius:10px; padding:16px; text-align:center;">
+            <p style="font-weight:600; margin-bottom:8px;">Still stuck?</p>
+            <a href="https://wa.me/2349069959358" target="_blank" rel="noopener" class="primary-btn" style="display:inline-block; text-decoration:none; padding:10px 20px;">💬 Message us on WhatsApp</a>
+        </div>
+    </div>
+
     <!-- ===== LANDING PAGE ===== -->
     <div id="landingPage">
         <div style="text-align:center; padding:20px 0;">
@@ -668,6 +690,16 @@
         </div>
 
         <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+                <h3 style="margin:0;">Manage FAQs</h3>
+                <button onclick="openFaqAddForm()" class="primary-btn" style="padding:8px 18px;">+ Add New FAQ</button>
+            </div>
+            <div id="adminFaqList" class="scrollable-panel">
+                <p class="helper-text">Loading...</p>
+            </div>
+        </div>
+
+        <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
             <h3 style="margin-bottom:12px;">Manage Teachers</h3>
             <div id="adminTeacherList" class="scrollable-panel">
                 <p class="helper-text">No teachers registered yet.</p>
@@ -799,6 +831,36 @@
         <p style="margin:0 0 8px 0; font-weight:700; color:#1a1a2e; font-size:18px;">Monitoring Paused</p>
         <p style="margin:0 0 18px 0; color:#6b7a8f; font-size:14px;">Your camera/microphone access was lost (this can happen after a page refresh). Click below to resume monitoring and continue your assessment.</p>
         <button onclick="resumeProctorMonitoringAfterRefresh()" id="proctorResumeBtn" class="primary-btn full-width" style="background:#dc3545;">Resume Monitoring &amp; Continue</button>
+    </div>
+</div>
+
+<!-- Admin: Add/Edit FAQ form -->
+<div id="faqFormOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:white; border-radius:12px; padding:24px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 10px 40px rgba(0,0,0,0.25);">
+        <p id="faqFormTitle" style="margin:0 0 14px 0; font-weight:700; font-size:18px; color:#1a1a2e;">Add New FAQ</p>
+        <div class="form-group">
+            <label for="faqFormCategory">Category</label>
+            <select id="faqFormCategory" class="form-input">
+                <option value="teacher">Teacher FAQ</option>
+                <option value="student">Student FAQ</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="faqFormQuestion">Question</label>
+            <input type="text" id="faqFormQuestion" class="form-input" placeholder="e.g. How do I reset my password?">
+        </div>
+        <div class="form-group">
+            <label for="faqFormAnswer">Answer</label>
+            <textarea id="faqFormAnswer" class="form-input" rows="6" placeholder="Write the full answer here. Use a blank line to start a new paragraph."></textarea>
+        </div>
+        <div class="form-group">
+            <label for="faqFormVideoUrl">Video URL (optional)</label>
+            <input type="text" id="faqFormVideoUrl" class="form-input" placeholder="https://...">
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:8px;">
+            <button onclick="closeFaqForm()" class="secondary-btn" style="padding:10px 20px;">Cancel</button>
+            <button onclick="saveFaqForm()" class="primary-btn" style="padding:10px 20px;">Save</button>
+        </div>
     </div>
 </div>
 

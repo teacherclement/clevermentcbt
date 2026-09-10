@@ -140,6 +140,320 @@ if (typeof supabase !== 'undefined' && supabase.createClient) {
 var supabase = supabaseClient;
 
 // ============================================================
+// FAQ PAGE
+// ============================================================
+
+var WHATSAPP_SUPPORT_NUMBER = '2349069959358';
+
+var DEFAULT_FAQS = [
+    // ---------- TEACHER FAQS ----------
+    { category: 'teacher', question: 'How do I create a teacher account?', answer: 'On the landing page, tap "I\'m a Teacher", then "Sign Up". Enter your name, email, and a password. You\'ll be logged in immediately after signing up.' },
+    { category: 'teacher', question: 'I forgot my password. How do I get back in?', answer: 'On the teacher login screen, tap "Forgot password?". Enter your account email and a reset link will be emailed to you. The link is valid for 1 hour. Open it, set a new password, and log in as normal.' },
+    { category: 'teacher', question: 'What format should my CSV file be in?', answer: 'Each row is one question, with columns in this order: Question, Option A, Option B, Option C, Option D, Correct Answer, Image URL (optional).\n\nThe Correct Answer column should contain the letter (A, B, C, or D) of the correct option.\n\nIf any cell contains a comma (like "5,000" or a sentence with a comma in it), wrap that whole cell in double quotes so it doesn\'t get split into the wrong columns.' },
+    { category: 'teacher', question: 'Can I add images to my questions?', answer: 'Yes. Add a 7th column to your CSV with a direct image URL (a link ending in .jpg, .png, etc. - you can host images for free on a site like postimg.cc or imgur). Leave the cell blank for questions without an image.' },
+    { category: 'teacher', question: 'Can I include maths equations or symbols in questions?', answer: 'Plain symbols like ×, ÷, ±, √, π, ½, ² work fine typed directly into a cell. For a properly typeset equation, wrap it in single dollar signs, e.g. $x^2 + 5x - 6 = 0$, or double dollar signs for a larger standalone equation, e.g. $$\\frac{a}{b} = \\frac{c}{d}$$.' },
+    { category: 'teacher', question: 'What is the Question Bank, and how do I use it?', answer: 'The Question Bank lets you save a set of questions under a name so you can reuse it later without re-uploading the CSV each time. After uploading a CSV, click "Save Current as Question Bank" and give it a name. Later, pick it from the dropdown and click "Load Selected" before publishing. You can also delete a saved bank you no longer need. Question banks sync to your account, so they show up no matter which device or browser you log in from.' },
+    { category: 'teacher', question: 'How do I publish an assessment, step by step?', answer: '1. Log in and go to your dashboard.\n2. Choose the Subject and Class.\n3. Upload a CSV or load a saved Question Bank.\n4. Set a Time Limit, Pass Mark, and optionally an Available From/Until window.\n5. Turn on Shuffle, Camera/Noise Monitoring, or turn off "Show Results & Certificate" if this is a real exam.\n6. Add your name and signature for the certificate (optional).\n7. Click Publish Assessment. You\'ll get a unique code to share with students.' },
+    { category: 'teacher', question: 'What does "Shuffle Questions & Answer Options" do?', answer: 'When turned on, each student sees the questions in a different random order, and the A/B/C/D options within each question are also shuffled independently for each student. This makes it much harder for students sitting near each other to copy answers by position or letter.' },
+    { category: 'teacher', question: 'What is "Available From / Until" for?', answer: 'This lets you schedule exactly when an assessment code will work. Leave both blank for a code that works any time. Set them if you want the assessment to only be accessible during a specific exam window - students trying the code before or after will see a message saying it isn\'t open.' },
+    { category: 'teacher', question: 'What is "Pass Mark" and how is it used?', answer: 'This is the percentage a student needs to be marked as having passed. It defaults to 50% but you can set any value per assessment. Students see a Pass/Fail badge based on this number, and your dashboard\'s "Pass Rate" statistic uses each assessment\'s own pass mark rather than one fixed number.' },
+    { category: 'teacher', question: 'What does turning off "Show Results & Certificate to Student" do?', answer: 'This is for real exams and tests where students shouldn\'t see their score right away. When off, a student just sees "Assessment Submitted Successfully" after clicking submit - no score, no corrections, no certificate. You (and admin) can still see their actual score on your Results Dashboard as normal; this setting only affects what the student sees.' },
+    { category: 'teacher', question: 'What do Camera Monitoring and Noise Monitoring actually do?', answer: 'When turned on for an assessment, students must allow camera and/or microphone access before starting. The app checks live, in the browser, that a face stays visible and that background noise stays low. Nothing is ever recorded or saved - only a pass/fail check happens live. A student gets two warnings; a third violation ends and submits their assessment automatically as "submitted due to misconduct". This is a helpful deterrent, not perfect proctoring - poor lighting or a noisy shared environment can occasionally cause false warnings.' },
+    { category: 'teacher', question: 'What is a Class Roster, and how do I set one up?', answer: 'A roster is the list of students expected in a class, with their admission numbers. Go to "Class Roster" on your dashboard, pick a class, and click "Download Roster Template" - this gives you a spreadsheet pre-labeled for that class. Fill in each student\'s Name and Admission Number, save the file, then upload it back using "Upload Roster". Once a class has a roster, only students whose admission number is on that list can take assessments published for that class - anyone else is blocked with a message to contact you.' },
+    { category: 'teacher', question: 'Do I have to set up a roster for every class?', answer: 'No. Rostering is optional. If you never upload a roster for a class, any student with a valid assessment code can take it - no restriction. Only classes where you\'ve uploaded a roster get the "must be on the list" restriction.' },
+    { category: 'teacher', question: 'How does the app stop a student from submitting an assessment twice?', answer: 'Each submission is checked against that assessment\'s existing results by admission number. If that admission number has already submitted for that specific assessment code, they\'re blocked with a message telling them to contact you if it\'s a mistake.' },
+    { category: 'teacher', question: 'What do "Tab Switches" and "Cam/Noise Flags" mean on my results table?', answer: '"Tab Switches" counts how many times a student switched away from the browser tab/app during their assessment - useful context, though refreshing the page can sometimes register as one switch too, so treat a count of 1 loosely. "Cam/Noise Flags" counts camera/microphone monitoring violations, only relevant for assessments where you turned that on.' },
+    { category: 'teacher', question: 'What is Question Analytics & Attendance?', answer: 'On your dashboard, pick any of your published assessments from the dropdown to see: which questions students get wrong most often (great for knowing what to re-teach), and - if you\'ve uploaded a roster for that class - who has and hasn\'t submitted yet, by name and admission number.' },
+    { category: 'teacher', question: 'How do I download certificates for a whole class at once?', answer: 'In the Question Analytics section, pick the assessment, then click "Download All Certificates (ZIP)". It generates a certificate for every student who submitted and packages them into one ZIP file. This can take a minute or two for a large class - a progress message will show while it works.' },
+    { category: 'teacher', question: 'My account says "Paused" - what do I do?', answer: 'A paused account needs to be reactivated with a small payment before you can log in again. When you try to log in, you\'ll see a "Pay Now to Reactivate" button - this takes you to a secure Flutterwave payment page. Once payment is confirmed, your account is unpaused automatically, usually within moments.' },
+    { category: 'teacher', question: 'Where can I see my CSV upload history?', answer: 'Your dashboard keeps a history of CSV files you\'ve uploaded, so you can reuse one with "Use Again" instead of finding the original file again, or delete old ones you don\'t need.' },
+
+    // ---------- STUDENT FAQS ----------
+    { category: 'student', question: 'How do I take an assessment?', answer: 'On the landing page, tap "I\'m a Student", then enter the assessment code your teacher gave you. Once it\'s accepted, enter your name and admission number, then tap Start Assessment.' },
+    { category: 'student', question: 'Why do I need to enter my admission number?', answer: 'Your admission number uniquely identifies you and is used to make sure you can only submit an assessment once, and (if your teacher has set one up) to check you\'re on the class roster for that assessment. If you don\'t know your admission number, ask your teacher.' },
+    { category: 'student', question: 'It says I\'m "not found on the class roster" - what does that mean?', answer: 'Your teacher has uploaded a specific list of students allowed to take this assessment, and your admission number wasn\'t on it. Double-check you typed it correctly. If it\'s still not working, contact your teacher - it may need to be added to the list.' },
+    { category: 'student', question: 'It says I\'ve "already submitted this assessment" but I haven\'t.', answer: 'This usually means someone already submitted using the same admission number, which could be a typo on your entry or someone else\'s. Double-check the number you\'re entering, and if it still won\'t work, contact your teacher.' },
+    { category: 'student', question: 'The assessment code isn\'t working.', answer: 'Make sure you\'ve typed it exactly as given (it auto-formats as you type). If it\'s still rejected, the assessment may not be open yet, may have already closed, or the code may be wrong - check with your teacher.' },
+    { category: 'student', question: 'Why are my questions or options in a different order than my classmate\'s?', answer: 'Some assessments have shuffling turned on by the teacher, which gives each student their own random order of questions and answer choices. This is normal and doesn\'t affect your score.' },
+    { category: 'student', question: 'What happens if I switch to another app or tab during the assessment?', answer: 'It gets recorded and a small warning banner appears. It won\'t end your assessment by itself, but your teacher can see how many times it happened.' },
+    { category: 'student', question: 'The assessment wants to use my camera and microphone - is that normal?', answer: 'Yes, if your teacher has turned on monitoring for this assessment. You\'ll see a red notice explaining this before it starts. Keep your face visible to the camera and stay somewhere quiet for the whole assessment. You\'ll get a warning if either check fails - after two warnings, a third violation ends and submits your assessment automatically.' },
+    { category: 'student', question: 'I got a monitoring warning even though I didn\'t do anything wrong.', answer: 'Camera checks can occasionally be thrown off by dim lighting, and noise checks by background sound you can\'t fully control (other students nearby, a fan, etc.). Try to sit somewhere brighter and quieter if possible. If your assessment ends due to this, let your teacher know - they can see this happened and use their judgment.' },
+    { category: 'student', question: 'My camera/microphone stopped working after I refreshed the page.', answer: 'A page refresh can disconnect the camera/microphone. You\'ll see a "Resume Monitoring & Continue" button - tap it and allow access again to keep going. Your answers and progress are not lost.' },
+    { category: 'student', question: 'I submitted my assessment but don\'t see my score.', answer: 'Some assessments (usually real exams or tests) are set by the teacher to hide results immediately - you\'ll just see "Assessment Submitted Successfully". Your teacher has your actual score and will share it with you separately.' },
+    { category: 'student', question: 'How do I download my certificate?', answer: 'If your teacher has results/certificates turned on for that assessment, you\'ll see "Download Certificate" buttons right after your results are shown. If you don\'t see them, that assessment likely has results hidden by the teacher (see above).' },
+    { category: 'student', question: 'What happens when the timer runs out?', answer: 'Your assessment is submitted automatically with whatever answers you\'ve given so far - you don\'t need to do anything.' }
+];
+
+var faqCache = [];
+var faqCurrentCategory = 'teacher';
+var faqPreviousPageState = null;
+
+async function ensureFaqsSeeded() {
+    try {
+        var { data, error } = await supabase.from('cleverment_faqs').select('id').limit(1);
+        if (error) return; // table probably doesn't exist yet - nothing to seed
+        if (data && data.length > 0) return; // already has content
+
+        var rows = DEFAULT_FAQS.map(function(f, i) {
+            return {
+                category: f.category,
+                question: f.question,
+                answer: f.answer,
+                video_url: f.video_url || null,
+                sort_order: i
+            };
+        });
+        await supabase.from('cleverment_faqs').insert(rows);
+    } catch (e) {
+        // Non-critical - the page will just show a "no FAQs yet" state.
+    }
+}
+
+async function loadFaqs() {
+    try {
+        var { data, error } = await supabase
+            .from('cleverment_faqs')
+            .select('*')
+            .order('category', { ascending: true })
+            .order('sort_order', { ascending: true });
+        if (error) return [];
+        return data || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+async function openFaqPage() {
+    // Remember what was visible so the Back button can return to it.
+    var sections = ['landingPage', 'studentAccess', 'studentAssessmentView', 'teacherAuth', 'teacherDashboard', 'adminAuth', 'adminDashboard'];
+    faqPreviousPageState = null;
+    for (var i = 0; i < sections.length; i++) {
+        var el = document.getElementById(sections[i]);
+        if (el && el.style.display === 'block') {
+            faqPreviousPageState = sections[i];
+            el.style.display = 'none';
+        }
+    }
+
+    document.getElementById('faqPage').style.display = 'block';
+    document.getElementById('faqSearchInput').value = '';
+    faqCurrentCategory = 'teacher';
+    setFaqTabStyles();
+
+    var container = document.getElementById('faqAccordionContainer');
+    container.innerHTML = '<p class="helper-text">Loading...</p>';
+
+    await ensureFaqsSeeded();
+    faqCache = await loadFaqs();
+    renderFaqAccordion();
+}
+
+function closeFaqPage() {
+    document.getElementById('faqPage').style.display = 'none';
+    if (faqPreviousPageState) {
+        document.getElementById(faqPreviousPageState).style.display = 'block';
+    } else {
+        document.getElementById('landingPage').style.display = 'block';
+    }
+}
+
+function setFaqCategory(category) {
+    faqCurrentCategory = category;
+    setFaqTabStyles();
+    renderFaqAccordion();
+}
+
+function setFaqTabStyles() {
+    var teacherTab = document.getElementById('faqTabTeacher');
+    var studentTab = document.getElementById('faqTabStudent');
+    if (!teacherTab || !studentTab) return;
+    teacherTab.className = faqCurrentCategory === 'teacher' ? 'primary-btn' : 'secondary-btn';
+    studentTab.className = faqCurrentCategory === 'student' ? 'primary-btn' : 'secondary-btn';
+}
+
+function filterFaqs() {
+    renderFaqAccordion();
+}
+
+function renderFaqAccordion() {
+    var container = document.getElementById('faqAccordionContainer');
+    var searchTerm = document.getElementById('faqSearchInput').value.trim().toLowerCase();
+
+    var filtered = faqCache.filter(function(f) { return f.category === faqCurrentCategory; });
+
+    if (searchTerm) {
+        filtered = filtered.filter(function(f) {
+            return f.question.toLowerCase().indexOf(searchTerm) !== -1 ||
+                   f.answer.toLowerCase().indexOf(searchTerm) !== -1;
+        });
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = '<p class="helper-text">No matching questions found. Try a different search, or use the WhatsApp link below.</p>';
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < filtered.length; i++) {
+        var f = filtered[i];
+        var answerHtml = f.answer.split('\n').map(function(line) {
+            return line ? '<p style="margin:0 0 8px 0;">' + line + '</p>' : '';
+        }).join('');
+        var videoHtml = f.video_url ? '<a href="' + f.video_url + '" target="_blank" rel="noopener" style="display:inline-block; margin-top:6px; color:#2d6cdf; font-weight:600; text-decoration:none;">🎥 Watch Video</a>' : '';
+
+        html += '<div class="faq-item" style="background:white; border:1.5px solid #eef2f6; border-radius:10px; margin-bottom:10px; overflow:hidden;">' +
+            '<button onclick="toggleFaqItem(' + f.id + ')" style="width:100%; text-align:left; background:none; border:none; padding:14px 16px; font-weight:600; font-size:15px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; color:#1a1a2e;">' +
+            '<span>' + f.question + '</span><span id="faqChevron' + f.id + '" style="margin-left:10px; color:#6b7a8f;">▼</span></button>' +
+            '<div id="faqAnswer' + f.id + '" style="display:none; padding:0 16px 16px; color:#4a5568; font-size:14px; line-height:1.5;">' + answerHtml + videoHtml + '</div>' +
+            '</div>';
+    }
+    container.innerHTML = html;
+}
+
+function toggleFaqItem(id) {
+    var answerEl = document.getElementById('faqAnswer' + id);
+    var chevronEl = document.getElementById('faqChevron' + id);
+    var isOpen = answerEl.style.display === 'block';
+    answerEl.style.display = isOpen ? 'none' : 'block';
+    chevronEl.textContent = isOpen ? '▼' : '▲';
+}
+
+// ============================================================
+// ADMIN: MANAGE FAQs
+// ============================================================
+
+var adminFaqCache = [];
+var adminFaqEditingId = null;
+
+async function renderAdminFaqList() {
+    var container = document.getElementById('adminFaqList');
+    if (!container) return;
+    container.innerHTML = '<p class="helper-text">Loading...</p>';
+
+    await ensureFaqsSeeded();
+    adminFaqCache = await loadFaqs();
+
+    var teacherFaqs = adminFaqCache.filter(function(f) { return f.category === 'teacher'; });
+    var studentFaqs = adminFaqCache.filter(function(f) { return f.category === 'student'; });
+
+    var html = '<h4 style="margin:0 0 8px 0;">Teacher FAQs (' + teacherFaqs.length + ')</h4>';
+    html += buildAdminFaqRows(teacherFaqs);
+    html += '<h4 style="margin:16px 0 8px 0;">Student FAQs (' + studentFaqs.length + ')</h4>';
+    html += buildAdminFaqRows(studentFaqs);
+
+    container.innerHTML = html;
+}
+
+function buildAdminFaqRows(list) {
+    if (list.length === 0) return '<p class="helper-text">None yet.</p>';
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+        var f = list[i];
+        html += '<div style="background:white; padding:10px 14px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">' +
+            '<span style="flex:1; min-width:180px;">' + f.question + (f.video_url ? ' 🎥' : '') + '</span>' +
+            '<div style="display:flex; gap:6px; flex-wrap:wrap;">' +
+            '<button onclick="moveFaqEntry(' + f.id + ', \'up\')" class="secondary-btn" style="font-size:12px; padding:4px 10px;">↑</button>' +
+            '<button onclick="moveFaqEntry(' + f.id + ', \'down\')" class="secondary-btn" style="font-size:12px; padding:4px 10px;">↓</button>' +
+            '<button onclick="openFaqEditForm(' + f.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 10px;">Edit</button>' +
+            '<button onclick="deleteFaqEntry(' + f.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 10px; background:#dc3545; color:white;">Delete</button>' +
+            '</div></div>';
+    }
+    return html;
+}
+
+function openFaqAddForm() {
+    adminFaqEditingId = null;
+    document.getElementById('faqFormTitle').textContent = 'Add New FAQ';
+    document.getElementById('faqFormCategory').value = 'teacher';
+    document.getElementById('faqFormQuestion').value = '';
+    document.getElementById('faqFormAnswer').value = '';
+    document.getElementById('faqFormVideoUrl').value = '';
+    document.getElementById('faqFormOverlay').style.display = 'flex';
+}
+
+function openFaqEditForm(id) {
+    var entry = adminFaqCache.filter(function(f) { return f.id === id; })[0];
+    if (!entry) return;
+    adminFaqEditingId = id;
+    document.getElementById('faqFormTitle').textContent = 'Edit FAQ';
+    document.getElementById('faqFormCategory').value = entry.category;
+    document.getElementById('faqFormQuestion').value = entry.question;
+    document.getElementById('faqFormAnswer').value = entry.answer;
+    document.getElementById('faqFormVideoUrl').value = entry.video_url || '';
+    document.getElementById('faqFormOverlay').style.display = 'flex';
+}
+
+function closeFaqForm() {
+    document.getElementById('faqFormOverlay').style.display = 'none';
+}
+
+async function saveFaqForm() {
+    var category = document.getElementById('faqFormCategory').value;
+    var question = document.getElementById('faqFormQuestion').value.trim();
+    var answer = document.getElementById('faqFormAnswer').value.trim();
+    var videoUrl = document.getElementById('faqFormVideoUrl').value.trim();
+
+    if (!question || !answer) {
+        alert('Please fill in both the question and the answer.');
+        return;
+    }
+
+    try {
+        if (adminFaqEditingId) {
+            var { error } = await supabase
+                .from('cleverment_faqs')
+                .update({ category: category, question: question, answer: answer, video_url: videoUrl || null })
+                .eq('id', adminFaqEditingId);
+            if (error) { alert('Error: ' + error.message); return; }
+        } else {
+            var maxOrder = adminFaqCache.filter(function(f) { return f.category === category; })
+                .reduce(function(max, f) { return Math.max(max, f.sort_order || 0); }, -1);
+            var { error: insertError } = await supabase
+                .from('cleverment_faqs')
+                .insert([{ category: category, question: question, answer: answer, video_url: videoUrl || null, sort_order: maxOrder + 1 }]);
+            if (insertError) { alert('Error: ' + insertError.message); return; }
+        }
+        closeFaqForm();
+        renderAdminFaqList();
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function deleteFaqEntry(id) {
+    if (!confirm('Delete this FAQ? This cannot be undone.')) return;
+    try {
+        var { error } = await supabase.from('cleverment_faqs').delete().eq('id', id);
+        if (error) { alert('Error: ' + error.message); return; }
+        renderAdminFaqList();
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function moveFaqEntry(id, direction) {
+    var entry = adminFaqCache.filter(function(f) { return f.id === id; })[0];
+    if (!entry) return;
+    var siblings = adminFaqCache.filter(function(f) { return f.category === entry.category; })
+        .sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
+    var index = siblings.findIndex(function(f) { return f.id === id; });
+    var swapIndex = direction === 'up' ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= siblings.length) return;
+
+    var other = siblings[swapIndex];
+    var thisOrder = entry.sort_order || 0;
+    var otherOrder = other.sort_order || 0;
+
+    try {
+        await supabase.from('cleverment_faqs').update({ sort_order: otherOrder }).eq('id', entry.id);
+        await supabase.from('cleverment_faqs').update({ sort_order: thisOrder }).eq('id', other.id);
+        renderAdminFaqList();
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+// ============================================================
 // EMAILJS CONNECTION (for teacher password reset emails)
 // ============================================================
 
@@ -2168,6 +2482,8 @@ function backToStudentAccess() {
     clearQuizState();
     stopProctorMonitoring();
     preloadedImageCache = {};
+    var helpBtn1 = document.getElementById('needHelpBtn');
+    if (helpBtn1) helpBtn1.style.display = 'block';
     document.getElementById('studentAssessmentView').style.display = 'none';
     document.getElementById('studentAccess').style.display = 'block';
     document.getElementById('assessmentCode').value = '';
@@ -2347,6 +2663,9 @@ function restoreQuizState() {
     studentProctorStrikes = state.studentProctorStrikes || 0;
     window.assessmentTeacherName = state.assessmentTeacherName || '';
     window.assessmentTeacherSignature = state.assessmentTeacherSignature || '';
+
+    var helpBtn = document.getElementById('needHelpBtn');
+    if (helpBtn) helpBtn.style.display = 'none';
 
     document.querySelector('.header').style.display = 'block';
     document.querySelector('.footer').style.display = 'block';
@@ -2786,6 +3105,9 @@ async function startStudentQuiz() {
 }
 
 function proceedToStartQuiz() {
+    var helpBtn = document.getElementById('needHelpBtn');
+    if (helpBtn) helpBtn.style.display = 'none';
+
     studentSubject = currentAssessment.subject;
     studentQuestions = JSON.parse(JSON.stringify(currentAssessment.questions));
     studentTimeLimit = currentAssessment.timeLimit || 0;
@@ -3244,6 +3566,9 @@ function studentSubmitQuiz() {
 
     clearQuizState();
     stopProctorMonitoring();
+
+    var helpBtn = document.getElementById('needHelpBtn');
+    if (helpBtn) helpBtn.style.display = 'block';
 
     var correct = 0;
     var corrections = [];
@@ -3931,6 +4256,8 @@ function studentResetQuiz() {
     clearQuizState();
     stopProctorMonitoring();
     preloadedImageCache = {};
+    var helpBtn2 = document.getElementById('needHelpBtn');
+    if (helpBtn2) helpBtn2.style.display = 'block';
     document.getElementById('studentResultsSection').style.display = 'none';
     document.getElementById('studentSimpleSubmittedScreen').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'none';
@@ -4171,6 +4498,7 @@ async function renderAdminDashboard() {
     renderAdminResults();
     renderAdminActivityLog();
     renderAdminFileList();
+    renderAdminFaqList();
 }
 
 async function renderAdminReactivationFee() {
