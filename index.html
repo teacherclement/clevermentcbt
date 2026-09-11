@@ -88,9 +88,10 @@
             <button onclick="backToStudentAccess()" class="secondary-btn" style="font-size:13px; padding:6px 16px; margin-bottom:16px;">← Back</button>
             <h2 id="studentAssessmentTitle">Assessment</h2>
             <p id="studentAssessmentSubject" style="color:#6b7a8f; margin-bottom:16px;"></p>
-            <div class="form-group">
+            <div class="form-group" style="position:relative;">
                 <label for="studentNameInput">Student Name</label>
-                <input type="text" id="studentNameInput" placeholder="Enter your full name" class="form-input">
+                <input type="text" id="studentNameInput" placeholder="Enter your full name" class="form-input" oninput="showNameSuggestions()" onblur="hideNameSuggestionsDelayed()" autocomplete="off">
+                <div id="studentNameSuggestions" style="display:none; position:absolute; top:100%; left:0; right:0; background:white; border:1.5px solid #2d6cdf; border-radius:8px; margin-top:4px; max-height:220px; overflow-y:auto; z-index:50; box-shadow:0 4px 14px rgba(0,0,0,0.12);"></div>
             </div>
             <div class="form-group">
                 <label for="studentAdmissionNumber">Admission Number</label>
@@ -569,6 +570,15 @@
             </div>
             <button onclick="handleRosterFileUpload()" class="primary-btn full-width">Upload Roster</button>
             <p id="rosterUploadStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
+
+            <div id="rosterEditWrapper" style="display:none; margin-top:20px; border-top:1.5px solid #eef2f6; padding-top:16px;">
+                <h4 style="margin-bottom:4px;">3. Edit This Class's Roster</h4>
+                <p class="helper-text" style="margin-bottom:12px;">Fix a typo, add one student, or remove someone - without redoing the whole spreadsheet.</p>
+                <div id="rosterEditList"></div>
+                <button onclick="addRosterEditRow()" class="secondary-btn full-width" style="margin-top:8px;">+ Add Student</button>
+                <button onclick="saveRosterEdits()" class="primary-btn full-width" style="margin-top:10px;">Save Changes</button>
+                <p id="rosterEditStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
+            </div>
         </div>
 
         <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">

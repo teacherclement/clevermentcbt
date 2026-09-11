@@ -939,23 +939,23 @@ document.addEventListener('DOMContentLoaded', function() {
         rosterClassSelect.addEventListener('change', async function() {
             var statusEl = document.getElementById('rosterUploadStatus');
             statusEl.style.display = 'none';
+            document.getElementById('rosterEditStatus').style.display = 'none';
 
             if (this.value === 'Other') {
                 rosterCustomWrapper.style.display = 'block';
                 rosterCustomInput.focus();
+                document.getElementById('rosterEditWrapper').style.display = 'none';
                 return;
             }
             rosterCustomWrapper.style.display = 'none';
             rosterCustomInput.value = '';
             var className = this.value;
-            if (!className) return;
-
-            var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
-            var roster = await getRosterForClass(teacherEmail, className);
-            if (roster && roster.length > 0) {
-                statusEl.textContent = 'Current roster for ' + className + ': ' + roster.length + ' student(s). Uploading a new file will replace this.';
-                statusEl.style.display = 'block';
+            if (!className) {
+                document.getElementById('rosterEditWrapper').style.display = 'none';
+                return;
             }
+
+            await loadRosterForEditing(className);
         });
     }
 
@@ -2016,6 +2016,107 @@ async function getRosterForClass(teacherEmail, className) {
     }
 }
 
+// ============================================================
+// ROSTER EDITING (in-app, no spreadsheet round-trip needed)
+// ============================================================
+
+var currentRosterEditClass = '';
+var currentRosterEditEntries = [];
+
+async function loadRosterForEditing(className) {
+    currentRosterEditClass = className;
+    var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
+    var roster = await getRosterForClass(teacherEmail, className);
+    currentRosterEditEntries = roster ? roster.map(function(e) {
+        return { name: e.name || '', admissionNumber: e.admissionNumber || '' };
+    }) : [];
+
+    document.getElementById('rosterEditWrapper').style.display = 'block';
+    renderRosterEditList();
+}
+
+function syncRosterEditEntriesFromDOM() {
+    var rows = document.querySelectorAll('#rosterEditList .roster-edit-row');
+    var entries = [];
+    for (var i = 0; i < rows.length; i++) {
+        var nameInput = rows[i].querySelector('.roster-edit-name');
+        var admInput = rows[i].querySelector('.roster-edit-admission');
+        entries.push({ name: nameInput.value, admissionNumber: admInput.value });
+    }
+    currentRosterEditEntries = entries;
+}
+
+function renderRosterEditList() {
+    var container = document.getElementById('rosterEditList');
+    if (currentRosterEditEntries.length === 0) {
+        container.innerHTML = '<p class="helper-text">No students yet. Upload a spreadsheet above, or add students one by one below.</p>';
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < currentRosterEditEntries.length; i++) {
+        var entry = currentRosterEditEntries[i];
+        html += '<div class="roster-edit-row" style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">' +
+            '<input type="text" class="roster-edit-name form-input" style="flex:2; min-width:140px;" placeholder="Student Name" value="' + escapeHtmlAttr(entry.name) + '">' +
+            '<input type="text" class="roster-edit-admission form-input" style="flex:1; min-width:120px;" placeholder="Admission Number" value="' + escapeHtmlAttr(entry.admissionNumber) + '">' +
+            '<button onclick="deleteRosterEditRow(' + i + ')" class="secondary-btn" style="background:#dc3545; color:white; padding:8px 12px;">✕</button>' +
+            '</div>';
+    }
+    container.innerHTML = html;
+}
+
+function escapeHtmlAttr(str) {
+    return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function addRosterEditRow() {
+    syncRosterEditEntriesFromDOM();
+    currentRosterEditEntries.push({ name: '', admissionNumber: '' });
+    renderRosterEditList();
+    var rows = document.querySelectorAll('#rosterEditList .roster-edit-row');
+    var lastRow = rows[rows.length - 1];
+    if (lastRow) lastRow.querySelector('.roster-edit-name').focus();
+}
+
+function deleteRosterEditRow(index) {
+    syncRosterEditEntriesFromDOM();
+    currentRosterEditEntries.splice(index, 1);
+    renderRosterEditList();
+}
+
+async function saveRosterEdits() {
+    if (!currentRosterEditClass) {
+        alert('Please select a class first.');
+        return;
+    }
+    syncRosterEditEntriesFromDOM();
+
+    var cleaned = [];
+    for (var i = 0; i < currentRosterEditEntries.length; i++) {
+        var name = currentRosterEditEntries[i].name.trim();
+        var admissionNumber = currentRosterEditEntries[i].admissionNumber.trim();
+        if (!name && !admissionNumber) continue; // skip fully blank rows
+        if (!name || !admissionNumber) {
+            alert('Every student needs both a Name and an Admission Number. Please fill in the incomplete row, or remove it.');
+            return;
+        }
+        cleaned.push({ name: name, admissionNumber: admissionNumber });
+    }
+
+    var statusEl = document.getElementById('rosterEditStatus');
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Saving...';
+
+    var saved = await saveClassRosterEntries(currentRosterEditClass, cleaned);
+    if (saved) {
+        currentRosterEditEntries = cleaned;
+        renderRosterEditList();
+        statusEl.textContent = 'Saved: ' + cleaned.length + ' student(s) on the roster for ' + currentRosterEditClass + '.';
+    } else {
+        statusEl.textContent = 'Could not save. Please try again.';
+    }
+}
+
 function downloadRosterTemplate() {
     var classSelect = document.getElementById('rosterClassSelect');
     var customInput = document.getElementById('rosterCustomClass');
@@ -2492,6 +2593,67 @@ function showAssessmentForm() {
     document.getElementById('studentAdmissionNumber').value = '';
     document.getElementById('studentNameInput').focus();
     updateURL('student-assessment');
+
+    loadRosterForNameAutocomplete();
+}
+
+var currentClassRosterForAutocomplete = [];
+
+async function loadRosterForNameAutocomplete() {
+    currentClassRosterForAutocomplete = [];
+    if (!currentAssessment) return;
+    var roster = await getRosterForClass(currentAssessment.teacherEmail, currentAssessment.className);
+    currentClassRosterForAutocomplete = roster || [];
+}
+
+function showNameSuggestions() {
+    var input = document.getElementById('studentNameInput');
+    var box = document.getElementById('studentNameSuggestions');
+    var typed = input.value.trim().toLowerCase();
+
+    if (typed.length < 2 || currentClassRosterForAutocomplete.length === 0) {
+        box.style.display = 'none';
+        return;
+    }
+
+    var matches = currentClassRosterForAutocomplete.filter(function(entry) {
+        return entry.name && entry.name.toLowerCase().indexOf(typed) !== -1;
+    }).slice(0, 5);
+
+    if (matches.length === 0) {
+        box.style.display = 'none';
+        return;
+    }
+
+    var html = '';
+    for (var i = 0; i < matches.length; i++) {
+        var entry = matches[i];
+        html += '<div onmousedown="selectNameSuggestion(\'' + escapeJsString(entry.name) + '\', \'' + escapeJsString(entry.admissionNumber) + '\')" ' +
+            'style="padding:10px 14px; cursor:pointer; border-bottom:1px solid #eef2f6;" ' +
+            'onmouseover="this.style.background=\'#eef6ff\'" onmouseout="this.style.background=\'white\'">' +
+            '<strong>' + entry.name + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + entry.admissionNumber + ')</span>' +
+            '</div>';
+    }
+    box.innerHTML = html;
+    box.style.display = 'block';
+}
+
+function selectNameSuggestion(name, admissionNumber) {
+    document.getElementById('studentNameInput').value = name;
+    document.getElementById('studentAdmissionNumber').value = admissionNumber;
+    document.getElementById('studentNameSuggestions').style.display = 'none';
+}
+
+function hideNameSuggestionsDelayed() {
+    // A short delay so a click on a suggestion (onmousedown) fires before
+    // this blur-triggered hide would otherwise remove it from the DOM.
+    setTimeout(function() {
+        document.getElementById('studentNameSuggestions').style.display = 'none';
+    }, 150);
+}
+
+function escapeJsString(str) {
+    return (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 function backToStudentAccess() {
