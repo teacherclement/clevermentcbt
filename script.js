@@ -191,8 +191,8 @@ var faqPreviousPageState = null;
 async function ensureFaqsSeeded() {
     try {
         var { data, error } = await supabase.from('cleverment_faqs').select('id').limit(1);
-        if (error) return; // table probably doesn't exist yet - nothing to seed
-        if (data && data.length > 0) return; // already has content
+        if (error) return { ok: false, error: error.message };
+        if (data && data.length > 0) return { ok: true, alreadyHadContent: true };
 
         var rows = DEFAULT_FAQS.map(function(f, i) {
             return {
@@ -203,9 +203,11 @@ async function ensureFaqsSeeded() {
                 sort_order: i
             };
         });
-        await supabase.from('cleverment_faqs').insert(rows);
+        var { error: insertError } = await supabase.from('cleverment_faqs').insert(rows);
+        if (insertError) return { ok: false, error: insertError.message };
+        return { ok: true, alreadyHadContent: false };
     } catch (e) {
-        // Non-critical - the page will just show a "no FAQs yet" state.
+        return { ok: false, error: e.message };
     }
 }
 
@@ -221,6 +223,13 @@ async function loadFaqs() {
     } catch (e) {
         return [];
     }
+}
+
+function explainFaqSeedError(message) {
+    if (/row-level security|permission denied|rls/i.test(message || '')) {
+        return 'Could not load FAQs: Row Level Security is still blocking writes on the cleverment_faqs table. Go to that table in Supabase and turn OFF "Enable RLS" (Table Editor -> cleverment_faqs -> the RLS toggle near the top), then reopen this page.';
+    }
+    return 'Could not load FAQs (' + message + '). Please check the cleverment_faqs table exists in Supabase with the right columns, then try again.';
 }
 
 async function openFaqPage() {
@@ -243,7 +252,11 @@ async function openFaqPage() {
     var container = document.getElementById('faqAccordionContainer');
     container.innerHTML = '<p class="helper-text">Loading...</p>';
 
-    await ensureFaqsSeeded();
+    var seedResult = await ensureFaqsSeeded();
+    if (!seedResult.ok) {
+        container.innerHTML = '<p style="color:#dc3545; font-weight:600;">' + explainFaqSeedError(seedResult.error) + '</p>';
+        return;
+    }
     faqCache = await loadFaqs();
     renderFaqAccordion();
 }
@@ -330,7 +343,11 @@ async function renderAdminFaqList() {
     if (!container) return;
     container.innerHTML = '<p class="helper-text">Loading...</p>';
 
-    await ensureFaqsSeeded();
+    var seedResult = await ensureFaqsSeeded();
+    if (!seedResult.ok) {
+        container.innerHTML = '<p style="color:#dc3545; font-weight:600;">' + explainFaqSeedError(seedResult.error) + '</p>';
+        return;
+    }
     adminFaqCache = await loadFaqs();
 
     var teacherFaqs = adminFaqCache.filter(function(f) { return f.category === 'teacher'; });
