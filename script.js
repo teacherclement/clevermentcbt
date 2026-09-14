@@ -1253,41 +1253,6 @@ async function submitNewPassword() {
     }
 }
 
-function getTeachersLocal() {
-    var stored = localStorage.getItem('cleverment_teachers');
-    if (stored) {
-        try { return JSON.parse(stored); } catch(e) { return []; }
-    }
-    return [];
-}
-
-function saveTeachersLocal(teachers) {
-    localStorage.setItem('cleverment_teachers', JSON.stringify(teachers));
-}
-
-async function getTeacherFromDatabase(email) {
-    try {
-        var { data, error } = await supabase
-            .from('cleverment_teachers')
-            .select('*')
-            .eq('email', email)
-            .maybeSingle();
-        if (error) return null;
-        return data;
-    } catch(e) { return null; }
-}
-
-async function getAllTeachersFromDatabase() {
-    try {
-        var { data, error } = await supabase
-            .from('cleverment_teachers')
-            .select('*')
-            .order('created_at', { ascending: false });
-        if (error) return [];
-        return data || [];
-    } catch(e) { return []; }
-}
-
 async function teacherSignup() {
     var name = document.getElementById('teacherSignupName').value.trim();
     var email = document.getElementById('teacherSignupEmail').value.trim();
@@ -4736,29 +4701,47 @@ async function saveReactivationFee() {
 async function renderAdminTeacherList() {
     var container = document.getElementById('adminTeacherList');
     if (!container) return;
-    
-    var teachers = await getAllTeachersFromDatabase();
-    
-    if (!teachers || teachers.length === 0) {
-        container.innerHTML = '<p class="helper-text">No teachers registered yet.</p>';
+
+    var adminToken = localStorage.getItem('cleverment_admin_token');
+    if (!adminToken) {
+        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">Admin session missing - please log out and log in again.</p>';
         return;
     }
-    
-    var html = '';
-    for (var i = 0; i < teachers.length; i++) {
-        var isPaused = teachers[i].paused ? true : false;
-        var pauseText = isPaused ? 'Unpause' : 'Pause';
-        var pauseColor = isPaused ? '#2d9c5c' : '#e67e22';
-        html += '<div style="background:white; padding:10px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
-            '<div><strong>' + teachers[i].name + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + teachers[i].email + ')</span>' +
-            (isPaused ? ' <span style="color:#dc3545; font-size:12px; font-weight:600;">[PAUSED]</span>' : '') +
-            '</div>' +
-            '<div style="display:flex; gap:6px;">' +
-            '<button onclick="adminPauseTeacher(' + teachers[i].id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:' + pauseColor + '; color:white;">' + pauseText + '</button>' +
-            '<button onclick="adminDeleteTeacher(' + teachers[i].id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#dc3545; color:white;">Remove</button>' +
-            '</div></div>';
+
+    try {
+        var res = await fetch(BACKEND_URL + '/api/admin/teachers', {
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            container.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + (data.error || 'Could not load teachers.') + '</p>';
+            return;
+        }
+        var teachers = data.teachers || [];
+
+        if (teachers.length === 0) {
+            container.innerHTML = '<p class="helper-text">No teachers registered yet.</p>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < teachers.length; i++) {
+            var isPaused = teachers[i].paused ? true : false;
+            var pauseText = isPaused ? 'Unpause' : 'Pause';
+            var pauseColor = isPaused ? '#2d9c5c' : '#e67e22';
+            html += '<div style="background:white; padding:10px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
+                '<div><strong>' + teachers[i].name + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + teachers[i].email + ')</span>' +
+                (isPaused ? ' <span style="color:#dc3545; font-size:12px; font-weight:600;">[PAUSED]</span>' : '') +
+                '</div>' +
+                '<div style="display:flex; gap:6px;">' +
+                '<button onclick="adminPauseTeacher(' + teachers[i].id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:' + pauseColor + '; color:white;">' + pauseText + '</button>' +
+                '<button onclick="adminDeleteTeacher(' + teachers[i].id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#dc3545; color:white;">Remove</button>' +
+                '</div></div>';
+        }
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">Could not reach the server. Please check your connection.</p>';
     }
-    container.innerHTML = html;
 }
 
 var adminAssessmentsCache = [];
@@ -4828,70 +4811,44 @@ function applyAdminAssessmentFilter() {
 
 async function adminPauseTeacher(id) {
     if (!confirm('Pause/unpause this teacher?')) return;
+    var adminToken = localStorage.getItem('cleverment_admin_token');
 
-    var teachers = await getAllTeachersFromDatabase();
-    var teacher = null;
-    for (var i = 0; i < teachers.length; i++) {
-        if (teachers[i].id === id) {
-            teacher = teachers[i];
-            break;
-        }
-    }
-    
-    if (!teacher) {
-        alert('Teacher not found.');
-        return;
-    }
-    
-    var newPaused = !teacher.paused;
-    
     try {
-        var { error } = await supabase
-            .from('cleverment_teachers')
-            .update({ paused: newPaused })
-            .eq('id', id);
-        
-        if (error) {
-            alert('Error: ' + error.message);
+        var res = await fetch(BACKEND_URL + '/api/admin/teachers/' + id + '/pause', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            alert('Error: ' + (data.error || 'Could not update teacher.'));
             return;
         }
-        
-        alert(newPaused ? 'Teacher paused.' : 'Teacher unpaused.');
+        alert(data.paused ? 'Teacher paused.' : 'Teacher unpaused.');
         renderAdminTeacherList();
-    } catch(e) {
+    } catch (e) {
         alert('Error: ' + e.message);
     }
 }
 
 async function adminDeleteTeacher(id) {
     if (!confirm('Delete this teacher? This will permanently remove their account and all their data.')) return;
-    
+    var adminToken = localStorage.getItem('cleverment_admin_token');
+
     try {
-        var { error } = await supabase
-            .from('cleverment_teachers')
-            .delete()
-            .eq('id', id);
-        
-        if (error) {
-            alert('Error: ' + error.message);
+        var res = await fetch(BACKEND_URL + '/api/admin/teachers/' + id, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            alert('Error: ' + (data.error || 'Could not delete teacher.'));
             return;
         }
-        
-        var teachers = getTeachersLocal();
-        var filtered = teachers.filter(function(t) { return t.id !== id; });
-        saveTeachersLocal(filtered);
-        
         alert('Teacher deleted successfully.');
         renderAdminTeacherList();
-    } catch(e) {
+    } catch (e) {
         alert('Error: ' + e.message);
     }
-}
-
-function adminDeleteAllTeachers() {
-    if (!confirm('Delete ALL teachers? This cannot be undone!')) return;
-    saveTeachersLocal([]);
-    renderAdminTeacherList();
 }
 
 var adminResultsCache = [];
