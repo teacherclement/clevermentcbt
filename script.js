@@ -1646,72 +1646,41 @@ function getPublishedAssessmentsLocal() {
     return [];
 }
 
-// ============================================================
-// GENERIC INSERT-WITH-FALLBACK: several optional columns
-// (available_from, available_until, pass_mark, tab_switches,
-// answers) may not exist yet if a Supabase migration hasn't been
-// run. Rather than one-off retry logic per table, this strips
-// whichever specific column Postgres says is missing and retries,
-// one column at a time, so a submission or publish never fails
-// just because a newer feature's column isn't there yet.
-// ============================================================
-
-async function insertWithColumnFallback(table, payload) {
-    var attemptPayload = Object.assign({}, payload);
-    for (var attempt = 0; attempt < 6; attempt++) {
-        try {
-            var { data, error } = await supabase.from(table).insert([attemptPayload]);
-            if (!error) return { success: true };
-            var match = /column ["']?([a-zA-Z0-9_]+)["']? .*does not exist/i.exec(error.message || '');
-            if (match && Object.prototype.hasOwnProperty.call(attemptPayload, match[1])) {
-                delete attemptPayload[match[1]];
-                console.warn(table + ': column "' + match[1] + '" not found in Supabase - saved without it. Add that column to enable the related feature.');
-                continue;
-            }
-            return { success: false, error: error };
-        } catch (e) {
-            return { success: false, error: e };
-        }
-    }
-    return { success: false, error: { message: 'Too many missing columns - could not save.' } };
-}
-
 async function savePublishedAssessmentToDatabase(assessment) {
-    var payload = {
-        teacher_email: assessment.teacherEmail,
-        teacher_name: assessment.teacherName || 'Unknown Teacher',
-        teacher_signature: assessment.teacherSignature || '',
-        subject: assessment.subject,
-        class_name: assessment.className,
-        code: assessment.code,
-        questions: assessment.questions,
-        time_limit: assessment.timeLimit,
-        shuffle: assessment.shuffle,
-        camera_monitoring: assessment.cameraMonitoring || false,
-        noise_monitoring: assessment.noiseMonitoring || false,
-        show_results: assessment.showResults !== false,
-        available_from: assessment.availableFrom,
-        available_until: assessment.availableUntil,
-        pass_mark: assessment.passMark
-    };
-    var result = await insertWithColumnFallback('cleverment_assessments', payload);
-    if (!result.success) {
-        alert('Supabase Error: ' + result.error.message);
-        return false;
-    }
-    return true;
-}
-
-async function getAssessmentByCodeFromDatabase(code) {
+    var teacherToken = localStorage.getItem('cleverment_teacher_token');
     try {
-        var { data, error } = await supabase
-            .from('cleverment_assessments')
-            .select('*')
-            .eq('code', code)
-            .maybeSingle();
-        if (error) return null;
-        return data;
-    } catch(e) { return null; }
+        var res = await fetch(BACKEND_URL + '/api/teacher/assessments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + teacherToken
+            },
+            body: JSON.stringify({
+                teacherName: assessment.teacherName,
+                teacherSignature: assessment.teacherSignature,
+                subject: assessment.subject,
+                className: assessment.className,
+                questions: assessment.questions,
+                timeLimit: assessment.timeLimit,
+                shuffle: assessment.shuffle,
+                cameraMonitoring: assessment.cameraMonitoring,
+                noiseMonitoring: assessment.noiseMonitoring,
+                showResults: assessment.showResults,
+                availableFrom: assessment.availableFrom,
+                availableUntil: assessment.availableUntil,
+                passMark: assessment.passMark
+            })
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            alert('Error: ' + (data.error || 'Could not publish assessment.'));
+            return null;
+        }
+        return data.assessment.code;
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection and try again.');
+        return null;
+    }
 }
 
 function teacherPublishAssessment() {
@@ -1817,15 +1786,12 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
     var availableFrom = availableFromRaw ? new Date(availableFromRaw).toISOString() : null;
     var availableUntil = availableUntilRaw ? new Date(availableUntilRaw).toISOString() : null;
 
-    var code = subject.substring(0, 3).toUpperCase() + '-' + className.substring(0, 3).toUpperCase() + '-' + String(Date.now()).slice(-3);
-
     var assessment = {
         teacherEmail: currentTeacher ? currentTeacher.email : 'unknown',
         teacherName: teacherCertName || currentTeacher?.name || 'Unknown Teacher',
         teacherSignature: teacherSignature || '',
         subject: subject,
         className: className,
-        code: code,
         questions: JSON.parse(JSON.stringify(teacherQuestions)),
         timeLimit: timeLimit,
         shuffle: shuffle,
@@ -1837,7 +1803,9 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         availableUntil: availableUntil
     };
 
-    await savePublishedAssessmentToDatabase(assessment);
+    var code = await savePublishedAssessmentToDatabase(assessment);
+    if (!code) return; // publish failed - the error was already shown
+
     logTeacherActivity(assessment.teacherEmail, 'publish_assessment', 'Published: ' + subject + ' | Class: ' + className + ' | Code: ' + code);
 
     if (teacherQuestions.length > 0) {
@@ -1923,8 +1891,7 @@ async function renderTeacherPublishedList() {
     if (!container) return;
 
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
-    var allAssessments = await getAllAssessmentsFromDatabase();
-    var filtered = allAssessments.filter(function(a) { return a.teacherEmail === teacherEmail; });
+    var filtered = await getTeacherAssessmentsFromBackend();
     teacherAssessmentsCache = filtered;
 
     populateTeacherAnalyticsSelect(filtered);
@@ -2524,17 +2491,19 @@ function copyAssessmentCode(code) {
 
 async function deletePublishedAssessment(id) {
     if (!confirm('Delete this assessment? This cannot be undone.')) return;
+    var teacherToken = localStorage.getItem('cleverment_teacher_token');
     try {
-        var { error } = await supabase
-            .from('cleverment_assessments')
-            .delete()
-            .eq('id', id);
-        if (error) {
-            alert('Error: ' + error.message);
+        var res = await fetch(BACKEND_URL + '/api/teacher/assessments/' + id, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + teacherToken }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            alert('Error: ' + (data.error || 'Could not delete assessment.'));
             return;
         }
     } catch (e) {
-        alert('Error: ' + e.message);
+        alert('Could not reach the server. Please check your connection.');
         return;
     }
     renderTeacherPublishedList();
@@ -2634,108 +2603,60 @@ function backToStudentAccess() {
     updateURL('student');
 }
 
-function getAssessmentWindowBlockMessage(assessment) {
-    var now = new Date();
-    if (assessment.availableFrom) {
-        var from = new Date(assessment.availableFrom);
-        if (!isNaN(from.getTime()) && now < from) {
-            return 'This assessment is not open yet. It becomes available on ' + formatDate(from) + '.';
-        }
-    }
-    if (assessment.availableUntil) {
-        var until = new Date(assessment.availableUntil);
-        if (!isNaN(until.getTime()) && now > until) {
-            return 'This assessment window has closed. It was available until ' + formatDate(until) + '.';
-        }
-    }
-    return null;
-}
-
-function verifyAssessmentCode() {
+async function verifyAssessmentCode() {
     var codeFromURL = getCodeFromURL();
     var code = codeFromURL || document.getElementById('assessmentCode').value.trim().toUpperCase();
-    
+
     if (!code) {
         alert('Please enter the assessment code provided by your teacher.');
         return;
     }
 
-    getAssessmentByCodeFromDatabase(code).then(function(found) {
-        if (found) {
-            currentAssessment = {
-                id: found.id,
-                code: found.code,
-                teacherEmail: found.teacher_email,
-                teacherName: found.teacher_name || 'Unknown Teacher',
-                teacherSignature: found.teacher_signature || '',
-                subject: found.subject,
-                className: found.class_name,
-                questions: found.questions,
-                timeLimit: found.time_limit,
-                shuffle: found.shuffle,
-                cameraMonitoring: found.camera_monitoring || false,
-                noiseMonitoring: found.noise_monitoring || false,
-                showResults: found.show_results !== false,
-                passMark: (found.pass_mark !== null && found.pass_mark !== undefined) ? found.pass_mark : 50,
-                availableFrom: found.available_from || null,
-                availableUntil: found.available_until || null
-            };
-            currentAssessmentCode = code;
-            window.assessmentTeacherName = found.teacher_name || 'Unknown Teacher';
-            window.assessmentTeacherSignature = found.teacher_signature || '';
+    try {
+        var res = await fetch(BACKEND_URL + '/api/quiz/assessment/' + encodeURIComponent(code));
+        var data = await res.json();
 
-            var blockMsg = getAssessmentWindowBlockMessage(currentAssessment);
-            if (blockMsg) {
-                alert(blockMsg);
-                currentAssessment = null;
-                currentAssessmentCode = '';
-                return;
-            }
-
-            if (codeFromURL) {
-                document.getElementById('studentAccess').style.display = 'none';
-                showAssessmentForm();
-                document.getElementById('assessmentCode').value = code;
+        if (!res.ok) {
+            if (data.error === 'not_yet_open') {
+                alert('This assessment is not open yet. It becomes available on ' + formatDate(new Date(data.availableFrom)) + '.');
+            } else if (data.error === 'closed') {
+                alert('This assessment window has closed. It was available until ' + formatDate(new Date(data.availableUntil)) + '.');
             } else {
-                showAssessmentForm();
+                alert('Invalid assessment code. Please check with your teacher.');
             }
             return;
         }
 
-        var published = getPublishedAssessmentsLocal();
-        var foundLocal = null;
-        for (var i = 0; i < published.length; i++) {
-            if (published[i].code === code) {
-                foundLocal = published[i];
-                break;
-            }
-        }
+        currentAssessment = {
+            id: data.id,
+            code: data.code,
+            teacherEmail: data.teacherEmail,
+            teacherName: data.teacherName,
+            teacherSignature: data.teacherSignature,
+            subject: data.subject,
+            className: data.className,
+            questions: data.questions, // already stripped of correct answers by the server
+            timeLimit: data.timeLimit,
+            shuffle: data.shuffle,
+            cameraMonitoring: data.cameraMonitoring,
+            noiseMonitoring: data.noiseMonitoring,
+            showResults: data.showResults,
+            passMark: data.passMark
+        };
+        currentAssessmentCode = code;
+        window.assessmentTeacherName = data.teacherName;
+        window.assessmentTeacherSignature = data.teacherSignature;
 
-        if (foundLocal) {
-            currentAssessment = foundLocal;
-            currentAssessmentCode = code;
-            window.assessmentTeacherName = foundLocal.teacherName || 'Unknown Teacher';
-            window.assessmentTeacherSignature = foundLocal.teacherSignature || '';
-
-            var blockMsgLocal = getAssessmentWindowBlockMessage(currentAssessment);
-            if (blockMsgLocal) {
-                alert(blockMsgLocal);
-                currentAssessment = null;
-                currentAssessmentCode = '';
-                return;
-            }
-
-            if (codeFromURL) {
-                document.getElementById('studentAccess').style.display = 'none';
-                showAssessmentForm();
-                document.getElementById('assessmentCode').value = code;
-            } else {
-                showAssessmentForm();
-            }
+        if (codeFromURL) {
+            document.getElementById('studentAccess').style.display = 'none';
+            showAssessmentForm();
+            document.getElementById('assessmentCode').value = code;
         } else {
-            alert('Invalid assessment code. Please check with your teacher.');
+            showAssessmentForm();
         }
-    });
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection and try again.');
+    }
 }
 
 // ============================================================
@@ -3132,9 +3053,7 @@ async function resumeProctorMonitoringAfterRefresh() {
 }
 
 function shuffleOptionsForQuestion(q) {
-    var letters = ['A', 'B', 'C', 'D'];
-    var correctIndex = letters.indexOf(q.correctAnswer);
-    if (correctIndex === -1 || correctIndex >= q.options.length) return q;
+    if (!q.options || q.options.length < 2) return q;
 
     var indices = [];
     for (var i = 0; i < q.options.length; i++) indices.push(i);
@@ -3144,14 +3063,14 @@ function shuffleOptionsForQuestion(q) {
     }
 
     var newOptions = [];
-    var newCorrectIndex = 0;
     for (var m = 0; m < indices.length; m++) {
         newOptions.push(q.options[indices[m]]);
-        if (indices[m] === correctIndex) newCorrectIndex = m;
     }
 
+    // No correctAnswer letter to keep in sync anymore - the server
+    // grades by comparing option TEXT, so shuffled order alone is
+    // all that's needed here.
     q.options = newOptions;
-    q.correctAnswer = letters[newCorrectIndex];
     return q;
 }
 
@@ -3544,63 +3463,12 @@ function studentTimeUp() {
 // STUDENT SUBMIT QUIZ
 // ============================================================
 
-function saveResultLocal(result) {
-    var results = getAllResultsLocal();
-    results.push({
-        id: Date.now(),
-        teacherEmail: result.teacherEmail,
-        className: result.className,
-        studentName: result.studentName,
-        admissionNumber: result.admissionNumber || '',
-        subject: result.subject,
-        score: result.score,
-        totalQuestions: result.totalQuestions,
-        correctAnswers: result.correctAnswers,
-        timeTaken: result.timeTaken,
-        assessmentCode: result.assessmentCode,
-        tabSwitches: result.tabSwitches || 0,
-        proctorViolations: result.proctorViolations || 0,
-        date: new Date().toLocaleString()
-    });
-    // Cap this local backup so it can't grow forever and eventually
-    // hit the browser's storage quota. Supabase is the real source
-    // of truth now; this is only an offline-fallback safety net.
-    if (results.length > 300) {
-        results = results.slice(results.length - 300);
-    }
-    localStorage.setItem('cleverment_all_results', JSON.stringify(results));
-}
-
 function getAllResultsLocal() {
     var stored = localStorage.getItem('cleverment_all_results');
     if (stored) {
         try { return JSON.parse(stored); } catch(e) { return []; }
     }
     return [];
-}
-
-async function saveResultToDatabase(result) {
-    var payload = {
-        teacher_email: result.teacherEmail,
-        student_name: result.studentName,
-        admission_number: result.admissionNumber || '',
-        class_name: result.className,
-        subject: result.subject,
-        score: result.score,
-        correct_answers: result.correctAnswers,
-        total_questions: result.totalQuestions,
-        time_taken: result.timeTaken,
-        assessment_code: result.assessmentCode,
-        tab_switches: result.tabSwitches || 0,
-        proctor_violations: result.proctorViolations || 0,
-        answers: result.answers || null
-    };
-    var outcome = await insertWithColumnFallback('cleverment_results', payload);
-    if (!outcome.success) {
-        alert('Supabase Error: ' + outcome.error.message);
-        return false;
-    }
-    return true;
 }
 
 // ============================================================
@@ -3662,38 +3530,55 @@ function normalizeAssessmentRow(a) {
     };
 }
 
-async function getAllAssessmentsFromDatabase() {
+async function getTeacherAssessmentsFromBackend() {
+    var teacherToken = localStorage.getItem('cleverment_teacher_token');
     try {
-        var { data, error } = await supabase
-            .from('cleverment_assessments')
-            .select('*')
-            .order('id', { ascending: false });
-        if (error || !data) return getPublishedAssessmentsLocal();
-        return data.map(normalizeAssessmentRow);
+        var res = await fetch(BACKEND_URL + '/api/teacher/assessments', {
+            headers: { 'Authorization': 'Bearer ' + teacherToken }
+        });
+        var data = await res.json();
+        if (!res.ok) return getPublishedAssessmentsLocal();
+        return (data.assessments || []).map(normalizeAssessmentRow);
     } catch (e) {
         return getPublishedAssessmentsLocal();
     }
 }
 
+async function getAdminAssessmentsFromBackend() {
+    var adminToken = localStorage.getItem('cleverment_admin_token');
+    try {
+        var res = await fetch(BACKEND_URL + '/api/admin/assessments', {
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        var data = await res.json();
+        if (!res.ok) return [];
+        return (data.assessments || []).map(normalizeAssessmentRow);
+    } catch (e) {
+        return [];
+    }
+}
+
 async function adminDeleteAssessment(id) {
     if (!confirm('Delete this assessment? Students will no longer be able to take it with its code.')) return;
+    var adminToken = localStorage.getItem('cleverment_admin_token');
     try {
-        var { error } = await supabase
-            .from('cleverment_assessments')
-            .delete()
-            .eq('id', id);
-        if (error) {
-            alert('Error: ' + error.message);
+        var res = await fetch(BACKEND_URL + '/api/admin/assessments/' + id, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            alert('Error: ' + (data.error || 'Could not delete assessment.'));
             return;
         }
         alert('Assessment deleted.');
         renderAdminAssessmentList();
     } catch (e) {
-        alert('Error: ' + e.message);
+        alert('Could not reach the server. Please check your connection.');
     }
 }
 
-function studentSubmitQuiz() {
+async function studentSubmitQuiz() {
     var overlay = document.getElementById('studentTimeUpOverlay');
     if (overlay) overlay.remove();
     studentStopTimer();
@@ -3708,61 +3593,64 @@ function studentSubmitQuiz() {
         }
     }
 
+    var submitBtn = document.getElementById('studentSubmitBtn');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
+
+    var letters = ['A', 'B', 'C', 'D'];
+    var answersPayload = [];
+    for (var i = 0; i < studentQuestions.length; i++) {
+        var q = studentQuestions[i];
+        var userLetter = studentAnswers[i];
+        var letterIdx = letters.indexOf(userLetter);
+        var selectedText = letterIdx !== -1 ? (q.options[letterIdx] || null) : null;
+        answersPayload.push({ originalIndex: q.originalIndex, selectedOptionText: selectedText });
+    }
+
+    studentTimeTaken = studentGetTimeTaken();
+
+    var data;
+    try {
+        var res = await fetch(BACKEND_URL + '/api/quiz/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: currentAssessmentCode,
+                studentName: studentName,
+                admissionNumber: studentAdmissionNumber,
+                answers: answersPayload,
+                tabSwitches: studentTabSwitchCount,
+                proctorViolations: studentProctorStrikes,
+                timeTaken: studentTimeTaken
+            })
+        });
+        data = await res.json();
+        if (!res.ok) {
+            alert('Could not submit your assessment: ' + (data.error || 'Unknown error') + '\n\nYour answers are still here - please try Submit again.');
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit'; }
+            if (!studentIsTimeUp && studentEndReason !== 'misconduct') studentStartTimer();
+            return;
+        }
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection and try Submit again - your answers are still here.');
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit'; }
+        if (!studentIsTimeUp && studentEndReason !== 'misconduct') studentStartTimer();
+        return;
+    }
+
     clearQuizState();
     stopProctorMonitoring();
 
     var helpBtn = document.getElementById('needHelpBtn');
     if (helpBtn) helpBtn.style.display = 'block';
 
-    var correct = 0;
-    var corrections = [];
-    var letters = ['A', 'B', 'C', 'D'];
-    for (var i = 0; i < studentQuestions.length; i++) {
-        var q = studentQuestions[i];
-        var userAns = studentAnswers[i];
-        var isCorrect = userAns === q.correctAnswer;
-        if (isCorrect) correct++;
-        var userAnsIdx = letters.indexOf(userAns);
-        var correctAnsIdx = letters.indexOf(q.correctAnswer);
-        corrections.push({
-            question: q.question,
-            userAnswer: userAns || 'Not answered',
-            userAnswerText: userAnsIdx !== -1 ? (q.options[userAnsIdx] || '') : '',
-            correctAnswer: q.correctAnswer,
-            correctAnswerText: correctAnsIdx !== -1 ? (q.options[correctAnsIdx] || '') : '',
-            isCorrect: isCorrect
-        });
-    }
-
-    studentScore = Math.round((correct / studentQuestions.length) * 100);
-    studentCorrect = correct;
-    studentTotal = studentQuestions.length;
-    studentTimeTaken = studentGetTimeTaken();
-
-    var result = {
-        teacherEmail: currentAssessment.teacherEmail || 'unknown',
-        studentName: studentName,
-        admissionNumber: studentAdmissionNumber,
-        className: studentClass,
-        subject: studentSubject,
-        score: studentScore,
-        correctAnswers: correct,
-        totalQuestions: studentQuestions.length,
-        timeTaken: studentTimeTaken,
-        assessmentCode: currentAssessmentCode,
-        tabSwitches: studentTabSwitchCount,
-        proctorViolations: studentProctorStrikes,
-        answers: corrections
-    };
-
-    saveResultToDatabase(result);
-    saveResultLocal(result);
+    studentScore = data.score;
+    studentCorrect = data.correctAnswers;
+    studentTotal = data.totalQuestions;
+    var corrections = data.corrections || [];
 
     document.getElementById('studentQuizSection').style.display = 'none';
 
-    var showResults = currentAssessment.showResults !== false; // defaults to true for older assessments
-
-    if (!showResults) {
+    if (!data.showResults) {
         renderSimpleSubmittedScreen();
         updateURL('results');
         return;
@@ -3783,12 +3671,12 @@ function studentSubmitQuiz() {
     }
 
     var grade = getGrade(studentScore);
-    var passMark = (currentAssessment.passMark !== null && currentAssessment.passMark !== undefined) ? currentAssessment.passMark : 50;
-    var passed = studentScore >= passMark;
+    var passed = data.passed;
+    var passMark = data.passMark;
 
     document.getElementById('studentScoreDisplay').innerHTML = `
         <span class="grade">${grade}</span>
-        ${studentScore}% (${correct}/${studentQuestions.length})<br>
+        ${studentScore}% (${studentCorrect}/${studentTotal})<br>
         <span style="display:inline-block; margin-top:6px; padding:4px 14px; border-radius:20px; font-weight:700; font-size:13px; background:${passed ? '#e6f7ec' : '#fdecec'}; color:${passed ? '#1f8a4c' : '#c0392b'};">${passed ? 'PASSED' : 'NOT PASSED'} (Pass mark: ${passMark}%)</span><br>
         <span class="result-details">
             Class: ${studentClass} | Student: ${studentName} | Subject: ${studentSubject} | Time: ${studentTimeTaken}
@@ -3803,8 +3691,8 @@ function studentSubmitQuiz() {
         div.className = 'correction-item';
         div.innerHTML = `
             <p><strong>Q${j + 1}:</strong> ${item.question}</p>
-            <p>Your answer: <strong style="color:${item.isCorrect ? '#2d9c5c' : '#dc3545'}">${item.userAnswer}${item.userAnswerText ? ' - ' + item.userAnswerText : ''}</strong></p>
-            ${!item.isCorrect ? '<p>Correct answer: <strong style="color:#2d9c5c">' + item.correctAnswer + (item.correctAnswerText ? ' - ' + item.correctAnswerText : '') + '</strong></p>' : ''}
+            <p>Your answer: <strong style="color:${item.isCorrect ? '#2d9c5c' : '#dc3545'}">${item.userAnswerText || 'Not answered'}</strong></p>
+            ${!item.isCorrect ? '<p>Correct answer: <strong style="color:#2d9c5c">' + item.correctAnswerText + '</strong></p>' : ''}
             <p>${item.isCorrect ? 'Correct' : 'Wrong'}</p>
         `;
         container.appendChild(div);
@@ -4427,8 +4315,8 @@ function studentResetQuiz() {
 var teacherResultsCache = [];
 var teacherAssessmentsCache = [];
 
-async function attachPassMarks(results) {
-    var assessments = await getAllAssessmentsFromDatabase();
+async function attachPassMarks(results, isAdmin) {
+    var assessments = isAdmin ? await getAdminAssessmentsFromBackend() : await getTeacherAssessmentsFromBackend();
     var codeToPassMark = {};
     for (var i = 0; i < assessments.length; i++) {
         codeToPassMark[assessments[i].code] = (assessments[i].passMark !== null && assessments[i].passMark !== undefined) ? assessments[i].passMark : 50;
@@ -4443,7 +4331,7 @@ async function renderTeacherDashboard() {
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
     var allResults = await getAllResultsFromDatabase();
     var filtered = allResults.filter(function(r) { return r.teacherEmail === teacherEmail; });
-    filtered = await attachPassMarks(filtered);
+    filtered = await attachPassMarks(filtered, false);
     teacherResultsCache = filtered;
 
     var classSelect = document.getElementById('teacherAdminFilterClass');
@@ -4567,17 +4455,19 @@ function teacherExportResults() {
 async function teacherClearResults() {
     if (!confirm('Delete all your results? This cannot be undone!')) return;
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
+    var teacherToken = localStorage.getItem('cleverment_teacher_token');
     try {
-        var { error } = await supabase
-            .from('cleverment_results')
-            .delete()
-            .eq('teacher_email', teacherEmail);
-        if (error) {
-            alert('Error: ' + error.message);
+        var res = await fetch(BACKEND_URL + '/api/teacher/results', {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + teacherToken }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            alert('Error: ' + (data.error || 'Could not clear results.'));
             return;
         }
     } catch (e) {
-        alert('Error: ' + e.message);
+        alert('Could not reach the server. Please check your connection.');
         return;
     }
     var localResults = getAllResultsLocal();
@@ -4750,7 +4640,7 @@ async function renderAdminAssessmentList() {
     var container = document.getElementById('adminAssessmentList');
     if (!container) return;
 
-    var assessments = await getAllAssessmentsFromDatabase();
+    var assessments = await getAdminAssessmentsFromBackend();
     adminAssessmentsCache = assessments;
 
     var teacherSelect = document.getElementById('adminAssessmentFilterTeacher');
@@ -4855,7 +4745,7 @@ var adminResultsCache = [];
 
 async function renderAdminResults() {
     var results = await getAllResultsFromDatabase();
-    results = await attachPassMarks(results);
+    results = await attachPassMarks(results, true);
     adminResultsCache = results;
 
     var teacherSelect = document.getElementById('adminResultsFilterTeacher');
@@ -4990,17 +4880,19 @@ function adminExportAllResults() {
 
 async function adminClearAllResults() {
     if (!confirm('Delete ALL results from ALL teachers? This cannot be undone!')) return;
+    var adminToken = localStorage.getItem('cleverment_admin_token');
     try {
-        var { error } = await supabase
-            .from('cleverment_results')
-            .delete()
-            .neq('id', -1);
-        if (error) {
-            alert('Error: ' + error.message);
+        var res = await fetch(BACKEND_URL + '/api/admin/results', {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            alert('Error: ' + (data.error || 'Could not clear results.'));
             return;
         }
     } catch (e) {
-        alert('Error: ' + e.message);
+        alert('Could not reach the server. Please check your connection.');
         return;
     }
     localStorage.setItem('cleverment_all_results', JSON.stringify([]));
