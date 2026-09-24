@@ -366,442 +366,555 @@
         </div>
     </div>
 
-    <!-- ===== TEACHER DASHBOARD ===== -->
-    <div id="teacherDashboard" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
-            <div>
-                <h2 id="teacherDashboardName">Teacher Dashboard</h2>
-                <p id="teacherDashboardEmail" style="color:#6b7a8f; font-size:14px;"></p>
-            </div>
-            <button onclick="teacherLogout()" class="secondary-btn" style="font-size:13px; padding:6px 16px;">Logout</button>
-        </div>
-
-        <div id="uploadSection">
-            <h3>Create & Publish Assessment</h3>
-            <div class="form-group">
-                <label for="teacherSubjectSelect">Subject</label>
-                <div class="subject-wrapper">
-                    <select id="teacherSubjectSelect" class="form-input subject-select">
-                        <option value="">-- Select or type a subject --</option>
-                        <option value="Agricultural Science">Agricultural Science</option>
-                        <option value="Art">Art</option>
-                        <option value="Biology">Biology</option>
-                        <option value="Business Studies">Business Studies</option>
-                        <option value="Chemistry">Chemistry</option>
-                        <option value="Christian Religious Knowledge">Christian Religious Knowledge</option>
-                        <option value="Computer Science">Computer Science</option>
-                        <option value="Economics">Economics</option>
-                        <option value="English">English</option>
-                        <option value="French">French</option>
-                        <option value="Geography">Geography</option>
-                        <option value="Government">Government</option>
-                        <option value="History">History</option>
-                        <option value="Islamic Religious Knowledge">Islamic Religious Knowledge</option>
-                        <option value="Literature">Literature</option>
-                        <option value="Mathematics">Mathematics</option>
-                        <option value="Music">Music</option>
-                        <option value="Physical Education">Physical Education</option>
-                        <option value="Physics">Physics</option>
-                        <option value="Science">Science</option>
-                        <option value="Social Studies">Social Studies</option>
-                        <option value="Other">Other (type below)</option>
-                    </select>
-                </div>
-                <div class="custom-subject-wrapper-teacher" style="display:none; margin-top:8px;">
-                    <input type="text" id="teacherCustomSubject" placeholder="Enter custom subject name" class="form-input">
-                    <p class="helper-text">Type your custom subject here</p>
-                </div>
-                <p class="helper-text">Select a subject from the list, or choose "Other" to type your own</p>
-            </div>
-            <div class="form-group">
-                <label for="teacherClassSelect">Select Class</label>
-                <select id="teacherClassSelect" class="form-input">
-                    <option value="">-- Select Class --</option>
-                    <option value="Primary 1">Primary 1</option>
-                    <option value="Primary 2">Primary 2</option>
-                    <option value="Primary 3">Primary 3</option>
-                    <option value="Primary 4">Primary 4</option>
-                    <option value="Primary 5">Primary 5</option>
-                    <option value="Primary 6">Primary 6</option>
-                    <option value="JSS 1">JSS 1</option>
-                    <option value="JSS 2">JSS 2</option>
-                    <option value="JSS 3">JSS 3</option>
-                    <option value="SSS 1">SSS 1</option>
-                    <option value="SSS 2">SSS 2</option>
-                    <option value="SSS 3">SSS 3</option>
-                    <option value="University 100">University 100 Level</option>
-                    <option value="University 200">University 200 Level</option>
-                    <option value="University 300">University 300 Level</option>
-                    <option value="University 400">University 400 Level</option>
-                    <option value="Other">Other</option>
-                </select>
-            </div>
-            <div class="custom-class-wrapper-teacher" style="display:none; margin-top:8px;">
-                <input type="text" id="teacherCustomClass" placeholder="Enter custom class name" class="form-input">
-            </div>
-            <div class="form-group">
-                <label for="teacherTimerSelect">Time Limit</label>
-                <select id="teacherTimerSelect" class="form-input">
-                    <option value="0">No time limit</option>
-                    <option value="5">5 minutes</option>
-                    <option value="10" selected>10 minutes</option>
-                    <option value="15">15 minutes</option>
-                    <option value="20">20 minutes</option>
-                    <option value="30">30 minutes</option>
-                    <option value="45">45 minutes</option>
-                    <option value="60">60 minutes</option>
-                    <option value="90">90 minutes</option>
-                    <option value="120">120 minutes</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="teacherPassMark">Pass Mark (%)</label>
-                <input type="number" id="teacherPassMark" class="form-input" min="0" max="100" value="50">
-            </div>
-            <div class="form-group">
-                <label for="teacherAvailableFrom">Available From (optional)</label>
-                <input type="datetime-local" id="teacherAvailableFrom" class="form-input">
-            </div>
-            <div class="form-group">
-                <label for="teacherAvailableUntil">Available Until (optional)</label>
-                <input type="datetime-local" id="teacherAvailableUntil" class="form-input">
-                <p class="helper-text" style="margin-top:4px;">Leave both blank for an assessment that's open any time the code is used. Times are based on your device's local time zone.</p>
-            </div>
-            <div class="form-group" style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-                <label for="teacherShuffleQuestions" style="margin-bottom:0; cursor:pointer;">Shuffle Questions &amp; Answer Options</label>
-                <input type="checkbox" id="teacherShuffleQuestions" style="width:18px; height:18px; cursor:pointer;">
-                <span style="font-size:13px; color:#6b7a8f;">Randomize question order for each student</span>
-            </div>
-            <div class="form-group" style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
-                <label for="teacherShowResults" style="margin-bottom:0; cursor:pointer;">Show Results &amp; Certificate to Student</label>
-                <input type="checkbox" id="teacherShowResults" checked style="width:18px; height:18px; cursor:pointer;">
-                <span style="font-size:13px; color:#6b7a8f;">Turn off for a real exam - students just see "Submitted", no instant score</span>
-            </div>
-
-            <div style="background:#fff8f0; border:1.5px solid #f5c98f; border-radius:10px; padding:14px 16px; margin-bottom:16px;">
-                <p style="font-weight:600; margin-bottom:8px; color:#a15c00;">Live Monitoring (optional)</p>
-                <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
-                    <label for="teacherCameraMonitoring" style="margin-bottom:0; cursor:pointer;">Camera Monitoring</label>
-                    <input type="checkbox" id="teacherCameraMonitoring" style="width:18px; height:18px; cursor:pointer;">
-                    <span style="font-size:13px; color:#6b7a8f;">Warns and ends the assessment if a student's face isn't visible</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <label for="teacherNoiseMonitoring" style="margin-bottom:0; cursor:pointer;">Noise Monitoring</label>
-                    <input type="checkbox" id="teacherNoiseMonitoring" style="width:18px; height:18px; cursor:pointer;">
-                    <span style="font-size:13px; color:#6b7a8f;">Warns and ends the assessment if it detects loud background noise</span>
-                </div>
-                <p class="helper-text" style="margin-top:8px;">Students will need to allow camera/microphone access to take this assessment. Nothing is ever recorded or saved - checks happen live in the browser only.</p>
-            </div>
-
-            <div class="form-group">
-                <label for="teacherCertName">Teacher's Name (for Certificate)</label>
-                <input type="text" id="teacherCertName" placeholder="Enter your full name as it should appear on certificates" class="form-input">
-            </div>
-            <div class="form-group">
-                <label for="teacherCertSignature">Teacher's Signature (for Certificate)</label>
-                <input type="file" id="teacherCertSignature" accept="image/*" class="form-input">
-                <p class="helper-text">Upload a clear image of your signature (PNG recommended with transparent background)</p>
-                <div id="signaturePreview" style="margin-top:8px; display:none;">
-                    <p style="font-size:13px; color:#2d9c5c;">✓ Signature uploaded</p>
-                    <img id="signaturePreviewImg" src="#" alt="Signature Preview" style="max-height:50px; max-width:150px; border:1px solid #ddd; border-radius:4px;">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="teacherQuestionBankSelect">Load from Question Bank</label>
-                <select id="teacherQuestionBankSelect" class="form-input">
-                    <option value="">-- Select a saved question set --</option>
-                </select>
-                <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
-                    <button onclick="teacherLoadFromBank()" class="secondary-btn" style="font-size:13px; padding:8px 16px;">Load Selected</button>
-                    <button onclick="teacherSaveToBank()" class="secondary-btn" style="font-size:13px; padding:8px 16px; background:#2d6cdf; color:white;">Save Current as Question Bank</button>
-                    <button onclick="teacherDeleteBank()" class="secondary-btn" style="font-size:13px; padding:8px 16px; background:#dc3545; color:white;">Delete Selected</button>
-                </div>
-            </div>
-            <div class="form-group">
-                <label for="teacherCsvFile">Upload Questions (CSV)</label>
-                <input type="file" id="teacherCsvFile" accept=".csv" class="form-input">
-                <p class="helper-text" style="margin-top:4px;">CSV Format: Question, Option A, Option B, Option C, Option D, Correct Answer, Image URL (optional). For equations, wrap them in $...$ (e.g. $x^2 + 5x - 6 = 0$) or $$...$$ for a standalone equation. If a question or option contains a comma, wrap that whole cell in double quotes.</p>
-            </div>
-            <button onclick="teacherPublishAssessment()" class="primary-btn full-width">Publish Assessment</button>
-        </div>
-
-        <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
-            <h3 style="margin-bottom:12px;">Your Published Assessments</h3>
-            <div id="teacherPublishedList" class="scrollable-panel">
-                <p class="helper-text">No assessments published yet.</p>
-            </div>
-        </div>
-
-        <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
-            <h3 style="margin-bottom:12px;">Class Roster</h3>
-            <p class="helper-text" style="margin-bottom:10px;">Upload the list of students expected in a class (with admission numbers) so only those students can take assessments published for this class, and so you can see who hasn't submitted yet.</p>
-            <div class="form-group">
-                <label for="rosterClassSelect">Class</label>
-                <select id="rosterClassSelect" class="form-input">
-                    <option value="">-- Select Class --</option>
-                    <option value="Primary 1">Primary 1</option>
-                    <option value="Primary 2">Primary 2</option>
-                    <option value="Primary 3">Primary 3</option>
-                    <option value="Primary 4">Primary 4</option>
-                    <option value="Primary 5">Primary 5</option>
-                    <option value="Primary 6">Primary 6</option>
-                    <option value="JSS 1">JSS 1</option>
-                    <option value="JSS 2">JSS 2</option>
-                    <option value="JSS 3">JSS 3</option>
-                    <option value="SSS 1">SSS 1</option>
-                    <option value="SSS 2">SSS 2</option>
-                    <option value="SSS 3">SSS 3</option>
-                    <option value="University 100">University 100 Level</option>
-                    <option value="University 200">University 200 Level</option>
-                    <option value="University 300">University 300 Level</option>
-                    <option value="University 400">University 400 Level</option>
-                    <option value="Other">Other</option>
-                </select>
-            </div>
-            <div class="custom-class-wrapper-roster" style="display:none; margin-top:8px; margin-bottom:16px;">
-                <input type="text" id="rosterCustomClass" placeholder="Enter custom class name" class="form-input">
-            </div>
-            <button onclick="downloadRosterTemplate()" class="secondary-btn full-width" style="margin-bottom:12px;">1. Download Roster Template for This Class</button>
-            <p class="helper-text" style="margin-bottom:12px;">Fill in each student's Name and Admission Number in the downloaded spreadsheet, then upload it back below.</p>
-            <div class="form-group">
-                <label for="rosterFileInput">2. Upload Filled-In Roster</label>
-                <input type="file" id="rosterFileInput" accept=".xlsx,.xls,.csv" class="form-input">
-            </div>
-            <button onclick="handleRosterFileUpload()" class="primary-btn full-width">Upload Roster</button>
-            <p id="rosterUploadStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
-
-            <div id="rosterEditWrapper" style="display:none; margin-top:20px; border-top:1.5px solid #eef2f6; padding-top:16px;">
-                <h4 style="margin-bottom:4px;">3. Edit This Class's Roster</h4>
-                <p class="helper-text" style="margin-bottom:12px;">Fix a typo, add one student, or remove someone - without redoing the whole spreadsheet.</p>
-                <div id="rosterEditList"></div>
-                <button onclick="addRosterEditRow()" class="secondary-btn full-width" style="margin-top:8px;">+ Add Student</button>
-                <button onclick="saveRosterEdits()" class="primary-btn full-width" style="margin-top:10px;">Save Changes</button>
-                <p id="rosterEditStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
-            </div>
-        </div>
-
-        <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
-            <h3 style="margin-bottom:12px;">Question Analytics &amp; Attendance</h3>
-            <p class="helper-text" style="margin-bottom:10px;">See which questions students struggle with most, and who hasn't taken this assessment yet (if you've saved a roster for its class).</p>
-            <select id="teacherAnalyticsSelect" class="form-input" style="margin-bottom:12px;" onchange="loadTeacherAnalytics()">
-                <option value="">-- Select an assessment --</option>
-            </select>
-            <button onclick="teacherDownloadAllCertificates()" id="teacherBulkCertBtn" class="secondary-btn full-width" style="margin-bottom:12px; background:#2d6cdf; color:white;">Download All Certificates (ZIP)</button>
-            <div id="teacherAnalyticsContainer" class="scrollable-panel">
-                <p class="helper-text">Pick an assessment above to see its question breakdown.</p>
-            </div>
-        </div>
-
-        <div style="margin-top:24px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
-            <h3 style="margin-bottom:12px;">My CSV Upload History</h3>
-            <div id="csvHistoryList" class="scrollable-panel">
-                <p class="helper-text">No CSV files uploaded yet.</p>
-            </div>
-        </div>
-
-        <div id="adminSection" style="margin-top:24px;">
-            <div class="admin-header">
-                <h3>Results Dashboard</h3>
-                <div class="admin-controls">
-                    <select id="teacherAdminFilterClass" class="form-input" style="width:auto; min-width:150px;">
-                        <option value="all">All Classes</option>
-                    </select>
-                    <select id="teacherAdminFilterSubject" class="form-input" style="width:auto; min-width:150px;">
-                        <option value="all">All Subjects</option>
-                    </select>
-                    <select id="teacherAdminFilterSort" class="form-input" style="width:auto; min-width:130px;">
-                        <option value="recent">Most Recent</option>
-                        <option value="score-high">Highest Score</option>
-                        <option value="score-low">Lowest Score</option>
-                        <option value="name">Name A-Z</option>
-                    </select>
-                    <button onclick="teacherExportResults()" class="primary-btn">Export CSV</button>
-                    <button onclick="teacherClearResults()" class="secondary-btn" style="background:#dc3545; color:white;">Clear All</button>
-                </div>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Total Students</h3>
-                    <p id="teacherStatTotalStudents">0</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Average Score</h3>
-                    <p id="teacherStatAvgScore">0%</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Pass Rate</h3>
-                    <p id="teacherStatPassRate">0%</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Classes</h3>
-                    <p id="teacherStatClasses">0</p>
-                </div>
-            </div>
-
-            <div id="teacherResultsTableContainer" class="scrollable-panel">
-                <table id="teacherResultsTable">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Class</th>
-                            <th>Student</th>
-                            <th>Admission No.</th>
-                            <th>Subject</th>
-                            <th>Score</th>
-                            <th>Questions</th>
-                            <th>Time Taken</th>
-                            <th>Tab Switches</th>
-                            <th>Cam/Noise Flags</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody id="teacherResultsTableBody">
-                        <tr>
-                            <td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">
-                                No results recorded yet.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
     
-    <!-- ===== ADMIN ===== -->
-    <div id="adminAuth" style="display:none;">
-        <button onclick="backToLanding()" class="secondary-btn" style="font-size:13px; padding:6px 16px; margin-bottom:16px;">← Back</button>
-        <h2>Admin Login</h2>
-        <div class="form-group">
-            <label for="adminPassword">Admin Password</label>
-            <div style="position:relative;">
-                <input type="password" id="adminPassword" placeholder="Enter admin password" class="form-input">
-                <button type="button" onclick="togglePasswordVisibility('adminPassword', 'adminToggleBtn')" id="adminToggleBtn" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:#6b7a8f; padding:4px 8px; font-size:14px;">Show</button>
-            </div>
+    <!-- ===== TEACHER DASHBOARD - NEAT SIDEBAR LAYOUT ===== -->
+    <div id="teacherDashboard" style="display:none;">
+        <div class="dashboard-layout">
+            <aside class="dashboard-sidebar" id="teacherSidebar">
+                <div class="sidebar-brand">
+                    <img src="https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg" alt="CleverMent" style="max-height:38px; width:auto; border-radius:8px;">
+                    <div style="margin-top:10px;">
+                        <strong id="teacherDashboardName" style="display:block; font-size:16px;">Teacher Dashboard</strong>
+                        <span id="teacherDashboardEmail" style="color:#6b7a8f; font-size:12px;"></span>
+                    </div>
+                </div>
+                <nav class="dashboard-nav">
+                    <button data-view="teacher-overview" class="nav-item active" onclick="switchTeacherView('teacher-overview')"><span class="nav-icon">📊</span> Overview</button>
+                    <button data-view="teacher-publish" class="nav-item" onclick="switchTeacherView('teacher-publish')"><span class="nav-icon">📝</span> Publish Assessment</button>
+                    <button data-view="teacher-published" class="nav-item" onclick="switchTeacherView('teacher-published')"><span class="nav-icon">📚</span> My Published Assessments</button>
+                    <button data-view="teacher-roster" class="nav-item" onclick="switchTeacherView('teacher-roster')"><span class="nav-icon">👥</span> Class Roster</button>
+                    <button data-view="teacher-analytics" class="nav-item" onclick="switchTeacherView('teacher-analytics')"><span class="nav-icon">📈</span> Analytics & Attendance</button>
+                    <button data-view="teacher-results" class="nav-item" onclick="switchTeacherView('teacher-results')"><span class="nav-icon">🏆</span> Results & Export</button>
+                    <button data-view="teacher-csvhistory" class="nav-item" onclick="switchTeacherView('teacher-csvhistory')"><span class="nav-icon">📂</span> CSV History</button>
+                </nav>
+                <div class="sidebar-footer">
+                    <button onclick="teacherLogout()" class="secondary-btn full-width">Logout</button>
+                </div>
+            </aside>
+            <div class="sidebar-overlay" id="teacherSidebarOverlay" onclick="toggleSidebar('teacherSidebar')"></div>
+            <main class="dashboard-main">
+                <div class="dashboard-topbar">
+                    <button class="hamburger-btn" onclick="toggleSidebar('teacherSidebar')">☰</button>
+                    <h2 id="teacherCurrentViewTitle">Overview</h2>
+                </div>
+
+                <!-- OVERVIEW - analytics only -->
+                <div id="teacher-overview" class="dashboard-view active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Total Students</h3>
+                            <p id="teacherStatTotalStudents">0</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Average Score</h3>
+                            <p id="teacherStatAvgScore">0%</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Pass Rate</h3>
+                            <p id="teacherStatPassRate">0%</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Classes</h3>
+                            <p id="teacherStatClasses">0</p>
+                        </div>
+                    </div>
+                    <div style="margin-top:20px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:8px;">Key Information</h3>
+                        <p class="helper-text" style="margin-bottom:16px;">Clean overview of your teaching performance. All management tools are in the left navigation.</p>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;">
+                            <div style="background:white; padding:16px; border-radius:10px; border:1.5px solid #eef2f6;">
+                                <div style="font-size:12px; color:#6b7a8f; margin-bottom:4px;">PUBLISHED</div>
+                                <div id="teacherQuickPublished" style="font-weight:700; font-size:18px;">0 assessments</div>
+                            </div>
+                            <div style="background:white; padding:16px; border-radius:10px; border:1.5px solid #eef2f6;">
+                                <div style="font-size:12px; color:#6b7a8f; margin-bottom:4px;">RECENT ACTIVITY</div>
+                                <div id="teacherQuickRecent" style="font-weight:600; font-size:14px; color:#1a1a2e;">No recent submissions</div>
+                            </div>
+                            <div style="background:white; padding:16px; border-radius:10px; border:1.5px solid #eef2f6;">
+                                <div style="font-size:12px; color:#6b7a8f; margin-bottom:4px;">NEXT STEP</div>
+                                <div style="font-weight:600; font-size:14px;">Publish a new assessment or upload a class roster</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PUBLISH -->
+                <div id="teacher-publish" class="dashboard-view">
+                    <div id="uploadSection">
+                        <h3>Create & Publish Assessment</h3>
+                        <div class="form-group">
+                            <label for="teacherSubjectSelect">Subject</label>
+                            <div class="subject-wrapper">
+                                <select id="teacherSubjectSelect" class="form-input subject-select">
+                                    <option value="">-- Select or type a subject --</option>
+                                    <option value="Agricultural Science">Agricultural Science</option>
+                                    <option value="Art">Art</option>
+                                    <option value="Biology">Biology</option>
+                                    <option value="Business Studies">Business Studies</option>
+                                    <option value="Chemistry">Chemistry</option>
+                                    <option value="Christian Religious Knowledge">Christian Religious Knowledge</option>
+                                    <option value="Computer Science">Computer Science</option>
+                                    <option value="Economics">Economics</option>
+                                    <option value="English">English</option>
+                                    <option value="French">French</option>
+                                    <option value="Geography">Geography</option>
+                                    <option value="Government">Government</option>
+                                    <option value="History">History</option>
+                                    <option value="Islamic Religious Knowledge">Islamic Religious Knowledge</option>
+                                    <option value="Literature">Literature</option>
+                                    <option value="Mathematics">Mathematics</option>
+                                    <option value="Music">Music</option>
+                                    <option value="Physical Education">Physical Education</option>
+                                    <option value="Physics">Physics</option>
+                                    <option value="Science">Science</option>
+                                    <option value="Social Studies">Social Studies</option>
+                                    <option value="Other">Other (type below)</option>
+                                </select>
+                            </div>
+                            <div class="custom-subject-wrapper-teacher" style="display:none; margin-top:8px;">
+                                <input type="text" id="teacherCustomSubject" placeholder="Enter custom subject name" class="form-input">
+                                <p class="helper-text">Type your custom subject here</p>
+                            </div>
+                            <p class="helper-text">Select a subject from the list, or choose "Other" to type your own</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="teacherClassSelect">Select Class</label>
+                            <select id="teacherClassSelect" class="form-input">
+                                <option value="">-- Select Class --</option>
+                                <option value="Primary 1">Primary 1</option>
+                                <option value="Primary 2">Primary 2</option>
+                                <option value="Primary 3">Primary 3</option>
+                                <option value="Primary 4">Primary 4</option>
+                                <option value="Primary 5">Primary 5</option>
+                                <option value="Primary 6">Primary 6</option>
+                                <option value="JSS 1">JSS 1</option>
+                                <option value="JSS 2">JSS 2</option>
+                                <option value="JSS 3">JSS 3</option>
+                                <option value="SSS 1">SSS 1</option>
+                                <option value="SSS 2">SSS 2</option>
+                                <option value="SSS 3">SSS 3</option>
+                                <option value="University 100">University 100 Level</option>
+                                <option value="University 200">University 200 Level</option>
+                                <option value="University 300">University 300 Level</option>
+                                <option value="University 400">University 400 Level</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="custom-class-wrapper-teacher" style="display:none; margin-top:8px;">
+                            <input type="text" id="teacherCustomClass" placeholder="Enter custom class name" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="teacherTimerSelect">Time Limit</label>
+                            <select id="teacherTimerSelect" class="form-input">
+                                <option value="0">No time limit</option>
+                                <option value="5">5 minutes</option>
+                                <option value="10" selected>10 minutes</option>
+                                <option value="15">15 minutes</option>
+                                <option value="20">20 minutes</option>
+                                <option value="30">30 minutes</option>
+                                <option value="45">45 minutes</option>
+                                <option value="60">60 minutes</option>
+                                <option value="90">90 minutes</option>
+                                <option value="120">120 minutes</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="teacherPassMark">Pass Mark (%)</label>
+                            <input type="number" id="teacherPassMark" class="form-input" min="0" max="100" value="50">
+                        </div>
+                        <div class="form-group">
+                            <label for="teacherAvailableFrom">Available From (optional)</label>
+                            <input type="datetime-local" id="teacherAvailableFrom" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="teacherAvailableUntil">Available Until (optional)</label>
+                            <input type="datetime-local" id="teacherAvailableUntil" class="form-input">
+                            <p class="helper-text" style="margin-top:4px;">Leave both blank for an assessment that's open any time the code is used. Times are based on your device's local time zone.</p>
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                            <label for="teacherShuffleQuestions" style="margin-bottom:0; cursor:pointer;">Shuffle Questions & Answer Options</label>
+                            <input type="checkbox" id="teacherShuffleQuestions" style="width:18px; height:18px; cursor:pointer;">
+                            <span style="font-size:13px; color:#6b7a8f;">Randomize question order for each student</span>
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                            <label for="teacherShowResults" style="margin-bottom:0; cursor:pointer;">Show Results & Certificate to Student</label>
+                            <input type="checkbox" id="teacherShowResults" checked style="width:18px; height:18px; cursor:pointer;">
+                            <span style="font-size:13px; color:#6b7a8f;">Turn off for a real exam - students just see "Submitted", no instant score</span>
+                        </div>
+
+                        <div style="background:#fff8f0; border:1.5px solid #f5c98f; border-radius:10px; padding:14px 16px; margin-bottom:16px;">
+                            <p style="font-weight:600; margin-bottom:8px; color:#a15c00;">Live Monitoring (optional)</p>
+                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:10px;">
+                                <label for="teacherCameraMonitoring" style="margin-bottom:0; cursor:pointer;">Camera Monitoring</label>
+                                <input type="checkbox" id="teacherCameraMonitoring" style="width:18px; height:18px; cursor:pointer;">
+                                <span style="font-size:13px; color:#6b7a8f;">Warns and ends the assessment if a student's face isn't visible</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <label for="teacherNoiseMonitoring" style="margin-bottom:0; cursor:pointer;">Noise Monitoring</label>
+                                <input type="checkbox" id="teacherNoiseMonitoring" style="width:18px; height:18px; cursor:pointer;">
+                                <span style="font-size:13px; color:#6b7a8f;">Warns and ends the assessment if it detects loud background noise</span>
+                            </div>
+                            <p class="helper-text" style="margin-top:8px;">Students will need to allow camera/microphone access to take this assessment. Nothing is ever recorded or saved - checks happen live in the browser only.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="teacherCertName">Teacher's Name (for Certificate)</label>
+                            <input type="text" id="teacherCertName" placeholder="Enter your full name as it should appear on certificates" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label for="teacherCertSignature">Teacher's Signature (for Certificate)</label>
+                            <input type="file" id="teacherCertSignature" accept="image/*" class="form-input">
+                            <p class="helper-text">Upload a clear image of your signature (PNG recommended with transparent background)</p>
+                            <div id="signaturePreview" style="margin-top:8px; display:none;">
+                                <p style="font-size:13px; color:#2d9c5c;">✓ Signature uploaded</p>
+                                <img id="signaturePreviewImg" src="#" alt="Signature Preview" style="max-height:50px; max-width:150px; border:1px solid #ddd; border-radius:4px;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="teacherQuestionBankSelect">Load from Question Bank</label>
+                            <select id="teacherQuestionBankSelect" class="form-input">
+                                <option value="">-- Select a saved question set --</option>
+                            </select>
+                            <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
+                                <button onclick="teacherLoadFromBank()" class="secondary-btn" style="font-size:13px; padding:8px 16px;">Load Selected</button>
+                                <button onclick="teacherSaveToBank()" class="secondary-btn" style="font-size:13px; padding:8px 16px; background:#2d6cdf; color:white;">Save Current as Question Bank</button>
+                                <button onclick="teacherDeleteBank()" class="secondary-btn" style="font-size:13px; padding:8px 16px; background:#dc3545; color:white;">Delete Selected</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="teacherCsvFile">Upload Questions (CSV)</label>
+                            <input type="file" id="teacherCsvFile" accept=".csv" class="form-input">
+                            <p class="helper-text" style="margin-top:4px;">CSV Format: Question, Option A, Option B, Option C, Option D, Correct Answer, Image URL (optional). For equations, wrap them in $...$ (e.g. $x^2 + 5x - 6 = 0$) or $$...$$ for a standalone equation. If a question or option contains a comma, wrap that whole cell in double quotes.</p>
+                        </div>
+                        <button onclick="teacherPublishAssessment()" class="primary-btn full-width">Publish Assessment</button>
+                    </div>
+                </div>
+
+                <div id="teacher-published" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:12px;">Your Published Assessments</h3>
+                        <div id="teacherPublishedList" class="scrollable-panel">
+                            <p class="helper-text">No assessments published yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="teacher-roster" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:12px;">Class Roster</h3>
+                        <p class="helper-text" style="margin-bottom:10px;">Upload the list of students expected in a class (with admission numbers) so only those students can take assessments published for this class, and so you can see who hasn't submitted yet.</p>
+                        <div class="form-group">
+                            <label for="rosterClassSelect">Class</label>
+                            <select id="rosterClassSelect" class="form-input">
+                                <option value="">-- Select Class --</option>
+                                <option value="Primary 1">Primary 1</option>
+                                <option value="Primary 2">Primary 2</option>
+                                <option value="Primary 3">Primary 3</option>
+                                <option value="Primary 4">Primary 4</option>
+                                <option value="Primary 5">Primary 5</option>
+                                <option value="Primary 6">Primary 6</option>
+                                <option value="JSS 1">JSS 1</option>
+                                <option value="JSS 2">JSS 2</option>
+                                <option value="JSS 3">JSS 3</option>
+                                <option value="SSS 1">SSS 1</option>
+                                <option value="SSS 2">SSS 2</option>
+                                <option value="SSS 3">SSS 3</option>
+                                <option value="University 100">University 100 Level</option>
+                                <option value="University 200">University 200 Level</option>
+                                <option value="University 300">University 300 Level</option>
+                                <option value="University 400">University 400 Level</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="custom-class-wrapper-roster" style="display:none; margin-top:8px; margin-bottom:16px;">
+                            <input type="text" id="rosterCustomClass" placeholder="Enter custom class name" class="form-input">
+                        </div>
+                        <button onclick="downloadRosterTemplate()" class="secondary-btn full-width" style="margin-bottom:12px;">1. Download Roster Template for This Class</button>
+                        <p class="helper-text" style="margin-bottom:12px;">Fill in each student's Name and Admission Number in the downloaded spreadsheet, then upload it back below.</p>
+                        <div class="form-group">
+                            <label for="rosterFileInput">2. Upload Filled-In Roster</label>
+                            <input type="file" id="rosterFileInput" accept=".xlsx,.xls,.csv" class="form-input">
+                        </div>
+                        <button onclick="handleRosterFileUpload()" class="primary-btn full-width">Upload Roster</button>
+                        <p id="rosterUploadStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
+
+                        <div id="rosterEditWrapper" style="display:none; margin-top:20px; border-top:1.5px solid #eef2f6; padding-top:16px;">
+                            <h4 style="margin-bottom:4px;">3. Edit This Class's Roster</h4>
+                            <p class="helper-text" style="margin-bottom:12px;">Fix a typo, add one student, or remove someone - without redoing the whole spreadsheet.</p>
+                            <div id="rosterEditList"></div>
+                            <button onclick="addRosterEditRow()" class="secondary-btn full-width" style="margin-top:8px;">+ Add Student</button>
+                            <button onclick="saveRosterEdits()" class="primary-btn full-width" style="margin-top:10px;">Save Changes</button>
+                            <p id="rosterEditStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="teacher-analytics" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:12px;">Question Analytics & Attendance</h3>
+                        <p class="helper-text" style="margin-bottom:10px;">See which questions students struggle with most, and who hasn't taken this assessment yet (if you've saved a roster for its class).</p>
+                        <select id="teacherAnalyticsSelect" class="form-input" style="margin-bottom:12px;" onchange="loadTeacherAnalytics()">
+                            <option value="">-- Select an assessment --</option>
+                        </select>
+                        <button onclick="teacherDownloadAllCertificates()" id="teacherBulkCertBtn" class="secondary-btn full-width" style="margin-bottom:12px; background:#2d6cdf; color:white;">Download All Certificates (ZIP)</button>
+                        <div id="teacherAnalyticsContainer" class="scrollable-panel">
+                            <p class="helper-text">Pick an assessment above to see its question breakdown.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="teacher-results" class="dashboard-view">
+                    <div id="adminSection">
+                        <div class="admin-header">
+                            <h3>Results Dashboard</h3>
+                            <div class="admin-controls">
+                                <select id="teacherAdminFilterClass" class="form-input" style="width:auto; min-width:150px;">
+                                    <option value="all">All Classes</option>
+                                </select>
+                                <select id="teacherAdminFilterSubject" class="form-input" style="width:auto; min-width:150px;">
+                                    <option value="all">All Subjects</option>
+                                </select>
+                                <select id="teacherAdminFilterSort" class="form-input" style="width:auto; min-width:130px;">
+                                    <option value="recent">Most Recent</option>
+                                    <option value="score-high">Highest Score</option>
+                                    <option value="score-low">Lowest Score</option>
+                                    <option value="name">Name A-Z</option>
+                                </select>
+                                <button onclick="teacherExportResults()" class="primary-btn">Export CSV</button>
+                                <button onclick="teacherClearResults()" class="secondary-btn" style="background:#dc3545; color:white;">Clear All</button>
+                            </div>
+                        </div>
+
+                        <div id="teacherResultsTableContainer" class="scrollable-panel">
+                            <table id="teacherResultsTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Class</th>
+                                        <th>Student</th>
+                                        <th>Admission No.</th>
+                                        <th>Subject</th>
+                                        <th>Score</th>
+                                        <th>Questions</th>
+                                        <th>Time Taken</th>
+                                        <th>Tab Switches</th>
+                                        <th>Cam/Noise Flags</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="teacherResultsTableBody">
+                                    <tr>
+                                        <td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">
+                                            No results recorded yet.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="teacher-csvhistory" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:12px;">My CSV Upload History</h3>
+                        <div id="csvHistoryList" class="scrollable-panel">
+                            <p class="helper-text">No CSV files uploaded yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
         </div>
-        <button onclick="adminLogin()" class="primary-btn full-width">Login</button>
     </div>
+
+
 
     <div id="adminDashboard" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
-            <h2>Admin Dashboard</h2>
-            <button onclick="adminLogout()" class="secondary-btn" style="font-size:13px; padding:6px 16px;">Logout</button>
-        </div>
-
-        <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
-            <h3 style="margin-bottom:12px;">Account Reactivation Fee</h3>
-            <p class="helper-text" style="margin-bottom:10px;">This is the amount a paused teacher is charged via Flutterwave to reactivate their own account.</p>
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <span style="font-weight:600;">₦</span>
-                <input type="number" id="adminReactivationFeeInput" class="form-input" style="max-width:160px;" min="0" placeholder="2500">
-                <button onclick="saveReactivationFee()" class="primary-btn" style="padding:10px 20px;">Save</button>
-            </div>
-        </div>
-
-        <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-                <h3 style="margin:0;">Manage FAQs</h3>
-                <button onclick="openFaqAddForm()" class="primary-btn" style="padding:8px 18px;">+ Add New FAQ</button>
-            </div>
-            <div id="adminFaqList" class="scrollable-panel">
-                <p class="helper-text">Loading...</p>
-            </div>
-        </div>
-
-        <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
-            <h3 style="margin-bottom:12px;">Manage Teachers</h3>
-            <div id="adminTeacherList" class="scrollable-panel">
-                <p class="helper-text">No teachers registered yet.</p>
-            </div>
-        </div>
-
-        <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-                <h3 style="margin:0;">Manage Assessments (All Teachers)</h3>
-                <select id="adminAssessmentFilterTeacher" class="form-input" style="width:auto; min-width:180px;">
-                    <option value="all">All Teachers</option>
-                </select>
-            </div>
-            <div id="adminAssessmentList" class="scrollable-panel">
-                <p class="helper-text">No assessments published yet.</p>
-            </div>
-        </div>
-
-        <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6; margin-bottom:20px;">
-            <h3 style="margin-bottom:12px;">Teacher Activity Log</h3>
-            <div style="max-height:300px; overflow-y:auto;">
-                <div id="adminActivityLog" class="scrollable-panel">
-                    <p class="helper-text">No activity recorded yet.</p>
+        <div class="dashboard-layout">
+            <aside class="dashboard-sidebar" id="adminSidebar">
+                <div class="sidebar-brand">
+                    <img src="https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg" alt="CleverMent" style="max-height:38px; width:auto; border-radius:8px;">
+                    <div style="margin-top:10px;">
+                        <strong style="display:block; font-size:16px;">Admin Dashboard</strong>
+                        <span style="color:#6b7a8f; font-size:12px;">Super Admin</span>
+                    </div>
                 </div>
-            </div>
-        </div>
+                <nav class="dashboard-nav">
+                    <button data-view="admin-overview" class="nav-item active" onclick="switchAdminView('admin-overview')"><span class="nav-icon">📊</span> Overview</button>
+                    <button data-view="admin-teachers" class="nav-item" onclick="switchAdminView('admin-teachers')"><span class="nav-icon">👨‍🏫</span> Manage Teachers</button>
+                    <button data-view="admin-assessments" class="nav-item" onclick="switchAdminView('admin-assessments')"><span class="nav-icon">📝</span> Manage Assessments</button>
+                    <button data-view="admin-results" class="nav-item" onclick="switchAdminView('admin-results')"><span class="nav-icon">🏆</span> All Results</button>
+                    <button data-view="admin-faqs" class="nav-item" onclick="switchAdminView('admin-faqs')"><span class="nav-icon">❓</span> Manage FAQs</button>
+                    <button data-view="admin-fee" class="nav-item" onclick="switchAdminView('admin-fee')"><span class="nav-icon">💳</span> Reactivation Fee</button>
+                    <button data-view="admin-activity" class="nav-item" onclick="switchAdminView('admin-activity')"><span class="nav-icon">📜</span> Activity Log</button>
+                    <button data-view="admin-files" class="nav-item" onclick="switchAdminView('admin-files')"><span class="nav-icon">📁</span> Teacher Files</button>
+                </nav>
+                <div class="sidebar-footer">
+                    <button onclick="adminLogout()" class="secondary-btn full-width">Logout</button>
+                </div>
+            </aside>
+            <div class="sidebar-overlay" id="adminSidebarOverlay" onclick="toggleSidebar('adminSidebar')"></div>
+            <main class="dashboard-main">
+                <div class="dashboard-topbar">
+                    <button class="hamburger-btn" onclick="toggleSidebar('adminSidebar')">☰</button>
+                    <h2 id="adminCurrentViewTitle">Overview</h2>
+                </div>
 
-        <div id="adminResultsSection">
-            <div class="admin-header">
-                <h3>All Results (All Teachers)</h3>
-                <div class="admin-controls">
-                    <select id="adminResultsFilterTeacher" class="form-input" style="width:auto; min-width:150px;">
-                        <option value="all">All Teachers</option>
-                    </select>
-                    <select id="adminResultsFilterClass" class="form-input" style="width:auto; min-width:150px;">
-                        <option value="all">All Classes</option>
-                    </select>
-                    <select id="adminResultsFilterSubject" class="form-input" style="width:auto; min-width:150px;">
-                        <option value="all">All Subjects</option>
-                    </select>
-                    <button onclick="adminExportAllResults()" class="primary-btn">Export CSV</button>
-                    <button onclick="adminClearAllResults()" class="secondary-btn" style="background:#dc3545; color:white;">Clear All</button>
+                <div id="admin-overview" class="dashboard-view active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Total Students</h3>
+                            <p id="adminStatTotalStudents">0</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Average Score</h3>
+                            <p id="adminStatAvgScore">0%</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Pass Rate</h3>
+                            <p id="adminStatPassRate">0%</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Teachers</h3>
+                            <p id="adminStatTeachers">0</p>
+                        </div>
+                    </div>
+                    <div style="margin-top:20px; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:8px;">Platform Overview</h3>
+                        <p class="helper-text" style="margin-bottom:16px;">Key metrics only. Use left navigation for detailed management.</p>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;">
+                            <div style="background:white; padding:16px; border-radius:10px; border:1.5px solid #eef2f6;">
+                                <div style="font-size:12px; color:#6b7a8f; margin-bottom:4px;">SYSTEM HEALTH</div>
+                                <div style="font-weight:700; font-size:16px; color:#2d9c5c;">● All systems operational</div>
+                            </div>
+                            <div style="background:white; padding:16px; border-radius:10px; border:1.5px solid #eef2f6;">
+                                <div style="font-size:12px; color:#6b7a8f; margin-bottom:4px;">QUICK ACTIONS</div>
+                                <div style="font-weight:600; font-size:14px;">Manage teachers, assessments, and FAQs from sidebar</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Total Students</h3>
-                    <p id="adminStatTotalStudents">0</p>
+                <div id="admin-teachers" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:12px;">Manage Teachers</h3>
+                        <div id="adminTeacherList" class="scrollable-panel">
+                            <p class="helper-text">No teachers registered yet.</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="stat-card">
-                    <h3>Average Score</h3>
-                    <p id="adminStatAvgScore">0%</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Pass Rate</h3>
-                    <p id="adminStatPassRate">0%</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Teachers</h3>
-                    <p id="adminStatTeachers">0</p>
-                </div>
-            </div>
 
-            <div id="adminResultsTableContainer" class="scrollable-panel">
-                <table id="adminResultsTable">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Teacher</th>
-                            <th>Class</th>
-                            <th>Student</th>
-                            <th>Admission No.</th>
-                            <th>Subject</th>
-                            <th>Score</th>
-                            <th>Questions</th>
-                            <th>Tab Switches</th>
-                            <th>Cam/Noise Flags</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody id="adminResultsTableBody">
-                        <tr>
-                            <td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">
-                                No results recorded yet.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                <div id="admin-assessments" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+                            <h3 style="margin:0;">Manage Assessments (All Teachers)</h3>
+                            <select id="adminAssessmentFilterTeacher" class="form-input" style="width:auto; min-width:180px;">
+                                <option value="all">All Teachers</option>
+                            </select>
+                        </div>
+                        <div id="adminAssessmentList" class="scrollable-panel">
+                            <p class="helper-text">No assessments published yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="admin-results" class="dashboard-view">
+                    <div id="adminResultsSection">
+                        <div class="admin-header">
+                            <h3>All Results (All Teachers)</h3>
+                            <div class="admin-controls">
+                                <select id="adminResultsFilterTeacher" class="form-input" style="width:auto; min-width:150px;">
+                                    <option value="all">All Teachers</option>
+                                </select>
+                                <select id="adminResultsFilterClass" class="form-input" style="width:auto; min-width:150px;">
+                                    <option value="all">All Classes</option>
+                                </select>
+                                <select id="adminResultsFilterSubject" class="form-input" style="width:auto; min-width:150px;">
+                                    <option value="all">All Subjects</option>
+                                </select>
+                                <button onclick="adminExportAllResults()" class="primary-btn">Export CSV</button>
+                                <button onclick="adminClearAllResults()" class="secondary-btn" style="background:#dc3545; color:white;">Clear All</button>
+                            </div>
+                        </div>
+
+                        <div id="adminResultsTableContainer" class="scrollable-panel">
+                            <table id="adminResultsTable">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Teacher</th>
+                                        <th>Class</th>
+                                        <th>Student</th>
+                                        <th>Admission No.</th>
+                                        <th>Subject</th>
+                                        <th>Score</th>
+                                        <th>Questions</th>
+                                        <th>Tab Switches</th>
+                                        <th>Cam/Noise Flags</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="adminResultsTableBody">
+                                    <tr>
+                                        <td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">
+                                            No results recorded yet.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="admin-faqs" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+                            <h3 style="margin:0;">Manage FAQs</h3>
+                            <button onclick="openFaqAddForm()" class="primary-btn" style="padding:8px 18px;">+ Add New FAQ</button>
+                        </div>
+                        <div id="adminFaqList" class="scrollable-panel">
+                            <p class="helper-text">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="admin-fee" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:12px;">Account Reactivation Fee</h3>
+                        <p class="helper-text" style="margin-bottom:10px;">This is the amount a paused teacher is charged via Flutterwave to reactivate their own account.</p>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <span style="font-weight:600;">₦</span>
+                            <input type="number" id="adminReactivationFeeInput" class="form-input" style="max-width:160px;" min="0" placeholder="2500">
+                            <button onclick="saveReactivationFee()" class="primary-btn" style="padding:10px 20px;">Save</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="admin-activity" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:12px;">Teacher Activity Log</h3>
+                        <div style="max-height:500px; overflow-y:auto;">
+                            <div id="adminActivityLog" class="scrollable-panel">
+                                <p class="helper-text">No activity recorded yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="admin-files" class="dashboard-view">
+                    <div style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+                        <h3 style="margin-bottom:12px;">Teacher Files (CSV Uploads)</h3>
+                        <div id="adminFileList" class="scrollable-panel">
+                            <p class="helper-text">No files uploaded by teachers yet.</p>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
         </div>
     </div>
+
 
     <!-- Footer -->
     <div class="footer" id="mainFooter">
