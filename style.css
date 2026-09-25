@@ -1113,3 +1113,136 @@ button:disabled {
 @keyframes cm-spin {
     to { transform: rotate(360deg); }
 }
+
+/* ============================================================
+   DASHBOARD SIDEBAR NAVIGATION
+   (Teacher & Admin dashboards: one section shown at a time)
+   ============================================================ */
+.dash-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.dash-sidebar {
+    width: 230px;
+    flex-shrink: 0;
+    background: #f8fafc;
+    border: 1.5px solid #eef2f6;
+    border-radius: 14px;
+    padding: 14px;
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+}
+
+.dash-sidebar nav {
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5a6e;
+    cursor: pointer;
+    margin-bottom: 4px;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.2px;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dash-nav-item svg {
+    flex-shrink: 0;
+}
+
+.dash-nav-item:hover {
+    background: #eef2f6;
+    transform: none;
+    box-shadow: none;
+}
+
+.dash-nav-item.active {
+    background: #2d6cdf;
+    color: #ffffff;
+}
+
+.dash-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.dash-panel {
+    display: none;
+}
+
+.dash-panel.active {
+    display: block;
+    animation: slideDown 0.25s ease;
+}
+
+.sidebar-toggle {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: #2d6cdf;
+    color: #ffffff;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 14px;
+    font-family: 'Inter', sans-serif;
+}
+
+.sidebar-backdrop {
+    display: none;
+}
+
+@media (max-width: 900px) {
+    .dash-layout {
+        flex-direction: column;
+    }
+
+    .sidebar-toggle {
+        display: inline-flex;
+    }
+
+    .dash-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 250px;
+        max-height: none;
+        border-radius: 0;
+        z-index: 1200;
+        transform: translateX(-105%);
+        transition: transform 0.25s ease;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    }
+
+    .dash-layout.sidebar-open .dash-sidebar {
+        transform: none;
+    }
+
+    .dash-layout.sidebar-open .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 1100;
+    }
+}

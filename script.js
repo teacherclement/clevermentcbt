@@ -4369,6 +4369,7 @@ async function renderTeacherDashboard() {
     }
 
     applyTeacherFilters();
+    showTeacherSection('teacherOverviewPanel');
 }
 
 function applyTeacherFilters() {
@@ -4533,6 +4534,7 @@ async function renderAdminDashboard() {
     renderAdminActivityLog();
     renderAdminFileList();
     renderAdminFaqList();
+    showAdminSection('adminOverviewPanel');
 }
 
 async function renderAdminReactivationFee() {
@@ -5025,3 +5027,47 @@ if ('serviceWorker' in navigator) {
 // restoreQuizState() and the teacher/admin session restore in
 // the DOMContentLoaded handler above.)
 // ============================================================
+
+// ============================================================
+// DASHBOARD SIDEBAR NAVIGATION
+// Shows one dashboard section at a time; the sidebar collapses
+// into a slide-in menu on small screens.
+// ============================================================
+
+function toggleDashSidebar(dashboardId) {
+    var layout = document.querySelector('#' + dashboardId + ' .dash-layout');
+    if (layout) layout.classList.toggle('sidebar-open');
+}
+
+function showDashSection(dashboardId, panelId, btn) {
+    var root = document.getElementById(dashboardId);
+    if (!root) return;
+    var layout = root.querySelector('.dash-layout');
+    if (!layout) return;
+
+    var panels = layout.querySelectorAll('.dash-panel');
+    for (var i = 0; i < panels.length; i++) panels[i].classList.remove('active');
+    var panel = document.getElementById(panelId);
+    if (panel) panel.classList.add('active');
+
+    var items = layout.querySelectorAll('.dash-nav-item');
+    for (var j = 0; j < items.length; j++) {
+        var isTarget = btn ? (items[j] === btn) : (items[j].getAttribute('data-target') === panelId);
+        if (isTarget) items[j].classList.add('active');
+        else items[j].classList.remove('active');
+    }
+
+    // Close the mobile slide-in menu after picking a section.
+    layout.classList.remove('sidebar-open');
+}
+
+function showTeacherSection(panelId, btn) {
+    showDashSection('teacherDashboard', panelId, btn);
+    if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
+        loadTeacherAnalytics();
+    }
+}
+
+function showAdminSection(panelId, btn) {
+    showDashSection('adminDashboard', panelId, btn);
+}
