@@ -5408,3 +5408,174 @@ if (document.readyState === 'loading') {
 } else {
     setupResultActionModal();
 }
+
+// ============================================================
+// CLEVERBOT - floating answer-only AI assistant
+// ============================================================
+(function initCleverBot(){
+    var floatBtn = document.getElementById('cleverBotFloat');
+    var panel = document.getElementById('cleverBotPanel');
+    var closeBtn = document.getElementById('cleverBotClose');
+    var messages = document.getElementById('cleverBotMessages');
+    var input = document.getElementById('cleverBotInput');
+    var sendBtn = document.getElementById('cleverBotSend');
+    var attachBtn = document.getElementById('cleverBotAttach');
+    var fileInput = document.getElementById('cleverBotFileInput');
+    var micBtn = document.getElementById('cleverBotMic');
+    var attachBox = document.getElementById('cleverBotAttachments');
+    if (!floatBtn || !panel || !messages || !input) return;
+
+    var botHistory = [];
+    var pendingFiles = [];
+    var recorder = null;
+    var audioChunks = [];
+    var drag = { active:false, moved:false, dx:0, dy:0 };
+
+    function addMessage(text, role) {
+        var el = document.createElement('div');
+        el.className = 'cleverbot-msg ' + (role || 'bot');
+        el.textContent = text;
+        messages.appendChild(el);
+        messages.scrollTop = messages.scrollHeight;
+        if (role === 'user' || role === 'bot') botHistory.push({ role: role === 'bot' ? 'assistant' : 'user', text: text });
+        return el;
+    }
+    function addTyping(){
+        var el=document.createElement('div'); el.className='cleverbot-msg bot'; el.id='cleverBotTyping';
+        el.innerHTML='<span class="cleverbot-typing"><span></span><span></span><span></span></span>'; messages.appendChild(el); messages.scrollTop=messages.scrollHeight; return el;
+    }
+    function isStudentAssessment(){
+        var assessment = document.getElementById('studentAssessmentView');
+        var quiz = document.getElementById('studentQuizSection');
+        return (assessment && getComputedStyle(assessment).display !== 'none') || (quiz && getComputedStyle(quiz).display !== 'none');
+    }
+    function updateVisibility(){
+        var hidden = isStudentAssessment();
+        floatBtn.style.display = hidden ? 'none' : 'flex';
+        if (hidden) panel.hidden = true;
+    }
+    function getContext(){
+        var page = new URLSearchParams(window.location.search).get('page') || 'landing';
+        var parts = ['Page: ' + page];
+        var active = document.querySelector('.dash-section.active, .dashboard-section.active, [data-active="true"]');
+        if (active) parts.push('Visible section: ' + (active.getAttribute('id') || active.textContent.slice(0,200)));
+        var heading = document.querySelector('#teacherDashboardName, #adminDashboardName');
+        if (heading && heading.textContent) parts.push('Dashboard greeting: ' + heading.textContent);
+        var visible = document.querySelector('#teacherDashboard, #adminDashboard');
+        if (visible && getComputedStyle(visible).display !== 'none') {
+            var text = visible.innerText || '';
+            parts.push('Current dashboard text excerpt: ' + text.replace(/\s+/g,' ').slice(0,3000));
+        }
+        return parts.join('\n');
+    }
+    function openBot(){
+        if (isStudentAssessment()) return;
+        panel.hidden=false;
+        if (!messages.dataset.greeted) {
+            addMessage('Hello! 👋 I’m CleverBot, your CleverMent assistant. How can I be of help today?', 'bot');
+            messages.dataset.greeted='1';
+        }
+        setTimeout(function(){ input.focus(); }, 50);
+    }
+    function closeBot(){ panel.hidden=true; }
+    floatBtn.addEventListener('click', function(){ if (!drag.moved) openBot(); });
+    closeBtn.addEventListener('click', closeBot);
+
+    function renderAttachments(){
+        attachBox.innerHTML='';
+        if (!pendingFiles.length){ attachBox.hidden=true; return; }
+        attachBox.hidden=false;
+        pendingFiles.forEach(function(f,i){
+            var chip=document.createElement('span'); chip.className='cleverbot-attachment-chip';
+            chip.textContent=(f.name||'Attachment').slice(0,28);
+            var x=document.createElement('button'); x.type='button'; x.textContent='×'; x.setAttribute('aria-label','Remove attachment');
+            x.onclick=function(){ pendingFiles.splice(i,1); renderAttachments(); };
+            chip.appendChild(x); attachBox.appendChild(chip);
+        });
+    }
+    function fileToBase64(file){
+        return new Promise(function(resolve,reject){
+            var r=new FileReader(); r.onload=function(){ resolve(String(r.result).split(',')[1] || ''); }; r.onerror=reject; r.readAsDataURL(file);
+        });
+    }
+    fileInput.addEventListener('change', function(){
+        var files=Array.prototype.slice.call(fileInput.files||[]);
+        files.forEach(function(f){
+            if (pendingFiles.length>=4) return;
+            if (f.size>8*1024*1024) { addMessage('I could not attach “'+f.name+'” because it is larger than 8 MB.','system'); return; }
+            pendingFiles.push(f);
+        });
+        fileInput.value=''; renderAttachments();
+    });
+    attachBtn.addEventListener('click', function(){ fileInput.click(); });
+
+    async function sendMessage(){
+        var text=input.value.trim();
+        if (!text && !pendingFiles.length) return;
+        var files=pendingFiles.slice(); pendingFiles=[]; renderAttachments();
+        if (text) addMessage(text,'user');
+        files.forEach(function(f){ addMessage('📎 '+f.name,'user'); });
+        input.value=''; input.style.height='auto'; sendBtn.disabled=true;
+        var typing=addTyping();
+        try {
+            var attachments=[];
+            for (var i=0;i<files.length;i++) {
+                attachments.push({name:files[i].name,mimeType:files[i].type||'application/octet-stream',data:await fileToBase64(files[i])});
+            }
+            var history=botHistory.slice(-12);
+            // Remove the attachment label messages from the actual AI conversation.
+            history=history.filter(function(h){ return !(h.role==='user' && /^📎 /.test(h.text)); });
+            var res=await fetch(BACKEND_URL+'/api/cleverbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history,context:getContext(),attachments:attachments})});
+            var data=await res.json();
+            if (typing.parentNode) typing.parentNode.removeChild(typing);
+            if (!res.ok) addMessage(data.error||'Sorry, CleverBot is temporarily unavailable.','bot');
+            else addMessage(data.reply||'I’m sorry, I could not generate a response.','bot');
+        } catch(e){
+            if (typing.parentNode) typing.parentNode.removeChild(typing);
+            addMessage('I could not connect to CleverBot right now. Please check your internet connection and try again.','bot');
+        } finally { sendBtn.disabled=false; input.focus(); }
+    }
+    sendBtn.addEventListener('click',sendMessage);
+    input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
+    input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,100)+'px'; });
+
+    async function blobToBase64(blob){ return await fileToBase64(new File([blob],'voice-message.webm',{type:blob.type||'audio/webm'})); }
+    micBtn.addEventListener('click',async function(){
+        if (recorder && recorder.state==='recording'){ recorder.stop(); return; }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ addMessage('Voice recording is not supported by this browser.','system'); return; }
+        try {
+            var stream=await navigator.mediaDevices.getUserMedia({audio:true});
+            audioChunks=[]; recorder=new MediaRecorder(stream);
+            recorder.ondataavailable=function(e){if(e.data.size)audioChunks.push(e.data);};
+            recorder.onstop=async function(){
+                stream.getTracks().forEach(function(t){t.stop();}); micBtn.classList.remove('recording'); micBtn.textContent='🎤';
+                var blob=new Blob(audioChunks,{type:recorder.mimeType||'audio/webm'});
+                if(blob.size>8*1024*1024){addMessage('That recording is too large. Please record a shorter message.','system');return;}
+                addMessage('🎤 Voice message','user'); var typing=addTyping();
+                try{
+                    var data64=await blobToBase64(blob);
+                    var res=await fetch(BACKEND_URL+'/api/cleverbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Please understand and answer the user’s voice message.',history:botHistory.slice(-12),context:getContext(),attachments:[{name:'voice-message.webm',mimeType:blob.type||'audio/webm',data:data64}]})});
+                    var data=await res.json(); if(typing.parentNode)typing.parentNode.removeChild(typing);
+                    addMessage(res.ok?(data.reply||'I could not understand that voice message.'):(data.error||'CleverBot is temporarily unavailable.'),'bot');
+                }catch(e){if(typing.parentNode)typing.parentNode.removeChild(typing);addMessage('I could not process the voice message. Please try again.','bot');}
+            };
+            recorder.start(); micBtn.classList.add('recording'); micBtn.textContent='■';
+        } catch(e){ addMessage('Microphone access was not granted. Please allow microphone access and try again.','system'); }
+    });
+
+    // Draggable floating icon; position persists locally.
+    function restorePosition(){
+        try{var p=JSON.parse(localStorage.getItem('cleverbot_float_position'));if(p&&typeof p.left==='number'&&typeof p.top==='number'){floatBtn.style.left=p.left+'px';floatBtn.style.top=p.top+'px';floatBtn.style.right='auto';floatBtn.style.bottom='auto';}}catch(e){}
+    }
+    function savePosition(){localStorage.setItem('cleverbot_float_position',JSON.stringify({left:parseFloat(floatBtn.style.left),top:parseFloat(floatBtn.style.top)}));}
+    function beginDrag(e){
+        drag.active=true;drag.moved=false;var r=floatBtn.getBoundingClientRect();drag.dx=(e.clientX-r.left);drag.dy=(e.clientY-r.top);floatBtn.setPointerCapture(e.pointerId);
+    }
+    function moveDrag(e){
+        if(!drag.active)return;var x=e.clientX-drag.dx,y=e.clientY-drag.dy;var maxX=window.innerWidth-floatBtn.offsetWidth,maxY=window.innerHeight-floatBtn.offsetHeight;x=Math.max(4,Math.min(x,maxX-4));y=Math.max(4,Math.min(y,maxY-4));if(Math.abs(e.movementX)+Math.abs(e.movementY)>2)drag.moved=true;floatBtn.style.left=x+'px';floatBtn.style.top=y+'px';floatBtn.style.right='auto';floatBtn.style.bottom='auto';
+    }
+    function endDrag(){if(!drag.active)return;drag.active=false;if(drag.moved)savePosition();setTimeout(function(){drag.moved=false;},0);}
+    floatBtn.addEventListener('pointerdown',beginDrag);floatBtn.addEventListener('pointermove',moveDrag);floatBtn.addEventListener('pointerup',endDrag);floatBtn.addEventListener('pointercancel',endDrag);
+    restorePosition(); updateVisibility();
+    setInterval(updateVisibility,700);
+})();

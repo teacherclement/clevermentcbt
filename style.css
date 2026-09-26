@@ -1612,3 +1612,26 @@ html, body {
         overflow: visible;
     }
 }
+
+/* ============================================================
+   CLEVERBOT
+   ============================================================ */
+#cleverBotRoot{position:fixed;inset:0;z-index:7000;pointer-events:none;font-family:Inter,Arial,sans-serif}
+#cleverBotFloat{position:fixed;right:20px;bottom:76px;width:48px;height:48px;border:0;border-radius:50%;background:#1a1a2e;color:#fff;box-shadow:0 5px 18px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;cursor:grab;pointer-events:auto;touch-action:none;user-select:none}
+#cleverBotFloat:active{cursor:grabbing}
+.cleverbot-mark{font-size:25px;line-height:1;font-weight:800}
+.cleverbot-panel{position:fixed;right:20px;bottom:134px;width:min(380px,calc(100vw - 24px));height:min(560px,calc(100vh - 155px));background:#fff;border-radius:16px;box-shadow:0 14px 45px rgba(0,0,0,.25);overflow:hidden;display:flex;flex-direction:column;pointer-events:auto;border:1px solid #e5e9f0}
+.cleverbot-header{height:62px;flex:0 0 62px;background:#1a1a2e;color:#fff;padding:10px 12px;display:flex;align-items:center;justify-content:space-between}
+.cleverbot-title-wrap{display:flex;align-items:center;gap:10px}.cleverbot-title-wrap strong{display:block;font-size:15px}.cleverbot-title-wrap small{display:block;opacity:.75;font-size:11px;margin-top:2px}
+.cleverbot-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#2d6cdf;color:#fff;font-weight:800}
+.cleverbot-close{background:transparent;border:0;color:#fff;font-size:26px;line-height:1;cursor:pointer;padding:4px 8px}
+.cleverbot-messages{flex:1;overflow-y:auto;padding:14px;background:#f7f9fc;display:flex;flex-direction:column;gap:10px}
+.cleverbot-msg{max-width:86%;padding:10px 12px;border-radius:14px;font-size:13px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}.cleverbot-msg.bot{align-self:flex-start;background:#fff;border:1px solid #e6ebf2;color:#1a1a2e;border-bottom-left-radius:5px}.cleverbot-msg.user{align-self:flex-end;background:#2d6cdf;color:#fff;border-bottom-right-radius:5px}
+.cleverbot-msg.system{align-self:center;background:#eef2f7;color:#6b7a8f;font-size:11px;padding:6px 9px}
+.cleverbot-attachments{padding:7px 10px;border-top:1px solid #edf0f4;background:#fff;max-height:78px;overflow:auto}.cleverbot-attachment-chip{display:inline-flex;align-items:center;gap:5px;background:#f0f4f9;border-radius:8px;padding:5px 8px;margin:2px;font-size:11px;color:#334155}.cleverbot-attachment-chip button{border:0;background:transparent;cursor:pointer;color:#6b7a8f}
+.cleverbot-composer{display:flex;align-items:flex-end;gap:6px;padding:8px;border-top:1px solid #e7ebf1;background:#fff}.cleverbot-composer textarea{flex:1;resize:none;border:1px solid #dce2ea;border-radius:18px;padding:9px 11px;max-height:100px;min-height:38px;font:inherit;font-size:13px;outline:none}.cleverbot-composer textarea:focus{border-color:#2d6cdf}.cleverbot-tool,.cleverbot-send{width:36px;height:36px;flex:0 0 36px;border-radius:50%;border:0;display:flex;align-items:center;justify-content:center;cursor:pointer}.cleverbot-tool{background:#eef2f7;color:#334155;font-size:21px}.cleverbot-send{background:#2d6cdf;color:#fff;font-size:17px}.cleverbot-tool.recording{background:#dc3545;color:#fff;animation:cleverBotPulse 1s infinite}.cleverbot-send:disabled{opacity:.5;cursor:not-allowed}
+.cleverbot-note{font-size:9px;color:#8a94a3;text-align:center;padding:4px 8px 7px;background:#fff}
+.cleverbot-typing{display:inline-flex;gap:3px;align-items:center}.cleverbot-typing span{width:5px;height:5px;border-radius:50%;background:#8a94a3;animation:cleverBotTyping 1s infinite}.cleverbot-typing span:nth-child(2){animation-delay:.15s}.cleverbot-typing span:nth-child(3){animation-delay:.3s}
+@keyframes cleverBotTyping{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
+@keyframes cleverBotPulse{50%{transform:scale(1.06)}}
+@media(max-width:600px){#cleverBotFloat{right:14px;bottom:72px;width:44px;height:44px}.cleverbot-panel{right:12px;bottom:124px;width:calc(100vw - 24px);height:min(560px,calc(100vh - 145px))}}
