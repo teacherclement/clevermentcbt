@@ -1559,3 +1559,56 @@ button:disabled {
     animation: pulse 1.5s ease-in-out infinite;
     flex-shrink: 0;
 }
+
+/* ===== FINAL MOBILE RESULTS WIDTH FIX =====
+   Keep the dashboard itself inside the viewport while allowing only
+   the results table wrapper to scroll horizontally. */
+html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.dash-layout,
+.dash-main,
+.dash-panel,
+.dash-panel.active,
+#adminSection,
+#adminResultsSection {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#teacherResultsTableContainer,
+#adminResultsTableContainer {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: auto !important;
+    overflow-y: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+#teacherResultsTable,
+#adminResultsTable {
+    width: max-content !important;
+    min-width: 1220px !important;
+    max-width: none !important;
+}
+
+@media (max-width: 900px) {
+    .dash-main {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .dash-panel.active {
+        width: 100%;
+        max-width: 100%;
+        overflow: visible;
+    }
+}
