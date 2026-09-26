@@ -4448,7 +4448,7 @@ function applyTeacherFilters() {
     var tbody = document.getElementById('teacherResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -4458,9 +4458,150 @@ function applyTeacherFilters() {
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'teacher\',' + item.id + ')">⋮ Take Action</button></td></tr>';
     }
     tbody.innerHTML = html;
+}
+
+var pendingResultAction = null;
+
+function openResultActions(role, resultId) {
+    var result = null;
+    var cache = role === 'admin' ? adminResultsCache : teacherResultsCache;
+    for (var i = 0; i < cache.length; i++) {
+        if (String(cache[i].id) === String(resultId)) {
+            result = cache[i];
+            break;
+        }
+    }
+    if (!result) {
+        alert('Could not find this result. Please refresh the dashboard and try again.');
+        return;
+    }
+
+    pendingResultAction = { role: role, result: result };
+    var overlay = document.getElementById('resultActionOverlay');
+    var message = document.getElementById('resultActionMessage');
+    if (message) {
+        message.textContent = result.studentName + ' — ' + result.subject + ' (' + result.score + '%)';
+    }
+    if (overlay) overlay.style.display = 'flex';
+}
+
+function closeResultActions() {
+    var overlay = document.getElementById('resultActionOverlay');
+    if (overlay) overlay.style.display = 'none';
+    pendingResultAction = null;
+}
+
+async function downloadResultCertificate() {
+    if (!pendingResultAction || !pendingResultAction.result) return;
+    var role = pendingResultAction.role;
+    var result = pendingResultAction.result;
+    closeResultActions();
+
+    try {
+        var assessments;
+        if (role === 'teacher') {
+            assessments = teacherAssessmentsCache && teacherAssessmentsCache.length
+                ? teacherAssessmentsCache
+                : await getTeacherAssessmentsFromBackend();
+        } else {
+            assessments = await getAdminAssessmentsFromBackend();
+        }
+
+        var assessment = null;
+        for (var i = 0; i < assessments.length; i++) {
+            if (assessments[i].code === result.assessmentCode) {
+                assessment = assessments[i];
+                break;
+            }
+        }
+
+        if (!assessment) {
+            alert('Could not find the assessment details needed to create this certificate.');
+            return;
+        }
+
+        var blob = await generateCertificatePDFBlob({
+            studentName: result.studentName,
+            subject: result.subject,
+            score: result.score,
+            teacherName: assessment.teacherName,
+            teacherSignature: assessment.teacherSignature,
+            code: assessment.code,
+            dateObj: new Date()
+        });
+
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'Certificate-' + (result.studentName || 'Student').replace(/[\\/:*?"<>|]/g, '_') + '.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {
+        console.error('Result certificate generation error:', e);
+        alert('Error generating certificate: ' + e.message);
+    }
+}
+
+async function deleteSelectedResult() {
+    if (!pendingResultAction || !pendingResultAction.result) return;
+    var role = pendingResultAction.role;
+    var result = pendingResultAction.result;
+    closeResultActions();
+
+    if (!confirm('Delete the result for ' + result.studentName + '? This cannot be undone.')) return;
+
+    var token = role === 'admin'
+        ? localStorage.getItem('cleverment_admin_token')
+        : localStorage.getItem('cleverment_teacher_token');
+    var endpoint = role === 'admin'
+        ? BACKEND_URL + '/api/admin/results/' + encodeURIComponent(result.id)
+        : BACKEND_URL + '/api/teacher/results/' + encodeURIComponent(result.id);
+
+    try {
+        var res = await fetch(endpoint, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            alert('Error: ' + (data.error || 'Could not delete this result.'));
+            return;
+        }
+
+        var localResults = getAllResultsLocal();
+        localResults = localResults.filter(function(r) { return String(r.id) !== String(result.id); });
+        localStorage.setItem('cleverment_all_results', JSON.stringify(localResults));
+
+        if (role === 'admin') {
+            adminResultsCache = adminResultsCache.filter(function(r) { return String(r.id) !== String(result.id); });
+            renderAdminResults();
+        } else {
+            teacherResultsCache = teacherResultsCache.filter(function(r) { return String(r.id) !== String(result.id); });
+            renderTeacherDashboard();
+        }
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection and try again.');
+    }
+}
+
+function setupResultActionModal() {
+    var downloadBtn = document.getElementById('resultActionDownload');
+    var deleteBtn = document.getElementById('resultActionDelete');
+    var cancelBtn = document.getElementById('resultActionCancel');
+    var overlay = document.getElementById('resultActionOverlay');
+    if (downloadBtn) downloadBtn.onclick = downloadResultCertificate;
+    if (deleteBtn) deleteBtn.onclick = deleteSelectedResult;
+    if (cancelBtn) cancelBtn.onclick = closeResultActions;
+    if (overlay) {
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) closeResultActions();
+        });
+    }
 }
 
 function teacherExportResults() {
@@ -4877,7 +5018,7 @@ function applyAdminFilters() {
     var tbody = document.getElementById('adminResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -4887,7 +5028,7 @@ function applyAdminFilters() {
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'admin\',' + item.id + ')">⋮ Take Action</button></td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -5258,4 +5399,12 @@ function stopTeacherLivePolling() {
         clearInterval(teacherLiveInterval);
         teacherLiveInterval = null;
     }
+}
+
+
+// Result action modal wiring
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupResultActionModal);
+} else {
+    setupResultActionModal();
 }

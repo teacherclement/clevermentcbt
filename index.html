@@ -697,11 +697,12 @@
                             <th>Tab Switches</th>
                             <th>Cam/Noise Flags</th>
                             <th>Date</th>
+                            <th>Take Action</th>
                         </tr>
                     </thead>
                     <tbody id="teacherResultsTableBody">
                         <tr>
-                            <td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">
+                            <td colspan="12" style="text-align:center; color:#6b7a8f; padding:40px;">
                                 No results recorded yet.
                             </td>
                         </tr>
@@ -857,11 +858,12 @@
                             <th>Tab Switches</th>
                             <th>Cam/Noise Flags</th>
                             <th>Date</th>
+                            <th>Take Action</th>
                         </tr>
                     </thead>
                     <tbody id="adminResultsTableBody">
                         <tr>
-                            <td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">
+                            <td colspan="12" style="text-align:center; color:#6b7a8f; padding:40px;">
                                 No results recorded yet.
                             </td>
                         </tr>
@@ -877,6 +879,19 @@
     <div class="footer" id="mainFooter">
         <p>&copy; 2026 <strong>CleverMent</strong> &mdash; Built by Teacher Clement</p>
         <p class="footer-sub">Empowering education for all levels</p>
+    </div>
+</div>
+
+<!-- Result action modal -->
+<div id="resultActionOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:10001; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:white; border-radius:14px; padding:24px; max-width:380px; width:100%; box-shadow:0 10px 40px rgba(0,0,0,0.25);">
+        <h3 style="margin:0 0 8px 0; color:#1a1a2e;">Take Action</h3>
+        <p id="resultActionMessage" style="margin:0 0 18px 0; color:#6b7a8f; font-size:14px;">Choose an action for this result.</p>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <button id="resultActionDownload" class="primary-btn" style="width:100%;">Download Certificate</button>
+            <button id="resultActionDelete" class="secondary-btn" style="width:100%; background:#dc3545; color:white;">Delete Result</button>
+            <button id="resultActionCancel" class="secondary-btn" style="width:100%;">Cancel</button>
+        </div>
     </div>
 </div>
 

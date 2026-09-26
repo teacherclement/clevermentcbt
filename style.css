@@ -784,11 +784,17 @@ button:disabled {
     background: white;
     border-radius: 12px;
     border: 1.5px solid #eef2f6;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 #teacherResultsTable,
 #adminResultsTable {
-    width: 100%;
+    width: max-content;
+    min-width: 1220px;
     border-collapse: collapse;
     font-size: 14px;
 }
@@ -838,6 +844,30 @@ button:disabled {
 #adminResultsTable .score-low {
     color: #dc3545;
     font-weight: 600;
+}
+
+.result-action-cell {
+    white-space: nowrap;
+    text-align: center;
+}
+
+.result-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 8px;
+    padding: 7px 11px;
+    background: #2d6cdf;
+    color: #fff;
+    font: 600 12px 'Inter', sans-serif;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.result-action-btn:hover {
+    background: #245bbb;
 }
 
 /* ===== Teacher Published List ===== */
@@ -1108,6 +1138,11 @@ button:disabled {
 
 .scrollable-panel table {
     min-width: 700px;
+}
+
+#teacherResultsTable,
+#adminResultsTable {
+    min-width: 1220px;
 }
 
 @keyframes cm-spin {
