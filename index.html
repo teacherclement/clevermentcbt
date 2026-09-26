@@ -368,6 +368,7 @@
 
     <!-- ===== TEACHER DASHBOARD ===== -->
     <div id="teacherDashboard" style="display:none;">
+        <button class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('teacherDashboard')">&#9776; Menu</button>
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
             <div>
                 <h2 id="teacherDashboardName">Teacher Dashboard</h2>
@@ -395,7 +396,6 @@
             </aside>
             <div class="sidebar-backdrop" onclick="toggleDashSidebar('teacherDashboard')"></div>
             <div class="dash-main">
-                <button class="sidebar-toggle" onclick="toggleDashSidebar('teacherDashboard')">&#9776; Menu</button>
                 <div class="dash-panel active" id="teacherOverviewPanel" style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
                     <h3 style="margin-bottom:12px;">Overview</h3>
 <div class="stats-grid">
@@ -718,6 +718,7 @@
     </div>
 
     <div id="adminDashboard" style="display:none;">
+        <button class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('adminDashboard')">&#9776; Menu</button>
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
             <h2>Admin Dashboard</h2>
             <button onclick="adminLogout()" class="secondary-btn" style="font-size:13px; padding:6px 16px;">Logout</button>
@@ -741,7 +742,6 @@
             </aside>
             <div class="sidebar-backdrop" onclick="toggleDashSidebar('adminDashboard')"></div>
             <div class="dash-main">
-                <button class="sidebar-toggle" onclick="toggleDashSidebar('adminDashboard')">&#9776; Menu</button>
                 <div class="dash-panel active" id="adminOverviewPanel" style="background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
                     <h3 style="margin-bottom:12px;">Overview</h3>
 <div class="stats-grid">
