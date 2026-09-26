@@ -1126,7 +1126,8 @@ button:disabled {
 
 .dash-sidebar {
     width: 230px;
-    flex-shrink: 0;
+    flex: 0 0 230px;
+    min-width: 0;
     background: #f8fafc;
     border: 1.5px solid #eef2f6;
     border-radius: 14px;
@@ -1135,6 +1136,36 @@ button:disabled {
     top: 16px;
     max-height: calc(100vh - 32px);
     overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* CleverMent branding inside dashboard sidebars */
+.dash-branding {
+    width: 100%;
+    padding: 4px 4px 14px;
+    margin-bottom: 8px;
+    text-align: center;
+    border-bottom: 1px solid #e6ebf1;
+}
+
+.dash-logo-image {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    max-height: 72px;
+    margin: 0 auto 7px;
+    object-fit: contain;
+}
+
+.dash-tagline {
+    margin: 0;
+    color: #6b7a8f;
+    font-size: 10px;
+    line-height: 1.35;
+    font-weight: 500;
+    letter-spacing: 0.7px;
+    overflow-wrap: anywhere;
 }
 
 .dash-sidebar nav {
@@ -1163,7 +1194,16 @@ button:disabled {
 }
 
 .dash-nav-item svg {
-    flex-shrink: 0;
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+}
+
+.dash-nav-item span {
+    min-width: 0;
+    flex: 1 1 auto;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
 }
 
 .dash-nav-item:hover {
@@ -1225,7 +1265,8 @@ button:disabled {
         top: 0;
         left: 0;
         bottom: 0;
-        width: 250px;
+        width: min(250px, 88vw);
+        flex-basis: auto;
         max-height: none;
         border-radius: 0;
         z-index: 1200;

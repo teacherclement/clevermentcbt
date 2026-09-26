@@ -21,6 +21,14 @@ function updateURL(page) {
     window.history.pushState({ page: page }, '', newURL);
 }
 
+// Dashboard branding lives inside each dashboard sidebar. Hide the global
+// landing/header branding while a teacher or admin dashboard is active so
+// the same logo/tagline is not duplicated above the dashboard.
+function setDashboardHeaderVisible(visible) {
+    var header = document.querySelector('.header');
+    if (header) header.style.display = visible ? 'block' : 'none';
+}
+
 function showPageFromURL(page) {
     var sections = ['landingPage', 'studentAccess', 'studentAssessmentView', 'teacherAuth', 'teacherDashboard', 'adminAuth', 'adminDashboard', 'studentCertificateSection', 'studentResultsSection'];
     for (var i = 0; i < sections.length; i++) {
@@ -49,6 +57,7 @@ function showPageFromURL(page) {
         showTeacherLoginForm();
     } else if (page === 'teacher-dashboard') {
         if (currentTeacher) {
+            setDashboardHeaderVisible(false);
             document.getElementById('teacherDashboard').style.display = 'block';
             document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + currentTeacher.name + '!';
             document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email;
@@ -65,6 +74,7 @@ function showPageFromURL(page) {
         document.getElementById('adminAuth').style.display = 'block';
     } else if (page === 'admin-dashboard') {
         if (localStorage.getItem('cleverment_admin_session') === 'true') {
+            setDashboardHeaderVisible(false);
             document.getElementById('adminDashboard').style.display = 'block';
             renderAdminDashboard();
         } else {
@@ -105,10 +115,12 @@ function restorePageState() {
         if (target) {
             target.style.display = 'block';
             if (savedPage === 'teacherDashboard' && currentTeacher) {
+                setDashboardHeaderVisible(false);
                 renderTeacherDashboard();
                 renderCSVHistory();
             }
             if (savedPage === 'adminDashboard') {
+                setDashboardHeaderVisible(false);
                 renderAdminDashboard();
             }
         }
@@ -1332,6 +1344,7 @@ async function teacherLogin() {
 
         document.getElementById('teacherAuth').style.display = 'none';
         document.getElementById('teacherDashboard').style.display = 'block';
+        setDashboardHeaderVisible(false);
         document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + currentTeacher.name + '!';
         document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email;
         renderTeacherDashboard();
@@ -1352,6 +1365,7 @@ function teacherLogout() {
     localStorage.removeItem('cleverment_teacher_token');
     document.getElementById('teacherDashboard').style.display = 'none';
     document.getElementById('teacherAuth').style.display = 'block';
+    setDashboardHeaderVisible(true);
     showTeacherLoginForm();
     document.getElementById('teacherLoginPassword').value = '';
     updateURL('teacher');
@@ -4513,6 +4527,7 @@ async function adminLogin() {
         localStorage.setItem('cleverment_admin_token', data.token);
         document.getElementById('adminAuth').style.display = 'none';
         document.getElementById('adminDashboard').style.display = 'block';
+        setDashboardHeaderVisible(false);
         renderAdminDashboard();
         updateURL('admin-dashboard');
     } catch (e) {
@@ -4527,6 +4542,7 @@ function adminLogout() {
     localStorage.removeItem('cleverment_admin_token');
     document.getElementById('adminDashboard').style.display = 'none';
     document.getElementById('adminAuth').style.display = 'block';
+    setDashboardHeaderVisible(true);
     document.getElementById('adminPassword').value = '';
     updateURL('admin');
 }
