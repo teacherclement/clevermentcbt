@@ -1137,6 +1137,7 @@ button:disabled {
     max-height: calc(100vh - 32px);
     overflow-y: auto;
     overflow-x: hidden;
+    transition: width 0.22s ease, flex-basis 0.22s ease, padding 0.22s ease;
 }
 
 /* CleverMent branding inside dashboard sidebars */
@@ -1146,6 +1147,7 @@ button:disabled {
     margin-bottom: 8px;
     text-align: center;
     border-bottom: 1px solid #e6ebf1;
+    transition: padding 0.22s ease, margin 0.22s ease;
 }
 
 .dash-logo-image {
@@ -1156,6 +1158,7 @@ button:disabled {
     max-height: 72px;
     margin: 0 auto 7px;
     object-fit: contain;
+    transition: max-height 0.22s ease, max-width 0.22s ease, margin 0.22s ease;
 }
 
 .dash-tagline {
@@ -1166,6 +1169,38 @@ button:disabled {
     font-weight: 500;
     letter-spacing: 0.7px;
     overflow-wrap: anywhere;
+    transition: opacity 0.15s ease, max-height 0.22s ease;
+}
+
+.sidebar-collapse-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid #dce3eb;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #4a5a6e;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 2;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.22s ease;
+}
+
+.sidebar-collapse-toggle:hover {
+    background: #eef2f6;
+    color: #1a1a2e;
+}
+
+.sidebar-collapse-toggle span {
+    display: block;
+    transform: translateY(-1px);
 }
 
 .dash-sidebar nav {
@@ -1178,6 +1213,7 @@ button:disabled {
     align-items: center;
     gap: 10px;
     width: 100%;
+    min-width: 0;
     text-align: left;
     background: none;
     border: none;
@@ -1190,7 +1226,7 @@ button:disabled {
     margin-bottom: 4px;
     font-family: 'Inter', sans-serif;
     letter-spacing: 0.2px;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease, padding 0.22s ease, gap 0.22s ease;
 }
 
 .dash-nav-item svg {
@@ -1204,6 +1240,7 @@ button:disabled {
     flex: 1 1 auto;
     line-height: 1.3;
     overflow-wrap: anywhere;
+    transition: opacity 0.12s ease;
 }
 
 .dash-nav-item:hover {
@@ -1215,6 +1252,67 @@ button:disabled {
 .dash-nav-item.active {
     background: #2d6cdf;
     color: #ffffff;
+}
+
+/* Desktop collapsed state: icon-only navigation with a compact CleverMent logo. */
+.dash-layout.sidebar-collapsed .dash-sidebar {
+    width: 72px;
+    flex-basis: 72px;
+    padding: 12px 8px;
+}
+
+.dash-layout.sidebar-collapsed .dash-branding {
+    padding: 34px 0 10px;
+    margin-bottom: 10px;
+}
+
+.dash-layout.sidebar-collapsed .dash-logo-image {
+    max-width: 42px;
+    max-height: 42px;
+    margin: 0 auto;
+}
+
+.dash-layout.sidebar-collapsed .dash-tagline {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.dash-layout.sidebar-collapsed .sidebar-collapse-toggle {
+    right: 50%;
+    transform: translateX(50%);
+    width: 26px;
+    height: 26px;
+    font-size: 21px;
+}
+
+.dash-layout.sidebar-collapsed .sidebar-collapse-toggle span {
+    transform: rotate(180deg) translateY(1px);
+}
+
+.dash-layout.sidebar-collapsed .dash-nav-item {
+    justify-content: center;
+    gap: 0;
+    padding: 11px 0;
+}
+
+.dash-layout.sidebar-collapsed .dash-nav-item span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.dash-layout.sidebar-collapsed .dash-nav-item svg {
+    flex: 0 0 19px;
+    width: 19px;
+    height: 19px;
 }
 
 .dash-main {
@@ -1229,6 +1327,10 @@ button:disabled {
 .dash-panel.active {
     display: block;
     animation: slideDown 0.25s ease;
+}
+
+.dashboard-menu-top {
+    margin-bottom: 14px;
 }
 
 .sidebar-toggle {
@@ -1251,6 +1353,48 @@ button:disabled {
     display: none;
 }
 
+/* WhatsApp support buttons */
+.whatsapp-float-btn {
+    position: fixed;
+    left: 16px;
+    bottom: 66px;
+    z-index: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 10px 16px;
+    border-radius: 24px;
+    background: #25D366;
+    color: #ffffff;
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.whatsapp-float-btn:hover {
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+}
+
+.whatsapp-icon {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    fill: currentColor;
+}
+
+.whatsapp-icon-inline {
+    width: 19px;
+    height: 19px;
+    flex-basis: 19px;
+    color: #ffffff;
+}
+
 @media (max-width: 900px) {
     .dash-layout {
         flex-direction: column;
@@ -1258,6 +1402,10 @@ button:disabled {
 
     .sidebar-toggle {
         display: inline-flex;
+    }
+
+    .sidebar-collapse-toggle {
+        display: none;
     }
 
     .dash-sidebar {
@@ -1275,6 +1423,56 @@ button:disabled {
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
     }
 
+    /* Never carry the desktop collapsed width into the mobile drawer. */
+    .dash-layout.sidebar-collapsed .dash-sidebar {
+        width: min(250px, 88vw);
+        flex-basis: auto;
+        padding: 14px;
+    }
+
+    .dash-layout.sidebar-collapsed .dash-branding {
+        padding: 4px 4px 14px;
+        margin-bottom: 8px;
+    }
+
+    .dash-layout.sidebar-collapsed .dash-logo-image {
+        max-width: 100%;
+        max-height: 72px;
+        margin: 0 auto 7px;
+    }
+
+    .dash-layout.sidebar-collapsed .dash-tagline {
+        opacity: 1;
+        max-height: none;
+        overflow-wrap: anywhere;
+        pointer-events: auto;
+    }
+
+    .dash-layout.sidebar-collapsed .dash-nav-item {
+        justify-content: flex-start;
+        gap: 10px;
+        padding: 10px 12px;
+    }
+
+    .dash-layout.sidebar-collapsed .dash-nav-item span {
+        position: static;
+        width: auto;
+        height: auto;
+        padding: 0;
+        margin: 0;
+        overflow: visible;
+        clip: auto;
+        white-space: normal;
+        border: 0;
+        flex: 1 1 auto;
+    }
+
+    .dash-layout.sidebar-collapsed .dash-nav-item svg {
+        flex: 0 0 18px;
+        width: 18px;
+        height: 18px;
+    }
+
     .dash-layout.sidebar-open .dash-sidebar {
         transform: none;
     }
@@ -1285,6 +1483,20 @@ button:disabled {
         inset: 0;
         background: rgba(0, 0, 0, 0.45);
         z-index: 1100;
+    }
+}
+
+@media (max-width: 520px) {
+    .whatsapp-float-btn {
+        left: 12px;
+        bottom: 66px;
+        padding: 9px 13px;
+        font-size: 13px;
+    }
+
+    #needHelpBtn {
+        left: 12px !important;
+        bottom: 12px !important;
     }
 }
 

@@ -59,6 +59,7 @@ function showPageFromURL(page) {
         if (currentTeacher) {
             setDashboardHeaderVisible(false);
             document.getElementById('teacherDashboard').style.display = 'block';
+            restoreDashSidebarState('teacherDashboard');
             document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + currentTeacher.name + '!';
             document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email;
             renderTeacherDashboard();
@@ -76,6 +77,7 @@ function showPageFromURL(page) {
         if (localStorage.getItem('cleverment_admin_session') === 'true') {
             setDashboardHeaderVisible(false);
             document.getElementById('adminDashboard').style.display = 'block';
+            restoreDashSidebarState('adminDashboard');
             renderAdminDashboard();
         } else {
             document.getElementById('adminAuth').style.display = 'block';
@@ -2612,6 +2614,8 @@ function backToStudentAccess() {
     preloadedImageCache = {};
     var helpBtn1 = document.getElementById('needHelpBtn');
     if (helpBtn1) helpBtn1.style.display = 'block';
+    var whatsappBtn1 = document.getElementById('whatsappFloatBtn');
+    if (whatsappBtn1) whatsappBtn1.style.display = 'inline-flex';
     document.getElementById('studentAssessmentView').style.display = 'none';
     document.getElementById('studentAccess').style.display = 'block';
     document.getElementById('assessmentCode').value = '';
@@ -2746,6 +2750,8 @@ function restoreQuizState() {
 
     var helpBtn = document.getElementById('needHelpBtn');
     if (helpBtn) helpBtn.style.display = 'none';
+    var whatsappBtn = document.getElementById('whatsappFloatBtn');
+    if (whatsappBtn) whatsappBtn.style.display = 'none';
 
     document.querySelector('.header').style.display = 'block';
     document.querySelector('.footer').style.display = 'block';
@@ -3186,6 +3192,8 @@ async function startStudentQuiz() {
 function proceedToStartQuiz() {
     var helpBtn = document.getElementById('needHelpBtn');
     if (helpBtn) helpBtn.style.display = 'none';
+    var whatsappBtn = document.getElementById('whatsappFloatBtn');
+    if (whatsappBtn) whatsappBtn.style.display = 'none';
 
     studentSubject = currentAssessment.subject;
     studentQuestions = JSON.parse(JSON.stringify(currentAssessment.questions));
@@ -3660,6 +3668,8 @@ async function studentSubmitQuiz() {
 
     var helpBtn = document.getElementById('needHelpBtn');
     if (helpBtn) helpBtn.style.display = 'block';
+    var whatsappBtn = document.getElementById('whatsappFloatBtn');
+    if (whatsappBtn) whatsappBtn.style.display = 'inline-flex';
 
     studentScore = data.score;
     studentCorrect = data.correctAnswers;
@@ -4309,6 +4319,8 @@ function studentResetQuiz() {
     preloadedImageCache = {};
     var helpBtn2 = document.getElementById('needHelpBtn');
     if (helpBtn2) helpBtn2.style.display = 'block';
+    var whatsappBtn2 = document.getElementById('whatsappFloatBtn');
+    if (whatsappBtn2) whatsappBtn2.style.display = 'inline-flex';
     document.getElementById('studentResultsSection').style.display = 'none';
     document.getElementById('studentSimpleSubmittedScreen').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'none';
@@ -5058,6 +5070,55 @@ if ('serviceWorker' in navigator) {
 function toggleDashSidebar(dashboardId) {
     var layout = document.querySelector('#' + dashboardId + ' .dash-layout');
     if (layout) layout.classList.toggle('sidebar-open');
+}
+
+// Desktop sidebar collapse: icon-only mode with a compact CleverMent logo.
+// The state is remembered separately for the teacher and admin dashboards.
+function toggleDashSidebarCollapse(dashboardId, btn) {
+    var root = document.getElementById(dashboardId);
+    if (!root) return;
+    var layout = root.querySelector('.dash-layout');
+    if (!layout) return;
+
+    var collapsed = layout.classList.toggle('sidebar-collapsed');
+    var key = dashboardId === 'teacherDashboard'
+        ? 'cleverment_teacher_sidebar_collapsed'
+        : 'cleverment_admin_sidebar_collapsed';
+
+    try {
+        localStorage.setItem(key, collapsed ? 'true' : 'false');
+    } catch (e) {}
+
+    if (btn) {
+        btn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        btn.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        var icon = btn.querySelector('span');
+        if (icon) icon.textContent = collapsed ? '›' : '‹';
+    }
+}
+
+function restoreDashSidebarState(dashboardId) {
+    var root = document.getElementById(dashboardId);
+    if (!root) return;
+    var layout = root.querySelector('.dash-layout');
+    if (!layout) return;
+
+    var key = dashboardId === 'teacherDashboard'
+        ? 'cleverment_teacher_sidebar_collapsed'
+        : 'cleverment_admin_sidebar_collapsed';
+    var collapsed = false;
+    try {
+        collapsed = localStorage.getItem(key) === 'true';
+    } catch (e) {}
+
+    layout.classList.toggle('sidebar-collapsed', collapsed);
+    var btn = root.querySelector('.sidebar-collapse-toggle');
+    if (btn) {
+        btn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        btn.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        var icon = btn.querySelector('span');
+        if (icon) icon.textContent = collapsed ? '›' : '‹';
+    }
 }
 
 function showDashSection(dashboardId, panelId, btn) {
