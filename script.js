@@ -2594,6 +2594,7 @@ function backToStudentAccess() {
     studentStopTimer();
     clearQuizState();
     stopProctorMonitoring();
+    stopStudentPresence();
     preloadedImageCache = {};
     var helpBtn1 = document.getElementById('needHelpBtn');
     if (helpBtn1) helpBtn1.style.display = 'block';
@@ -2770,6 +2771,7 @@ function restoreQuizState() {
     }
 
     updateURL('student-assessment');
+    startStudentPresence();
 
     if (currentAssessment.cameraMonitoring || currentAssessment.noiseMonitoring) {
         document.getElementById('proctorResumeOverlay').style.display = 'flex';
@@ -3232,6 +3234,7 @@ function proceedToStartQuiz() {
     studentStartTimer();
     updateURL('student-assessment');
     saveQuizState();
+    startStudentPresence();
 
     if (currentAssessment.cameraMonitoring || currentAssessment.noiseMonitoring) {
         startProctorMonitoring();
@@ -3639,6 +3642,7 @@ async function studentSubmitQuiz() {
 
     clearQuizState();
     stopProctorMonitoring();
+    stopStudentPresence();
 
     var helpBtn = document.getElementById('needHelpBtn');
     if (helpBtn) helpBtn.style.display = 'block';
@@ -4287,6 +4291,7 @@ function studentResetQuiz() {
     studentStopTimer();
     clearQuizState();
     stopProctorMonitoring();
+    stopStudentPresence();
     preloadedImageCache = {};
     var helpBtn2 = document.getElementById('needHelpBtn');
     if (helpBtn2) helpBtn2.style.display = 'block';
@@ -5066,8 +5071,114 @@ function showTeacherSection(panelId, btn) {
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
         loadTeacherAnalytics();
     }
+    if (panelId === 'liveSection') {
+        startTeacherLivePolling();
+    } else {
+        stopTeacherLivePolling();
+    }
 }
 
 function showAdminSection(panelId, btn) {
     showDashSection('adminDashboard', panelId, btn);
+}
+
+// ============================================================
+// LIVE PRESENCE (student heartbeat)
+// While a quiz is in progress, the app pings the backend every
+// 20s so the teacher's "Live Now" panel can show who is currently
+// taking an assessment. Stops on submit/exit; a student counts as
+// live for 60s after their last ping, so brief network drops
+// don't flicker them off the list.
+// ============================================================
+
+var studentPresenceInterval = null;
+
+function sendPresenceHeartbeat() {
+    if (!currentAssessmentCode || !studentName || !studentAdmissionNumber) return;
+    fetch(BACKEND_URL + '/api/quiz/presence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            code: currentAssessmentCode,
+            studentName: studentName,
+            admissionNumber: studentAdmissionNumber
+        })
+    }).catch(function() {
+        // Offline or server asleep - the next heartbeat retries.
+    });
+}
+
+function startStudentPresence() {
+    stopStudentPresence();
+    sendPresenceHeartbeat();
+    studentPresenceInterval = setInterval(sendPresenceHeartbeat, 20000);
+}
+
+function stopStudentPresence() {
+    if (studentPresenceInterval) {
+        clearInterval(studentPresenceInterval);
+        studentPresenceInterval = null;
+    }
+}
+
+// ============================================================
+// TEACHER: "Live Now" panel - polls the backend for students
+// currently taking this teacher's assessments.
+// ============================================================
+
+var teacherLiveInterval = null;
+
+async function loadTeacherLive() {
+    var container = document.getElementById('teacherLiveContainer');
+    if (!container) return;
+    var token = localStorage.getItem('cleverment_teacher_token');
+    if (!token) return;
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/live', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            container.innerHTML = '<p class="helper-text">Could not load live data. Please try again.</p>';
+            return;
+        }
+        renderTeacherLive(data.live || []);
+    } catch (e) {
+        // Transient network error - keep showing the previous list.
+    }
+}
+
+function renderTeacherLive(list) {
+    var container = document.getElementById('teacherLiveContainer');
+    if (!container) return;
+    if (!list || list.length === 0) {
+        container.innerHTML = '<p class="helper-text">No students are taking your assessments right now.</p>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+        var s = list[i];
+        var elapsedMs = Date.now() - new Date(s.startedAt).getTime();
+        var elapsedMin = Math.max(1, Math.round(elapsedMs / 60000));
+        html += '<div class="live-item">' +
+            '<span class="live-dot"></span>' +
+            '<div style="flex:1; min-width:160px;"><strong>' + s.studentName + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + s.admissionNumber + ')</span><br>' +
+            '<span style="color:#6b7a8f; font-size:13px;">' + s.subject + ' - ' + s.className + ' | Code: ' + s.code + '</span></div>' +
+            '<span style="font-size:13px; color:#2d9c5c; font-weight:600; white-space:nowrap;">in progress ~' + elapsedMin + ' min</span>' +
+            '</div>';
+    }
+    container.innerHTML = html;
+}
+
+function startTeacherLivePolling() {
+    stopTeacherLivePolling();
+    loadTeacherLive();
+    teacherLiveInterval = setInterval(loadTeacherLive, 8000);
+}
+
+function stopTeacherLivePolling() {
+    if (teacherLiveInterval) {
+        clearInterval(teacherLiveInterval);
+        teacherLiveInterval = null;
+    }
 }
