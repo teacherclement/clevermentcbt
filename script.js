@@ -59,7 +59,6 @@ function showPageFromURL(page) {
         if (currentTeacher) {
             setDashboardHeaderVisible(false);
             document.getElementById('teacherDashboard').style.display = 'block';
-            restoreDashSidebarState('teacherDashboard');
             document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + currentTeacher.name + '!';
             document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email;
             renderTeacherDashboard();
@@ -77,7 +76,6 @@ function showPageFromURL(page) {
         if (localStorage.getItem('cleverment_admin_session') === 'true') {
             setDashboardHeaderVisible(false);
             document.getElementById('adminDashboard').style.display = 'block';
-            restoreDashSidebarState('adminDashboard');
             renderAdminDashboard();
         } else {
             document.getElementById('adminAuth').style.display = 'block';
@@ -678,6 +676,8 @@ var studentTimerInterval = null;
 var studentTimeRemaining = 0;
 var studentTimeLimit = 0;
 var studentName = '';
+var studentQuizStartedAt = 0;
+var studentQuizEndsAt = 0;
 var studentAdmissionNumber = '';
 var preloadedImageCache = {};
 var studentTabSwitchCount = 0;
@@ -1073,14 +1073,14 @@ document.addEventListener('DOMContentLoaded', function() {
         checkForPasswordResetToken().then(function(handled) {
             if (handled) return;
 
-            var quizWasRestored = restoreQuizState();
-
-            if (!quizWasRestored) {
+            restoreQuizState().then(function(quizWasRestored) {
+                if (!quizWasRestored) {
                 var page = getPageFromURL();
                 if (page) {
                     showPageFromURL(page);
                 }
-            }
+                }
+            });
         });
     });
 });
@@ -2614,8 +2614,6 @@ function backToStudentAccess() {
     preloadedImageCache = {};
     var helpBtn1 = document.getElementById('needHelpBtn');
     if (helpBtn1) helpBtn1.style.display = 'block';
-    var whatsappBtn1 = document.getElementById('whatsappFloatBtn');
-    if (whatsappBtn1) whatsappBtn1.style.display = 'inline-flex';
     document.getElementById('studentAssessmentView').style.display = 'none';
     document.getElementById('studentAccess').style.display = 'block';
     document.getElementById('assessmentCode').value = '';
@@ -2698,6 +2696,8 @@ function saveQuizState() {
         studentTimeLimit: studentTimeLimit,
         studentName: studentName,
         studentAdmissionNumber: studentAdmissionNumber,
+        studentQuizStartedAt: studentQuizStartedAt,
+        studentQuizEndsAt: studentQuizEndsAt,
         studentClass: studentClass,
         studentSubject: studentSubject,
         studentIsTimeUp: studentIsTimeUp,
@@ -2717,7 +2717,7 @@ function clearQuizState() {
     localStorage.removeItem('cleverment_quiz_state');
 }
 
-function restoreQuizState() {
+async function restoreQuizState() {
     var saved = localStorage.getItem('cleverment_quiz_state');
     if (!saved) return false;
 
@@ -2728,6 +2728,56 @@ function restoreQuizState() {
         return false;
     }
     if (!state || !state.currentAssessment || !state.studentQuestions || state.studentQuestions.length === 0) {
+        clearQuizState();
+        return false;
+    }
+
+    // The assessment timer is based on an absolute deadline, not on how long
+    // this page has remained open. This means closing the page, refreshing,
+    // switching apps, or leaving the browser in the background does NOT pause
+    // the assessment clock. Older saved states are supported by deriving the
+    // deadline from their original start time.
+    var savedStartedAt = Number(state.studentQuizStartedAt || 0);
+    var savedEndsAt = Number(state.studentQuizEndsAt || 0);
+    var savedLimit = Number(state.studentTimeLimit || 0);
+    if (!savedEndsAt && savedStartedAt && savedLimit > 0) {
+        savedEndsAt = savedStartedAt + (savedLimit * 1000);
+    }
+    if (!savedStartedAt || (savedLimit > 0 && !savedEndsAt)) {
+        clearQuizState();
+        return false;
+    }
+
+    // Before restoring, ask the backend whether this student is still eligible.
+    // This prevents a submitted attempt from being resurrected from localStorage.
+    if (!state.currentAssessmentCode || !state.studentAdmissionNumber) {
+        clearQuizState();
+        return false;
+    }
+    try {
+        var eligibilityRes = await fetch(BACKEND_URL + '/api/quiz/start-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: state.currentAssessmentCode,
+                admissionNumber: state.studentAdmissionNumber
+            })
+        });
+        var eligibility = await eligibilityRes.json().catch(function() { return {}; });
+        if (!eligibilityRes.ok || !eligibility.allowed) {
+            // If this saved attempt has reached its own deadline, keep the
+            // local answers long enough to submit them automatically. A closed
+            // assessment window must not strand a timed-out student. For other
+            // rejection reasons (especially already_submitted), discard it.
+            var deadlineExpired = savedLimit > 0 && savedEndsAt && Date.now() >= savedEndsAt;
+            if (!(deadlineExpired && eligibility.reason === 'closed')) {
+                clearQuizState();
+                return false;
+            }
+        }
+    } catch (e) {
+        // Do not resurrect an old quiz when its server-side status cannot be verified.
+        clearQuizState();
         return false;
     }
 
@@ -2736,10 +2786,12 @@ function restoreQuizState() {
     studentQuestions = state.studentQuestions;
     studentCurrentIndex = state.studentCurrentIndex || 0;
     studentAnswers = state.studentAnswers || new Array(studentQuestions.length).fill(null);
-    studentTimeRemaining = state.studentTimeRemaining || 0;
     studentTimeLimit = state.studentTimeLimit || 0;
+    studentQuizEndsAt = savedEndsAt;
+    studentTimeRemaining = studentTimeLimit > 0 && studentQuizEndsAt ? Math.max(0, Math.ceil((studentQuizEndsAt - Date.now()) / 1000)) : 0;
     studentName = state.studentName || '';
     studentAdmissionNumber = state.studentAdmissionNumber || '';
+    studentQuizStartedAt = Number(state.studentQuizStartedAt || 0);
     studentClass = state.studentClass || '';
     studentSubject = state.studentSubject || '';
     studentIsTimeUp = state.studentIsTimeUp || false;
@@ -2750,8 +2802,6 @@ function restoreQuizState() {
 
     var helpBtn = document.getElementById('needHelpBtn');
     if (helpBtn) helpBtn.style.display = 'none';
-    var whatsappBtn = document.getElementById('whatsappFloatBtn');
-    if (whatsappBtn) whatsappBtn.style.display = 'none';
 
     document.querySelector('.header').style.display = 'block';
     document.querySelector('.footer').style.display = 'block';
@@ -2820,8 +2870,39 @@ function registerTabSwitch() {
 }
 
 document.addEventListener('visibilitychange', function() {
-    if (document.hidden) registerTabSwitch();
+    if (document.hidden) {
+        registerTabSwitch();
+        return;
+    }
+    // Recalculate from the absolute deadline immediately when the student
+    // returns to the page. This handles mobile app switching/backgrounding
+    // even when the browser throttled the interval while hidden.
+    var quizVisible = document.getElementById('studentQuizSection') &&
+        document.getElementById('studentQuizSection').style.display === 'block';
+    if (quizVisible && !studentIsTimeUp && studentTimeLimit > 0 && studentQuizEndsAt) {
+        if (Date.now() >= studentQuizEndsAt) {
+            studentTimeRemaining = 0;
+            studentTimeUp();
+        } else {
+            studentStartTimer();
+            saveQuizState();
+        }
+    }
 });
+
+window.addEventListener('pageshow', function() {
+    var quizVisible = document.getElementById('studentQuizSection') &&
+        document.getElementById('studentQuizSection').style.display === 'block';
+    if (quizVisible && !studentIsTimeUp && studentTimeLimit > 0 && studentQuizEndsAt) {
+        if (Date.now() >= studentQuizEndsAt) {
+            studentTimeRemaining = 0;
+            studentTimeUp();
+        } else {
+            studentStartTimer();
+        }
+    }
+});
+
 
 // ============================================================
 // CAMERA & NOISE MONITORING (student quiz) - optional, per
@@ -3155,20 +3236,35 @@ async function startStudentQuiz() {
         startBtn.textContent = 'Checking...';
     }
 
-    var rosterCheck = await checkStudentOnRoster(currentAssessment.teacherEmail, currentAssessment.className, studentAdmissionNumber);
-    if (rosterCheck === false) {
-        alert('Admission number "' + studentAdmissionNumber + '" was not found on the class roster for ' + currentAssessment.className + '. Please check your admission number, or contact your teacher if you believe this is a mistake.');
-        if (startBtn) {
-            startBtn.disabled = false;
-            startBtn.textContent = 'Start Assessment';
+    try {
+        var eligibilityRes = await fetch(BACKEND_URL + '/api/quiz/start-check', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: currentAssessmentCode,
+                admissionNumber: studentAdmissionNumber
+            })
+        });
+        var eligibility = await eligibilityRes.json().catch(function() { return {}; });
+
+        if (!eligibilityRes.ok || !eligibility.allowed) {
+            if (eligibility.reason === 'not_on_roster') {
+                alert('Admission number "' + studentAdmissionNumber + '" was not found on the class roster for ' + currentAssessment.className + '. Please check your admission number, or contact your teacher if you believe this is a mistake.');
+            } else if (eligibility.reason === 'already_submitted') {
+                alert('A student with admission number "' + studentAdmissionNumber + '" has already submitted this assessment (Code: ' + currentAssessmentCode + '). Each student can only take a given assessment once. If this is a mistake, please contact your teacher.');
+            } else if (eligibility.reason === 'not_yet_open' || eligibility.reason === 'closed') {
+                alert(eligibility.error || 'This assessment is not currently available.');
+            } else {
+                alert(eligibility.error || 'We could not verify your eligibility to start this assessment. Please try again.');
+            }
+            if (startBtn) {
+                startBtn.disabled = false;
+                startBtn.textContent = 'Start Assessment';
+            }
+            return;
         }
-        return;
-    }
-
-    var alreadyAttempted = await hasAlreadyAttempted(currentAssessmentCode, studentAdmissionNumber);
-
-    if (alreadyAttempted) {
-        alert('A student with admission number "' + studentAdmissionNumber + '" has already submitted this assessment (Code: ' + currentAssessmentCode + '). Each student can only take a given assessment once. If this is a mistake, please contact your teacher.');
+    } catch (e) {
+        alert('Could not verify your assessment status. Please check your connection and try again.');
         if (startBtn) {
             startBtn.disabled = false;
             startBtn.textContent = 'Start Assessment';
@@ -3190,14 +3286,15 @@ async function startStudentQuiz() {
 }
 
 function proceedToStartQuiz() {
+    studentQuizStartedAt = Date.now();
+    studentQuizEndsAt = 0;
     var helpBtn = document.getElementById('needHelpBtn');
     if (helpBtn) helpBtn.style.display = 'none';
-    var whatsappBtn = document.getElementById('whatsappFloatBtn');
-    if (whatsappBtn) whatsappBtn.style.display = 'none';
 
     studentSubject = currentAssessment.subject;
     studentQuestions = JSON.parse(JSON.stringify(currentAssessment.questions));
     studentTimeLimit = currentAssessment.timeLimit || 0;
+    studentQuizEndsAt = studentTimeLimit > 0 ? studentQuizStartedAt + (studentTimeLimit * 1000) : 0;
     studentTimeRemaining = studentTimeLimit;
 
     if (currentAssessment.shuffle) {
@@ -3432,24 +3529,43 @@ function studentStartTimer() {
         document.getElementById('studentTimerDisplay').textContent = '∞';
         return;
     }
-    studentTimerInterval = setInterval(function() {
-        studentTimeRemaining--;
-        var mins = Math.floor(studentTimeRemaining / 60);
-        var secs = studentTimeRemaining % 60;
+
+    // The deadline is absolute. setInterval is only responsible for updating
+    // the display; it is NOT the source of truth for elapsed time. Therefore
+    // browser throttling/backgrounding cannot pause the assessment.
+    if (!studentQuizEndsAt) {
+        studentQuizEndsAt = Date.now() + (studentTimeLimit * 1000);
+    }
+
+    function tick() {
+        var remaining = Math.max(0, Math.ceil((studentQuizEndsAt - Date.now()) / 1000));
+        studentTimeRemaining = remaining;
+        var mins = Math.floor(remaining / 60);
+        var secs = remaining % 60;
         var display = document.getElementById('studentTimerDisplay');
-        display.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-        if (studentTimeRemaining <= studentTimeLimit * 0.2 && studentTimeRemaining > 0) {
-            display.classList.add('warning');
-        } else {
-            display.classList.remove('warning');
+        if (display) {
+            display.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+            if (remaining <= studentTimeLimit * 0.2 && remaining > 0) {
+                display.classList.add('warning');
+            } else {
+                display.classList.remove('warning');
+            }
         }
-        if (studentTimeRemaining <= 0) {
-            display.classList.add('expired');
-            display.classList.remove('warning');
+
+        if (remaining <= 0) {
+            if (display) {
+                display.classList.add('expired');
+                display.classList.remove('warning');
+            }
             studentTimeUp();
+            return;
         }
         saveQuizState();
-    }, 1000);
+    }
+
+    tick();
+    if (studentIsTimeUp) return;
+    studentTimerInterval = setInterval(tick, 1000);
 }
 
 function studentStopTimer() {
@@ -3460,7 +3576,12 @@ function studentStopTimer() {
 }
 
 function studentGetTimeTaken() {
-    var totalSeconds = studentTimeLimit - studentTimeRemaining;
+    var totalSeconds;
+    if (studentTimeLimit > 0 && studentQuizStartedAt) {
+        totalSeconds = Math.max(0, Math.min(studentTimeLimit, Math.floor((Date.now() - studentQuizStartedAt) / 1000)));
+    } else {
+        totalSeconds = Math.max(0, studentTimeLimit - studentTimeRemaining);
+    }
     var mins = Math.floor(totalSeconds / 60);
     var secs = totalSeconds % 60;
     return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
@@ -3470,18 +3591,32 @@ function studentTimeUp() {
     if (studentIsTimeUp) return;
     studentIsTimeUp = true;
     studentEndReason = 'timeup';
+    studentTimeRemaining = 0;
     studentStopTimer();
+    var display = document.getElementById('studentTimerDisplay');
+    if (display) {
+        display.textContent = '00:00';
+        display.classList.add('expired');
+        display.classList.remove('warning');
+    }
+
     var overlay = document.createElement('div');
     overlay.className = 'time-up-overlay';
     overlay.id = 'studentTimeUpOverlay';
     overlay.innerHTML = `
         <div class="time-up-box">
             <h2>Time is Up</h2>
-            <p>Your time for this assessment has expired.<br>Your answers will be submitted automatically.</p>
-            <button onclick="studentSubmitQuiz()">Submit Now</button>
+            <p>Your assessment time has ended.<br>Submitting your answers automatically...</p>
+            <div class="time-up-spinner" aria-label="Submitting"></div>
         </div>
     `;
     document.body.appendChild(overlay);
+
+    // Do not ask for permission. studentSubmitQuiz() skips the unanswered
+    // question confirmation when studentIsTimeUp is true.
+    setTimeout(function() {
+        studentSubmitQuiz();
+    }, 150);
 }
 
 // ============================================================
@@ -3668,8 +3803,6 @@ async function studentSubmitQuiz() {
 
     var helpBtn = document.getElementById('needHelpBtn');
     if (helpBtn) helpBtn.style.display = 'block';
-    var whatsappBtn = document.getElementById('whatsappFloatBtn');
-    if (whatsappBtn) whatsappBtn.style.display = 'inline-flex';
 
     studentScore = data.score;
     studentCorrect = data.correctAnswers;
@@ -4319,8 +4452,6 @@ function studentResetQuiz() {
     preloadedImageCache = {};
     var helpBtn2 = document.getElementById('needHelpBtn');
     if (helpBtn2) helpBtn2.style.display = 'block';
-    var whatsappBtn2 = document.getElementById('whatsappFloatBtn');
-    if (whatsappBtn2) whatsappBtn2.style.display = 'inline-flex';
     document.getElementById('studentResultsSection').style.display = 'none';
     document.getElementById('studentSimpleSubmittedScreen').style.display = 'none';
     document.getElementById('studentCertificateSection').style.display = 'none';
@@ -4448,7 +4579,7 @@ function applyTeacherFilters() {
     var tbody = document.getElementById('teacherResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -4458,150 +4589,9 @@ function applyTeacherFilters() {
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'teacher\',' + item.id + ')">⋮ Take Action</button></td></tr>';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
     }
     tbody.innerHTML = html;
-}
-
-var pendingResultAction = null;
-
-function openResultActions(role, resultId) {
-    var result = null;
-    var cache = role === 'admin' ? adminResultsCache : teacherResultsCache;
-    for (var i = 0; i < cache.length; i++) {
-        if (String(cache[i].id) === String(resultId)) {
-            result = cache[i];
-            break;
-        }
-    }
-    if (!result) {
-        alert('Could not find this result. Please refresh the dashboard and try again.');
-        return;
-    }
-
-    pendingResultAction = { role: role, result: result };
-    var overlay = document.getElementById('resultActionOverlay');
-    var message = document.getElementById('resultActionMessage');
-    if (message) {
-        message.textContent = result.studentName + ' — ' + result.subject + ' (' + result.score + '%)';
-    }
-    if (overlay) overlay.style.display = 'flex';
-}
-
-function closeResultActions() {
-    var overlay = document.getElementById('resultActionOverlay');
-    if (overlay) overlay.style.display = 'none';
-    pendingResultAction = null;
-}
-
-async function downloadResultCertificate() {
-    if (!pendingResultAction || !pendingResultAction.result) return;
-    var role = pendingResultAction.role;
-    var result = pendingResultAction.result;
-    closeResultActions();
-
-    try {
-        var assessments;
-        if (role === 'teacher') {
-            assessments = teacherAssessmentsCache && teacherAssessmentsCache.length
-                ? teacherAssessmentsCache
-                : await getTeacherAssessmentsFromBackend();
-        } else {
-            assessments = await getAdminAssessmentsFromBackend();
-        }
-
-        var assessment = null;
-        for (var i = 0; i < assessments.length; i++) {
-            if (assessments[i].code === result.assessmentCode) {
-                assessment = assessments[i];
-                break;
-            }
-        }
-
-        if (!assessment) {
-            alert('Could not find the assessment details needed to create this certificate.');
-            return;
-        }
-
-        var blob = await generateCertificatePDFBlob({
-            studentName: result.studentName,
-            subject: result.subject,
-            score: result.score,
-            teacherName: assessment.teacherName,
-            teacherSignature: assessment.teacherSignature,
-            code: assessment.code,
-            dateObj: new Date()
-        });
-
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'Certificate-' + (result.studentName || 'Student').replace(/[\\/:*?"<>|]/g, '_') + '.pdf';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
-    } catch (e) {
-        console.error('Result certificate generation error:', e);
-        alert('Error generating certificate: ' + e.message);
-    }
-}
-
-async function deleteSelectedResult() {
-    if (!pendingResultAction || !pendingResultAction.result) return;
-    var role = pendingResultAction.role;
-    var result = pendingResultAction.result;
-    closeResultActions();
-
-    if (!confirm('Delete the result for ' + result.studentName + '? This cannot be undone.')) return;
-
-    var token = role === 'admin'
-        ? localStorage.getItem('cleverment_admin_token')
-        : localStorage.getItem('cleverment_teacher_token');
-    var endpoint = role === 'admin'
-        ? BACKEND_URL + '/api/admin/results/' + encodeURIComponent(result.id)
-        : BACKEND_URL + '/api/teacher/results/' + encodeURIComponent(result.id);
-
-    try {
-        var res = await fetch(endpoint, {
-            method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        var data = await res.json();
-        if (!res.ok) {
-            alert('Error: ' + (data.error || 'Could not delete this result.'));
-            return;
-        }
-
-        var localResults = getAllResultsLocal();
-        localResults = localResults.filter(function(r) { return String(r.id) !== String(result.id); });
-        localStorage.setItem('cleverment_all_results', JSON.stringify(localResults));
-
-        if (role === 'admin') {
-            adminResultsCache = adminResultsCache.filter(function(r) { return String(r.id) !== String(result.id); });
-            renderAdminResults();
-        } else {
-            teacherResultsCache = teacherResultsCache.filter(function(r) { return String(r.id) !== String(result.id); });
-            renderTeacherDashboard();
-        }
-    } catch (e) {
-        alert('Could not reach the server. Please check your connection and try again.');
-    }
-}
-
-function setupResultActionModal() {
-    var downloadBtn = document.getElementById('resultActionDownload');
-    var deleteBtn = document.getElementById('resultActionDelete');
-    var cancelBtn = document.getElementById('resultActionCancel');
-    var overlay = document.getElementById('resultActionOverlay');
-    if (downloadBtn) downloadBtn.onclick = downloadResultCertificate;
-    if (deleteBtn) deleteBtn.onclick = deleteSelectedResult;
-    if (cancelBtn) cancelBtn.onclick = closeResultActions;
-    if (overlay) {
-        overlay.addEventListener('click', function(e) {
-            if (e.target === overlay) closeResultActions();
-        });
-    }
 }
 
 function teacherExportResults() {
@@ -5018,7 +5008,7 @@ function applyAdminFilters() {
     var tbody = document.getElementById('adminResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
         return;
     }
 
@@ -5028,7 +5018,7 @@ function applyAdminFilters() {
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'admin\',' + item.id + ')">⋮ Take Action</button></td></tr>';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -5213,55 +5203,6 @@ function toggleDashSidebar(dashboardId) {
     if (layout) layout.classList.toggle('sidebar-open');
 }
 
-// Desktop sidebar collapse: icon-only mode with a compact CleverMent logo.
-// The state is remembered separately for the teacher and admin dashboards.
-function toggleDashSidebarCollapse(dashboardId, btn) {
-    var root = document.getElementById(dashboardId);
-    if (!root) return;
-    var layout = root.querySelector('.dash-layout');
-    if (!layout) return;
-
-    var collapsed = layout.classList.toggle('sidebar-collapsed');
-    var key = dashboardId === 'teacherDashboard'
-        ? 'cleverment_teacher_sidebar_collapsed'
-        : 'cleverment_admin_sidebar_collapsed';
-
-    try {
-        localStorage.setItem(key, collapsed ? 'true' : 'false');
-    } catch (e) {}
-
-    if (btn) {
-        btn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-        btn.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-        var icon = btn.querySelector('span');
-        if (icon) icon.textContent = collapsed ? '›' : '‹';
-    }
-}
-
-function restoreDashSidebarState(dashboardId) {
-    var root = document.getElementById(dashboardId);
-    if (!root) return;
-    var layout = root.querySelector('.dash-layout');
-    if (!layout) return;
-
-    var key = dashboardId === 'teacherDashboard'
-        ? 'cleverment_teacher_sidebar_collapsed'
-        : 'cleverment_admin_sidebar_collapsed';
-    var collapsed = false;
-    try {
-        collapsed = localStorage.getItem(key) === 'true';
-    } catch (e) {}
-
-    layout.classList.toggle('sidebar-collapsed', collapsed);
-    var btn = root.querySelector('.sidebar-collapse-toggle');
-    if (btn) {
-        btn.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-        btn.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
-        var icon = btn.querySelector('span');
-        if (icon) icon.textContent = collapsed ? '›' : '‹';
-    }
-}
-
 function showDashSection(dashboardId, panelId, btn) {
     var root = document.getElementById(dashboardId);
     if (!root) return;
@@ -5400,371 +5341,3 @@ function stopTeacherLivePolling() {
         teacherLiveInterval = null;
     }
 }
-
-
-// Result action modal wiring
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupResultActionModal);
-} else {
-    setupResultActionModal();
-}
-
-// ============================================================
-// CLEVERBOT - floating answer-only AI assistant
-// ============================================================
-(function initCleverBot(){
-    var floatBtn = document.getElementById('cleverBotFloat');
-    var panel = document.getElementById('cleverBotPanel');
-    var closeBtn = document.getElementById('cleverBotClose');
-    var messages = document.getElementById('cleverBotMessages');
-    var input = document.getElementById('cleverBotInput');
-    var sendBtn = document.getElementById('cleverBotSend');
-    var attachBtn = document.getElementById('cleverBotAttach');
-    var fileInput = document.getElementById('cleverBotFileInput');
-    var micBtn = document.getElementById('cleverBotMic');
-    var attachBox = document.getElementById('cleverBotAttachments');
-    if (!floatBtn || !panel || !messages || !input) return;
-
-    var botHistory = [];
-    var pendingFiles = [];
-    var recorder = null;
-    var audioChunks = [];
-    var drag = { active:false, moved:false, dx:0, dy:0 };
-
-    function addMessage(text, role) {
-        var el = document.createElement('div');
-        el.className = 'cleverbot-msg ' + (role || 'bot');
-
-        if (role === 'bot') {
-            var body = document.createElement('div');
-            body.className = 'cleverbot-msg-body';
-            body.textContent = text;
-            el.appendChild(body);
-
-            var copyBtn = document.createElement('button');
-            copyBtn.type = 'button';
-            copyBtn.className = 'cleverbot-copy';
-            copyBtn.setAttribute('aria-label', 'Copy CleverBot response');
-            copyBtn.title = 'Copy entire response';
-            copyBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg><span>Copy</span>';
-            copyBtn.addEventListener('click', function(){
-                var value = String(text || '');
-                function copied(){
-                    copyBtn.classList.add('copied');
-                    copyBtn.querySelector('span').textContent = 'Copied';
-                    setTimeout(function(){
-                        copyBtn.classList.remove('copied');
-                        copyBtn.querySelector('span').textContent = 'Copy';
-                    }, 1400);
-                }
-                if (navigator.clipboard && window.isSecureContext) {
-                    navigator.clipboard.writeText(value).then(copied).catch(function(){ fallbackCopy(value, copied); });
-                } else {
-                    fallbackCopy(value, copied);
-                }
-            });
-            el.appendChild(copyBtn);
-        } else {
-            el.textContent = text;
-        }
-
-        messages.appendChild(el);
-        messages.scrollTop = messages.scrollHeight;
-        if (role === 'user' || role === 'bot') botHistory.push({ role: role === 'bot' ? 'assistant' : 'user', text: text });
-        return el;
-    }
-
-    function fallbackCopy(text, done) {
-        var area = document.createElement('textarea');
-        area.value = text;
-        area.setAttribute('readonly', '');
-        area.style.position = 'fixed';
-        area.style.left = '-9999px';
-        document.body.appendChild(area);
-        area.select();
-        try { document.execCommand('copy'); if (done) done(); } catch (e) {}
-        document.body.removeChild(area);
-    }
-    function addTyping(){
-        var el=document.createElement('div'); el.className='cleverbot-msg bot'; el.id='cleverBotTyping';
-        el.innerHTML='<span class="cleverbot-typing-label">Typing</span><span class="cleverbot-typing"><span></span><span></span><span></span></span>'; messages.appendChild(el); messages.scrollTop=messages.scrollHeight; return el;
-    }
-
-    function cleanBotText(text){
-        return String(text || '').replace(/\*\*/g, '').replace(/__+/g, '');
-    }
-    function createStreamingMessage(){
-        var el=document.createElement('div'); el.className='cleverbot-msg bot';
-        var body=document.createElement('div'); body.className='cleverbot-msg-body'; body.textContent=''; el.appendChild(body);
-        var copyBtn=document.createElement('button'); copyBtn.type='button'; copyBtn.className='cleverbot-copy';
-        copyBtn.setAttribute('aria-label','Copy CleverBot response'); copyBtn.title='Copy entire response';
-        copyBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg><span>Copy</span>';
-        copyBtn.style.display='none';
-        copyBtn.addEventListener('click',function(){
-            var value=body.textContent || '';
-            function copied(){ copyBtn.classList.add('copied'); copyBtn.querySelector('span').textContent='Copied'; setTimeout(function(){copyBtn.classList.remove('copied');copyBtn.querySelector('span').textContent='Copy';},1400); }
-            if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(value).then(copied).catch(function(){fallbackCopy(value,copied);}); else fallbackCopy(value,copied);
-        });
-        el.appendChild(copyBtn); messages.appendChild(el); messages.scrollTop=messages.scrollHeight;
-        return {el:el, body:body, copyBtn:copyBtn};
-    }
-
-    // Gemini can stream data to the backend in chunks, but a hosting proxy can
-    // sometimes deliver several chunks together. We therefore render the
-    // received text through a small client-side typewriter queue as well. This
-    // guarantees that CleverBot visibly "types" its answer even when the
-    // network hands the browser a whole response at once.
-    function createTextStreamer(target){
-        var queue='';
-        var displayed='';
-        var timer=null;
-        var finished=false;
-        var resolveDone;
-        var donePromise=new Promise(function(resolve){ resolveDone=resolve; });
-        var speed=12; // characters per tick; visibly progressive without feeling slow
-
-        function tick(){
-            if (queue.length > 0) {
-                var take=Math.min(speed, queue.length);
-                displayed += queue.slice(0,take);
-                queue = queue.slice(take);
-                target.body.textContent = cleanBotText(displayed);
-                messages.scrollTop=messages.scrollHeight;
-                timer=setTimeout(tick, 22);
-                return;
-            }
-            timer=null;
-            if (finished) finish();
-        }
-        function push(text){
-            queue += cleanBotText(text || '');
-            if (!timer) tick();
-        }
-        function finish(){
-            finished=true;
-            if (queue.length > 0) {
-                if (!timer) tick();
-                return;
-            }
-            target.body.textContent=cleanBotText(displayed).trim();
-            if (target.copyBtn) target.copyBtn.style.display = target.body.textContent ? 'inline-flex' : 'none';
-            if (resolveDone) { var r=resolveDone; resolveDone=null; r(cleanBotText(displayed).trim()); }
-        }
-        function getText(){ return cleanBotText(displayed).trim(); }
-        return {push:push, finish:finish, getText:getText, done:donePromise};
-    }
-
-    async function consumeCleverBotStream(res, target){
-        if(!res.ok){
-            var errorText=await res.text();
-            var errorMsg='CleverBot is temporarily unavailable.';
-            try { var parsed=JSON.parse(errorText); errorMsg=parsed.error||errorMsg; } catch(e) { if(errorText) errorMsg=errorText; }
-            throw new Error(errorMsg);
-        }
-        var reader=res.body && res.body.getReader ? res.body.getReader() : null;
-        if(!reader){ throw new Error('This browser does not support streamed CleverBot responses.'); }
-        var decoder=new TextDecoder('utf-8'); var buffer='';
-        var streamer=createTextStreamer(target);
-        while(true){
-            var part=await reader.read();
-            if(part.done) break;
-            buffer += decoder.decode(part.value,{stream:true});
-            var events=buffer.split(/\r?\n\r?\n/); buffer=events.pop()||'';
-            events.forEach(function(event){
-                event.split(/\r?\n/).forEach(function(line){
-                    if(line.indexOf('data:')!==0) return;
-                    var raw=line.slice(5).trim(); if(!raw) return;
-                    try{
-                        var obj=JSON.parse(raw);
-                        if(obj.error) throw new Error(obj.error);
-                        if(obj.text) streamer.push(obj.text);
-                    }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
-                });
-            });
-        }
-        buffer += decoder.decode();
-        if(buffer.indexOf('data:')===0){
-            try{
-                var obj=JSON.parse(buffer.slice(5).trim());
-                if(obj.error) throw new Error(obj.error);
-                if(obj.text) streamer.push(obj.text);
-            }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
-        }
-        streamer.finish();
-        // Do not expose the Copy button until the visible typewriter animation
-        // has finished. This also ensures the final text is what gets copied.
-        return await streamer.done;
-    }
-    function isStudentAssessment(){
-        var assessment = document.getElementById('studentAssessmentView');
-        var quiz = document.getElementById('studentQuizSection');
-        return (assessment && getComputedStyle(assessment).display !== 'none') || (quiz && getComputedStyle(quiz).display !== 'none');
-    }
-    function updateVisibility(){
-        var hidden = isStudentAssessment();
-        floatBtn.style.display = hidden ? 'none' : 'flex';
-        if (hidden) panel.hidden = true;
-    }
-    function getContext(){
-        var page = new URLSearchParams(window.location.search).get('page') || 'landing';
-        var parts = ['Page: ' + page];
-        var active = document.querySelector('.dash-section.active, .dashboard-section.active, [data-active="true"]');
-        if (active) parts.push('Visible section: ' + (active.getAttribute('id') || active.textContent.slice(0,200)));
-        var heading = document.querySelector('#teacherDashboardName, #adminDashboardName');
-        if (heading && heading.textContent) parts.push('Dashboard greeting: ' + heading.textContent);
-        var visible = document.querySelector('#teacherDashboard, #adminDashboard');
-        if (visible && getComputedStyle(visible).display !== 'none') {
-            var text = visible.innerText || '';
-            parts.push('Current dashboard text excerpt: ' + text.replace(/\s+/g,' ').slice(0,3000));
-        }
-        return parts.join('\n');
-    }
-    function openBot(){
-        if (isStudentAssessment()) return;
-        panel.hidden=false;
-        if (!messages.dataset.greeted) {
-            addMessage('Hello! 👋 I’m CleverBot, your CleverMent assistant. How can I be of help today?', 'bot');
-            messages.dataset.greeted='1';
-        }
-        setTimeout(function(){ input.focus(); }, 50);
-    }
-    function closeBot(){ panel.hidden=true; }
-    floatBtn.addEventListener('click', function(){ if (!drag.moved) openBot(); });
-    closeBtn.addEventListener('click', closeBot);
-
-    function renderAttachments(){
-        attachBox.innerHTML='';
-        if (!pendingFiles.length){ attachBox.hidden=true; return; }
-        attachBox.hidden=false;
-        pendingFiles.forEach(function(f,i){
-            var chip=document.createElement('span'); chip.className='cleverbot-attachment-chip';
-            chip.textContent=(f.name||'Attachment').slice(0,28);
-            var x=document.createElement('button'); x.type='button'; x.textContent='×'; x.setAttribute('aria-label','Remove attachment');
-            x.onclick=function(){ pendingFiles.splice(i,1); renderAttachments(); };
-            chip.appendChild(x); attachBox.appendChild(chip);
-        });
-    }
-    function fileToBase64(file){
-        return new Promise(function(resolve,reject){
-            var r=new FileReader(); r.onload=function(){ resolve(String(r.result).split(',')[1] || ''); }; r.onerror=reject; r.readAsDataURL(file);
-        });
-    }
-
-    async function extractPdfText(file){
-        if (!window.pdfjsLib) return '';
-        var buffer = await file.arrayBuffer();
-        var pdf = await window.pdfjsLib.getDocument({data: buffer}).promise;
-        var chunks = [];
-        var maxChars = 1400000;
-        for (var pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
-            var page = await pdf.getPage(pageNo);
-            var content = await page.getTextContent();
-            var pageText = content.items.map(function(item){ return item.str || ''; }).join(' ');
-            if (pageText.trim()) chunks.push('PAGE ' + pageNo + '\n' + pageText.trim());
-            if (chunks.join('\n\n').length >= maxChars) break;
-        }
-        return chunks.join('\n\n').slice(0, maxChars);
-    }
-    fileInput.addEventListener('change', function(){
-        var files=Array.prototype.slice.call(fileInput.files||[]);
-        files.forEach(function(f){
-            if (pendingFiles.length>=4) return;
-            if (f.size>8*1024*1024) { addMessage('I could not attach “'+f.name+'” because it is larger than 8 MB.','system'); return; }
-            pendingFiles.push(f);
-        });
-        fileInput.value=''; renderAttachments();
-    });
-    attachBtn.addEventListener('click', function(){ fileInput.click(); });
-
-    async function sendMessage(){
-        var text=input.value.trim();
-        if (!text && !pendingFiles.length) return;
-        var files=pendingFiles.slice(); pendingFiles=[]; renderAttachments();
-        if (text) addMessage(text,'user');
-        files.forEach(function(f){ addMessage('📎 '+f.name,'user'); });
-        input.value=''; input.style.height='auto'; sendBtn.disabled=true;
-        var typing=addTyping();
-        var streamMessage=null;
-        try {
-            var attachments=[];
-            var totalRawBytes=0;
-            for (var i=0;i<files.length;i++) {
-                var file=files[i];
-                totalRawBytes += file.size || 0;
-                if (totalRawBytes > 16*1024*1024) {
-                    throw new Error('The attached files are too large together. Please attach one file at a time or use smaller files.');
-                }
-                var mime=file.type||'application/octet-stream';
-                if (mime === 'application/pdf' || /\.pdf$/i.test(file.name||'')) {
-                    var pdfText='';
-                    try { pdfText=await extractPdfText(file); } catch (pdfErr) { pdfText=''; }
-                    if (pdfText.trim()) {
-                        attachments.push({name:file.name,mimeType:'text/plain',text:pdfText});
-                        continue;
-                    }
-                }
-                attachments.push({name:file.name,mimeType:mime,data:await fileToBase64(file)});
-            }
-            var history=botHistory.slice(-12);
-            history=history.filter(function(h){ return !(h.role==='user' && /^📎 /.test(h.text)); });
-            var res=await fetch(BACKEND_URL+'/api/cleverbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history,context:getContext(),attachments:attachments})});
-            if (typing.parentNode) typing.parentNode.removeChild(typing);
-            streamMessage=createStreamingMessage();
-            var reply=await consumeCleverBotStream(res,streamMessage);
-            if(!reply){ streamMessage.el.parentNode && streamMessage.el.parentNode.removeChild(streamMessage.el); addMessage('I’m sorry, I could not generate a response.','bot'); }
-            else botHistory.push({role:'assistant',text:reply});
-        } catch(e){
-            if (typing.parentNode) typing.parentNode.removeChild(typing);
-            if(streamMessage && streamMessage.el.parentNode) streamMessage.el.parentNode.removeChild(streamMessage.el);
-            addMessage(e.message||'I could not connect to CleverBot right now. Please check your internet connection and try again.','bot');
-        } finally { sendBtn.disabled=false; input.focus(); }
-    }
-    sendBtn.addEventListener('click',sendMessage);
-    input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
-    input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,100)+'px'; });
-
-    async function blobToBase64(blob){ return await fileToBase64(new File([blob],'voice-message.webm',{type:blob.type||'audio/webm'})); }
-    micBtn.addEventListener('click',async function(){
-        if (recorder && recorder.state==='recording'){ recorder.stop(); return; }
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ addMessage('Voice recording is not supported by this browser.','system'); return; }
-        try {
-            var stream=await navigator.mediaDevices.getUserMedia({audio:true});
-            audioChunks=[]; recorder=new MediaRecorder(stream);
-            recorder.ondataavailable=function(e){if(e.data.size)audioChunks.push(e.data);};
-            recorder.onstop=async function(){
-                stream.getTracks().forEach(function(t){t.stop();}); micBtn.classList.remove('recording'); micBtn.innerHTML='<svg class="mic-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>';
-                var blob=new Blob(audioChunks,{type:recorder.mimeType||'audio/webm'});
-                if(blob.size>8*1024*1024){addMessage('That recording is too large. Please record a shorter message.','system');return;}
-                addMessage('🎤 Voice message','user'); var typing=addTyping();
-                try{
-                    var data64=await blobToBase64(blob);
-                    var transRes=await fetch(BACKEND_URL+'/api/cleverbot/voice-transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:data64,mimeType:blob.type||'audio/webm'})});
-                    var transText=await transRes.text(); var transData={};
-                    try{transData=JSON.parse(transText);}catch(_){transData={error:transText};}
-                    if(typing.parentNode)typing.parentNode.removeChild(typing);
-                    if(!transRes.ok || !transData.transcript){ addMessage(transData.error||'I could not recognize the speech in that recording. Please try again.','bot'); return; }
-                    input.value=transData.transcript;
-                    input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,100)+'px';
-                    await sendMessage();
-                }catch(e){if(typing.parentNode)typing.parentNode.removeChild(typing);addMessage(e.message||'I could not process the voice message. Please try again.','bot');}
-            };
-            recorder.start(); micBtn.classList.add('recording'); micBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/></svg>';
-        } catch(e){ addMessage('Microphone access was not granted. Please allow microphone access and try again.','system'); }
-    });
-
-    // Draggable floating icon; position persists locally.
-    function restorePosition(){
-        try{var p=JSON.parse(localStorage.getItem('cleverbot_float_position'));if(p&&typeof p.left==='number'&&typeof p.top==='number'){floatBtn.style.left=p.left+'px';floatBtn.style.top=p.top+'px';floatBtn.style.right='auto';floatBtn.style.bottom='auto';}}catch(e){}
-    }
-    function savePosition(){localStorage.setItem('cleverbot_float_position',JSON.stringify({left:parseFloat(floatBtn.style.left),top:parseFloat(floatBtn.style.top)}));}
-    function beginDrag(e){
-        drag.active=true;drag.moved=false;var r=floatBtn.getBoundingClientRect();drag.dx=(e.clientX-r.left);drag.dy=(e.clientY-r.top);floatBtn.setPointerCapture(e.pointerId);
-    }
-    function moveDrag(e){
-        if(!drag.active)return;var x=e.clientX-drag.dx,y=e.clientY-drag.dy;var maxX=window.innerWidth-floatBtn.offsetWidth,maxY=window.innerHeight-floatBtn.offsetHeight;x=Math.max(4,Math.min(x,maxX-4));y=Math.max(4,Math.min(y,maxY-4));if(Math.abs(e.movementX)+Math.abs(e.movementY)>2)drag.moved=true;floatBtn.style.left=x+'px';floatBtn.style.top=y+'px';floatBtn.style.right='auto';floatBtn.style.bottom='auto';
-    }
-    function endDrag(){if(!drag.active)return;drag.active=false;if(drag.moved)savePosition();setTimeout(function(){drag.moved=false;},0);}
-    floatBtn.addEventListener('pointerdown',beginDrag);floatBtn.addEventListener('pointermove',moveDrag);floatBtn.addEventListener('pointerup',endDrag);floatBtn.addEventListener('pointercancel',endDrag);
-    restorePosition(); updateVisibility();
-    setInterval(updateVisibility,700);
-})();
