@@ -5489,6 +5489,59 @@ if (document.readyState === 'loading') {
         var el=document.createElement('div'); el.className='cleverbot-msg bot'; el.id='cleverBotTyping';
         el.innerHTML='<span class="cleverbot-typing"><span></span><span></span><span></span></span>'; messages.appendChild(el); messages.scrollTop=messages.scrollHeight; return el;
     }
+
+    function cleanBotText(text){
+        return String(text || '').replace(/\*\*/g, '').replace(/__+/g, '');
+    }
+    function createStreamingMessage(){
+        var el=document.createElement('div'); el.className='cleverbot-msg bot';
+        var body=document.createElement('div'); body.className='cleverbot-msg-body'; body.textContent=''; el.appendChild(body);
+        var copyBtn=document.createElement('button'); copyBtn.type='button'; copyBtn.className='cleverbot-copy';
+        copyBtn.setAttribute('aria-label','Copy CleverBot response'); copyBtn.title='Copy entire response';
+        copyBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg><span>Copy</span>';
+        copyBtn.addEventListener('click',function(){
+            var value=body.textContent || '';
+            function copied(){ copyBtn.classList.add('copied'); copyBtn.querySelector('span').textContent='Copied'; setTimeout(function(){copyBtn.classList.remove('copied');copyBtn.querySelector('span').textContent='Copy';},1400); }
+            if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(value).then(copied).catch(function(){fallbackCopy(value,copied);}); else fallbackCopy(value,copied);
+        });
+        el.appendChild(copyBtn); messages.appendChild(el); messages.scrollTop=messages.scrollHeight;
+        return {el:el, body:body};
+    }
+    async function consumeCleverBotStream(res, target){
+        if(!res.ok){
+            var errorText=await res.text();
+            var errorMsg='CleverBot is temporarily unavailable.';
+            try { var parsed=JSON.parse(errorText); errorMsg=parsed.error||errorMsg; } catch(e) { if(errorText) errorMsg=errorText; }
+            throw new Error(errorMsg);
+        }
+        var reader=res.body && res.body.getReader ? res.body.getReader() : null;
+        if(!reader){ throw new Error('This browser does not support streamed CleverBot responses.'); }
+        var decoder=new TextDecoder('utf-8'); var buffer=''; var full='';
+        while(true){
+            var part=await reader.read();
+            if(part.done) break;
+            buffer += decoder.decode(part.value,{stream:true});
+            var events=buffer.split(/\r?\n\r?\n/); buffer=events.pop()||'';
+            events.forEach(function(event){
+                event.split(/\r?\n/).forEach(function(line){
+                    if(line.indexOf('data:')!==0) return;
+                    var raw=line.slice(5).trim(); if(!raw) return;
+                    try{
+                        var obj=JSON.parse(raw);
+                        if(obj.error) throw new Error(obj.error);
+                        if(obj.text){
+                            var cleaned=cleanBotText(obj.text); full += cleaned; target.body.textContent=cleanBotText(full); messages.scrollTop=messages.scrollHeight;
+                        }
+                    }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
+                });
+            });
+        }
+        buffer += decoder.decode();
+        if(buffer.indexOf('data:')===0){
+            try{ var obj=JSON.parse(buffer.slice(5).trim()); if(obj.error) throw new Error(obj.error); if(obj.text){full += cleanBotText(obj.text); target.body.textContent=cleanBotText(full);} }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
+        }
+        return cleanBotText(full).trim();
+    }
     function isStudentAssessment(){
         var assessment = document.getElementById('studentAssessmentView');
         var quiz = document.getElementById('studentQuizSection');
@@ -5562,22 +5615,24 @@ if (document.readyState === 'loading') {
         files.forEach(function(f){ addMessage('📎 '+f.name,'user'); });
         input.value=''; input.style.height='auto'; sendBtn.disabled=true;
         var typing=addTyping();
+        var streamMessage=null;
         try {
             var attachments=[];
             for (var i=0;i<files.length;i++) {
                 attachments.push({name:files[i].name,mimeType:files[i].type||'application/octet-stream',data:await fileToBase64(files[i])});
             }
             var history=botHistory.slice(-12);
-            // Remove the attachment label messages from the actual AI conversation.
             history=history.filter(function(h){ return !(h.role==='user' && /^📎 /.test(h.text)); });
             var res=await fetch(BACKEND_URL+'/api/cleverbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history,context:getContext(),attachments:attachments})});
-            var data=await res.json();
             if (typing.parentNode) typing.parentNode.removeChild(typing);
-            if (!res.ok) addMessage(data.error||'Sorry, CleverBot is temporarily unavailable.','bot');
-            else addMessage(data.reply||'I’m sorry, I could not generate a response.','bot');
+            streamMessage=createStreamingMessage();
+            var reply=await consumeCleverBotStream(res,streamMessage);
+            if(!reply){ streamMessage.el.parentNode && streamMessage.el.parentNode.removeChild(streamMessage.el); addMessage('I’m sorry, I could not generate a response.','bot'); }
+            else botHistory.push({role:'assistant',text:reply});
         } catch(e){
             if (typing.parentNode) typing.parentNode.removeChild(typing);
-            addMessage('I could not connect to CleverBot right now. Please check your internet connection and try again.','bot');
+            if(streamMessage && streamMessage.el.parentNode) streamMessage.el.parentNode.removeChild(streamMessage.el);
+            addMessage(e.message||'I could not connect to CleverBot right now. Please check your internet connection and try again.','bot');
         } finally { sendBtn.disabled=false; input.focus(); }
     }
     sendBtn.addEventListener('click',sendMessage);

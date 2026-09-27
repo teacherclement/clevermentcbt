@@ -8,7 +8,7 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-cache-v10';
+var CACHE_NAME = 'cleverment-cache-v12';
 var urlsToCache = [
     '/',
     '/index.html',
@@ -28,11 +28,6 @@ var urlsToCache = [
     'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg'
 ];
 
-// Install: cache the core files, and activate this new worker
-// immediately instead of waiting for old tabs to close. Each URL
-// is fetched individually rather than via cache.addAll(), so one
-// slow/unreachable CDN can't block the whole install (addAll fails
-// the entire install if even a single request fails).
 self.addEventListener('install', function(event) {
     self.skipWaiting();
     event.waitUntil(
@@ -48,7 +43,6 @@ self.addEventListener('install', function(event) {
     );
 });
 
-// Activate: clean old caches and take control of open tabs right away.
 self.addEventListener('activate', function(event) {
     event.waitUntil(
         caches.keys().then(function(cacheNames) {
@@ -65,7 +59,6 @@ self.addEventListener('activate', function(event) {
     );
 });
 
-// Fetch: NETWORK-FIRST, cache as a fallback for offline use.
 self.addEventListener('fetch', function(event) {
     if (event.request.method !== 'GET') return;
 
