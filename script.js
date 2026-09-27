@@ -5487,7 +5487,7 @@ if (document.readyState === 'loading') {
     }
     function addTyping(){
         var el=document.createElement('div'); el.className='cleverbot-msg bot'; el.id='cleverBotTyping';
-        el.innerHTML='<span class="cleverbot-typing"><span></span><span></span><span></span></span>'; messages.appendChild(el); messages.scrollTop=messages.scrollHeight; return el;
+        el.innerHTML='<span class="cleverbot-typing-label">Typing</span><span class="cleverbot-typing"><span></span><span></span><span></span></span>'; messages.appendChild(el); messages.scrollTop=messages.scrollHeight; return el;
     }
 
     function cleanBotText(text){
@@ -5521,7 +5521,7 @@ if (document.readyState === 'loading') {
         var finished=false;
         var resolveDone;
         var donePromise=new Promise(function(resolve){ resolveDone=resolve; });
-        var speed=18; // characters per tick; fast enough to feel natural
+        var speed=12; // characters per tick; visibly progressive without feeling slow
 
         function tick(){
             if (queue.length > 0) {
@@ -5530,7 +5530,7 @@ if (document.readyState === 'loading') {
                 queue = queue.slice(take);
                 target.body.textContent = cleanBotText(displayed);
                 messages.scrollTop=messages.scrollHeight;
-                timer=setTimeout(tick, 18);
+                timer=setTimeout(tick, 22);
                 return;
             }
             timer=null;
