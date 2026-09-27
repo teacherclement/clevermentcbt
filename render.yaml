@@ -1,13 +1,13 @@
 services:
+  # FRONTEND ONLY. The backend runs as a separate Render Web Service.
   - type: web
     name: cleverment
     runtime: static
     staticPublishPath: .
     buildCommand: ""
     headers:
-      # Never let the browser cache index.html, script.js, style.css or
-      # sw.js on its own — always revalidate with the server so a new
-      # deploy is picked up on the very next load.
+      # Never let the browser cache core frontend files on its own.
+      # Always revalidate so a new frontend deploy is picked up immediately.
       - path: /index.html
         name: Cache-Control
         value: no-cache, no-store, must-revalidate
