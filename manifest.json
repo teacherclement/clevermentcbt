@@ -2,7 +2,7 @@
   "name": "CleverMent - Smart Assessment Platform",
   "short_name": "CleverMent",
   "description": "Intelligent Assessment. Instant Feedback.",
-  "start_url": "/?v=16",
+  "start_url": "/?v=10",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2d6cdf",
@@ -21,5 +21,5 @@
       "purpose": "any maskable"
     }
   ],
-  "version": "16"
+  "version": "10"
 }
