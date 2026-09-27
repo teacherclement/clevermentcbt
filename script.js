@@ -5548,7 +5548,7 @@ if (document.readyState === 'loading') {
             audioChunks=[]; recorder=new MediaRecorder(stream);
             recorder.ondataavailable=function(e){if(e.data.size)audioChunks.push(e.data);};
             recorder.onstop=async function(){
-                stream.getTracks().forEach(function(t){t.stop();}); micBtn.classList.remove('recording'); micBtn.textContent='🎤';
+                stream.getTracks().forEach(function(t){t.stop();}); micBtn.classList.remove('recording'); micBtn.innerHTML='<svg class="mic-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>';
                 var blob=new Blob(audioChunks,{type:recorder.mimeType||'audio/webm'});
                 if(blob.size>8*1024*1024){addMessage('That recording is too large. Please record a shorter message.','system');return;}
                 addMessage('🎤 Voice message','user'); var typing=addTyping();
@@ -5559,7 +5559,7 @@ if (document.readyState === 'loading') {
                     addMessage(res.ok?(data.reply||'I could not understand that voice message.'):(data.error||'CleverBot is temporarily unavailable.'),'bot');
                 }catch(e){if(typing.parentNode)typing.parentNode.removeChild(typing);addMessage('I could not process the voice message. Please try again.','bot');}
             };
-            recorder.start(); micBtn.classList.add('recording'); micBtn.textContent='■';
+            recorder.start(); micBtn.classList.add('recording'); micBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/></svg>';
         } catch(e){ addMessage('Microphone access was not granted. Please allow microphone access and try again.','system'); }
     });
 
