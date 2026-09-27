@@ -5434,11 +5434,56 @@ if (document.readyState === 'loading') {
     function addMessage(text, role) {
         var el = document.createElement('div');
         el.className = 'cleverbot-msg ' + (role || 'bot');
-        el.textContent = text;
+
+        if (role === 'bot') {
+            var body = document.createElement('div');
+            body.className = 'cleverbot-msg-body';
+            body.textContent = text;
+            el.appendChild(body);
+
+            var copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
+            copyBtn.className = 'cleverbot-copy';
+            copyBtn.setAttribute('aria-label', 'Copy CleverBot response');
+            copyBtn.title = 'Copy entire response';
+            copyBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg><span>Copy</span>';
+            copyBtn.addEventListener('click', function(){
+                var value = String(text || '');
+                function copied(){
+                    copyBtn.classList.add('copied');
+                    copyBtn.querySelector('span').textContent = 'Copied';
+                    setTimeout(function(){
+                        copyBtn.classList.remove('copied');
+                        copyBtn.querySelector('span').textContent = 'Copy';
+                    }, 1400);
+                }
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(value).then(copied).catch(function(){ fallbackCopy(value, copied); });
+                } else {
+                    fallbackCopy(value, copied);
+                }
+            });
+            el.appendChild(copyBtn);
+        } else {
+            el.textContent = text;
+        }
+
         messages.appendChild(el);
         messages.scrollTop = messages.scrollHeight;
         if (role === 'user' || role === 'bot') botHistory.push({ role: role === 'bot' ? 'assistant' : 'user', text: text });
         return el;
+    }
+
+    function fallbackCopy(text, done) {
+        var area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.left = '-9999px';
+        document.body.appendChild(area);
+        area.select();
+        try { document.execCommand('copy'); if (done) done(); } catch (e) {}
+        document.body.removeChild(area);
     }
     function addTyping(){
         var el=document.createElement('div'); el.className='cleverbot-msg bot'; el.id='cleverBotTyping';
