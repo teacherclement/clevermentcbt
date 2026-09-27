@@ -5499,14 +5499,61 @@ if (document.readyState === 'loading') {
         var copyBtn=document.createElement('button'); copyBtn.type='button'; copyBtn.className='cleverbot-copy';
         copyBtn.setAttribute('aria-label','Copy CleverBot response'); copyBtn.title='Copy entire response';
         copyBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg><span>Copy</span>';
+        copyBtn.style.display='none';
         copyBtn.addEventListener('click',function(){
             var value=body.textContent || '';
             function copied(){ copyBtn.classList.add('copied'); copyBtn.querySelector('span').textContent='Copied'; setTimeout(function(){copyBtn.classList.remove('copied');copyBtn.querySelector('span').textContent='Copy';},1400); }
             if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(value).then(copied).catch(function(){fallbackCopy(value,copied);}); else fallbackCopy(value,copied);
         });
         el.appendChild(copyBtn); messages.appendChild(el); messages.scrollTop=messages.scrollHeight;
-        return {el:el, body:body};
+        return {el:el, body:body, copyBtn:copyBtn};
     }
+
+    // Gemini can stream data to the backend in chunks, but a hosting proxy can
+    // sometimes deliver several chunks together. We therefore render the
+    // received text through a small client-side typewriter queue as well. This
+    // guarantees that CleverBot visibly "types" its answer even when the
+    // network hands the browser a whole response at once.
+    function createTextStreamer(target){
+        var queue='';
+        var displayed='';
+        var timer=null;
+        var finished=false;
+        var resolveDone;
+        var donePromise=new Promise(function(resolve){ resolveDone=resolve; });
+        var speed=18; // characters per tick; fast enough to feel natural
+
+        function tick(){
+            if (queue.length > 0) {
+                var take=Math.min(speed, queue.length);
+                displayed += queue.slice(0,take);
+                queue = queue.slice(take);
+                target.body.textContent = cleanBotText(displayed);
+                messages.scrollTop=messages.scrollHeight;
+                timer=setTimeout(tick, 18);
+                return;
+            }
+            timer=null;
+            if (finished) finish();
+        }
+        function push(text){
+            queue += cleanBotText(text || '');
+            if (!timer) tick();
+        }
+        function finish(){
+            finished=true;
+            if (queue.length > 0) {
+                if (!timer) tick();
+                return;
+            }
+            target.body.textContent=cleanBotText(displayed).trim();
+            if (target.copyBtn) target.copyBtn.style.display = target.body.textContent ? 'inline-flex' : 'none';
+            if (resolveDone) { var r=resolveDone; resolveDone=null; r(cleanBotText(displayed).trim()); }
+        }
+        function getText(){ return cleanBotText(displayed).trim(); }
+        return {push:push, finish:finish, getText:getText, done:donePromise};
+    }
+
     async function consumeCleverBotStream(res, target){
         if(!res.ok){
             var errorText=await res.text();
@@ -5516,7 +5563,8 @@ if (document.readyState === 'loading') {
         }
         var reader=res.body && res.body.getReader ? res.body.getReader() : null;
         if(!reader){ throw new Error('This browser does not support streamed CleverBot responses.'); }
-        var decoder=new TextDecoder('utf-8'); var buffer=''; var full='';
+        var decoder=new TextDecoder('utf-8'); var buffer='';
+        var streamer=createTextStreamer(target);
         while(true){
             var part=await reader.read();
             if(part.done) break;
@@ -5529,18 +5577,23 @@ if (document.readyState === 'loading') {
                     try{
                         var obj=JSON.parse(raw);
                         if(obj.error) throw new Error(obj.error);
-                        if(obj.text){
-                            var cleaned=cleanBotText(obj.text); full += cleaned; target.body.textContent=cleanBotText(full); messages.scrollTop=messages.scrollHeight;
-                        }
+                        if(obj.text) streamer.push(obj.text);
                     }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
                 });
             });
         }
         buffer += decoder.decode();
         if(buffer.indexOf('data:')===0){
-            try{ var obj=JSON.parse(buffer.slice(5).trim()); if(obj.error) throw new Error(obj.error); if(obj.text){full += cleanBotText(obj.text); target.body.textContent=cleanBotText(full);} }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
+            try{
+                var obj=JSON.parse(buffer.slice(5).trim());
+                if(obj.error) throw new Error(obj.error);
+                if(obj.text) streamer.push(obj.text);
+            }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
         }
-        return cleanBotText(full).trim();
+        streamer.finish();
+        // Do not expose the Copy button until the visible typewriter animation
+        // has finished. This also ensures the final text is what gets copied.
+        return await streamer.done;
     }
     function isStudentAssessment(){
         var assessment = document.getElementById('studentAssessmentView');
