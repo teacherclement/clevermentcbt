@@ -8,7 +8,7 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-cache-v15';
+var CACHE_NAME = 'cleverment-v16';
 var urlsToCache = [
     '/',
     '/index.html',
@@ -25,9 +25,16 @@ var urlsToCache = [
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
     'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
     'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg'
 ];
 
+// Install: cache the core files, and activate this new worker
+// immediately instead of waiting for old tabs to close. Each URL
+// is fetched individually rather than via cache.addAll(), so one
+// slow/unreachable CDN can't block the whole install (addAll fails
+// the entire install if even a single request fails).
 self.addEventListener('install', function(event) {
     self.skipWaiting();
     event.waitUntil(
@@ -43,6 +50,7 @@ self.addEventListener('install', function(event) {
     );
 });
 
+// Activate: clean old caches and take control of open tabs right away.
 self.addEventListener('activate', function(event) {
     event.waitUntil(
         caches.keys().then(function(cacheNames) {
@@ -59,6 +67,7 @@ self.addEventListener('activate', function(event) {
     );
 });
 
+// Fetch: NETWORK-FIRST, cache as a fallback for offline use.
 self.addEventListener('fetch', function(event) {
     if (event.request.method !== 'GET') return;
 

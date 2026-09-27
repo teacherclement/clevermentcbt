@@ -5649,6 +5649,22 @@ if (document.readyState === 'loading') {
             var r=new FileReader(); r.onload=function(){ resolve(String(r.result).split(',')[1] || ''); }; r.onerror=reject; r.readAsDataURL(file);
         });
     }
+
+    async function extractPdfText(file){
+        if (!window.pdfjsLib) return '';
+        var buffer = await file.arrayBuffer();
+        var pdf = await window.pdfjsLib.getDocument({data: buffer}).promise;
+        var chunks = [];
+        var maxChars = 1400000;
+        for (var pageNo = 1; pageNo <= pdf.numPages; pageNo++) {
+            var page = await pdf.getPage(pageNo);
+            var content = await page.getTextContent();
+            var pageText = content.items.map(function(item){ return item.str || ''; }).join(' ');
+            if (pageText.trim()) chunks.push('PAGE ' + pageNo + '\n' + pageText.trim());
+            if (chunks.join('\n\n').length >= maxChars) break;
+        }
+        return chunks.join('\n\n').slice(0, maxChars);
+    }
     fileInput.addEventListener('change', function(){
         var files=Array.prototype.slice.call(fileInput.files||[]);
         files.forEach(function(f){
@@ -5671,8 +5687,23 @@ if (document.readyState === 'loading') {
         var streamMessage=null;
         try {
             var attachments=[];
+            var totalRawBytes=0;
             for (var i=0;i<files.length;i++) {
-                attachments.push({name:files[i].name,mimeType:files[i].type||'application/octet-stream',data:await fileToBase64(files[i])});
+                var file=files[i];
+                totalRawBytes += file.size || 0;
+                if (totalRawBytes > 16*1024*1024) {
+                    throw new Error('The attached files are too large together. Please attach one file at a time or use smaller files.');
+                }
+                var mime=file.type||'application/octet-stream';
+                if (mime === 'application/pdf' || /\.pdf$/i.test(file.name||'')) {
+                    var pdfText='';
+                    try { pdfText=await extractPdfText(file); } catch (pdfErr) { pdfText=''; }
+                    if (pdfText.trim()) {
+                        attachments.push({name:file.name,mimeType:'text/plain',text:pdfText});
+                        continue;
+                    }
+                }
+                attachments.push({name:file.name,mimeType:mime,data:await fileToBase64(file)});
             }
             var history=botHistory.slice(-12);
             history=history.filter(function(h){ return !(h.role==='user' && /^📎 /.test(h.text)); });
