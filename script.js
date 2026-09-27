@@ -5654,10 +5654,15 @@ if (document.readyState === 'loading') {
                 addMessage('🎤 Voice message','user'); var typing=addTyping();
                 try{
                     var data64=await blobToBase64(blob);
-                    var res=await fetch(BACKEND_URL+'/api/cleverbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'Please understand and answer the user’s voice message.',history:botHistory.slice(-12),context:getContext(),attachments:[{name:'voice-message.webm',mimeType:blob.type||'audio/webm',data:data64}]})});
-                    var data=await res.json(); if(typing.parentNode)typing.parentNode.removeChild(typing);
-                    addMessage(res.ok?(data.reply||'I could not understand that voice message.'):(data.error||'CleverBot is temporarily unavailable.'),'bot');
-                }catch(e){if(typing.parentNode)typing.parentNode.removeChild(typing);addMessage('I could not process the voice message. Please try again.','bot');}
+                    var transRes=await fetch(BACKEND_URL+'/api/cleverbot/voice-transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:data64,mimeType:blob.type||'audio/webm'})});
+                    var transText=await transRes.text(); var transData={};
+                    try{transData=JSON.parse(transText);}catch(_){transData={error:transText};}
+                    if(typing.parentNode)typing.parentNode.removeChild(typing);
+                    if(!transRes.ok || !transData.transcript){ addMessage(transData.error||'I could not recognize the speech in that recording. Please try again.','bot'); return; }
+                    input.value=transData.transcript;
+                    input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,100)+'px';
+                    await sendMessage();
+                }catch(e){if(typing.parentNode)typing.parentNode.removeChild(typing);addMessage(e.message||'I could not process the voice message. Please try again.','bot');}
             };
             recorder.start(); micBtn.classList.add('recording'); micBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/></svg>';
         } catch(e){ addMessage('Microphone access was not granted. Please allow microphone access and try again.','system'); }
