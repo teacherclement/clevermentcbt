@@ -3293,6 +3293,14 @@ function proceedToStartQuiz() {
     studentCurrentIndex = 0;
     studentAnswers = new Array(studentQuestions.length).fill(null);
     studentIsTimeUp = false;
+    // A previous student's submission may have disabled the shared Submit button.
+    // Always restore the button to a clean state when a new attempt begins.
+    var freshSubmitBtn = document.getElementById('studentSubmitBtn');
+    if (freshSubmitBtn) {
+        freshSubmitBtn.disabled = false;
+        freshSubmitBtn.textContent = 'Submit';
+        freshSubmitBtn.removeAttribute('aria-busy');
+    }
     studentTabSwitchCount = 0;
     studentProctorStrikes = 0;
     studentEndReason = 'normal';
@@ -4440,6 +4448,12 @@ function studentResetQuiz() {
     studentCurrentIndex = 0;
     studentTimeRemaining = 0;
     studentIsTimeUp = false;
+    var resetSubmitBtn = document.getElementById('studentSubmitBtn');
+    if (resetSubmitBtn) {
+        resetSubmitBtn.disabled = false;
+        resetSubmitBtn.textContent = 'Submit';
+        resetSubmitBtn.removeAttribute('aria-busy');
+    }
     document.getElementById('studentTimerDisplay').textContent = '00:00';
     document.getElementById('studentTimerDisplay').classList.remove('warning', 'expired');
     updateURL('student');
@@ -5709,7 +5723,14 @@ if (document.readyState === 'loading') {
     function updateVisibility(){
         var hidden = isStudentAssessment();
         floatBtn.style.display = hidden ? 'none' : 'flex';
-        if (hidden) panel.hidden = true;
+        floatBtn.style.pointerEvents = hidden ? 'none' : 'auto';
+        floatBtn.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+        if (hidden) {
+            panel.hidden = true;
+            panel.style.pointerEvents = 'none';
+        } else {
+            panel.style.pointerEvents = 'auto';
+        }
     }
     function getContext(){
         var page = new URLSearchParams(window.location.search).get('page') || 'landing';
