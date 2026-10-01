@@ -1687,3 +1687,16 @@ html, body {
     .assessment-editor-options { grid-template-columns:1fr; }
     #assessmentEditorModal { padding:7px !important; }
 }
+
+/* Question image upload/preview controls */
+.assessment-editor-image-box{flex:3;min-width:260px}
+.assessment-editor-image-preview{margin:6px 0 8px;min-height:52px;max-height:180px;border:1px solid #e3eaf2;border-radius:8px;background:#f8fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.assessment-editor-image-preview img{display:block;max-width:100%;max-height:170px;object-fit:contain}
+.assessment-editor-image-preview .assessment-editor-image-broken-text{display:none;font-size:11px;color:#b42318;padding:10px}
+.assessment-editor-image-preview.broken .assessment-editor-image-broken-text{display:block}
+.assessment-editor-no-image{font-size:11px;color:#8a97a8;border:1px dashed #d5dde8;border-radius:8px;padding:10px;margin:6px 0 8px;background:#fbfcfe}
+.assessment-editor-image-actions{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px}
+.assessment-editor-image-actions button{font-size:12px!important;padding:7px 10px!important}
+.assessment-editor-remove-image{border:1px solid #f2c6c6;border-radius:6px;padding:6px 10px;background:#fff5f5;color:#c62828;cursor:pointer;font-size:12px}
+.assessment-editor-remove-image:hover{background:#fdecec}
+@media(max-width:640px){.assessment-editor-image-box{min-width:100%}}

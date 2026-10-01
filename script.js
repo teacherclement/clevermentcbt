@@ -164,7 +164,7 @@ var DEFAULT_FAQS = [
     { category: 'teacher', question: 'How do I create a teacher account?', answer: 'On the landing page, tap "I\'m a Teacher", then "Sign Up". Enter your name, email, and a password. You\'ll be logged in immediately after signing up.' },
     { category: 'teacher', question: 'I forgot my password. How do I get back in?', answer: 'On the teacher login screen, tap "Forgot password?". Enter your account email and a reset link will be emailed to you. The link is valid for 1 hour. Open it, set a new password, and log in as normal.' },
     { category: 'teacher', question: 'What format should my CSV file be in?', answer: 'Each row is one question, with columns in this order: Question, Option A, Option B, Option C, Option D, Correct Answer, Image URL (optional).\n\nThe Correct Answer column should contain the letter (A, B, C, or D) of the correct option.\n\nIf any cell contains a comma (like "5,000" or a sentence with a comma in it), wrap that whole cell in double quotes so it doesn\'t get split into the wrong columns.' },
-    { category: 'teacher', question: 'Can I add images to my questions?', answer: 'Yes. Add a 7th column to your CSV with a direct image URL (a link ending in .jpg, .png, etc. - you can host images for free on a site like postimg.cc or imgur). Leave the cell blank for questions without an image.' },
+    { category: 'teacher', question: 'Can I add images to my questions?', answer: 'Yes. After uploading your CSV or loading a Question Bank, click “Review Questions & Add Images” to attach an image directly to any question. Images are stored by CleverMent and do not require Google Drive sharing links. You can also use the optional 7th CSV column for an image URL.' },
     { category: 'teacher', question: 'Can I include maths equations or symbols in questions?', answer: 'Plain symbols like ×, ÷, ±, √, π, ½, ² work fine typed directly into a cell. For a properly typeset equation, wrap it in single dollar signs, e.g. $x^2 + 5x - 6 = 0$, or double dollar signs for a larger standalone equation, e.g. $$\\frac{a}{b} = \\frac{c}{d}$$.' },
     { category: 'teacher', question: 'What is the Question Bank, and how do I use it?', answer: 'The Question Bank lets you save a set of questions under a name so you can reuse it later without re-uploading the CSV each time. After uploading a CSV, click "Save Current as Question Bank" and give it a name. Later, pick it from the dropdown and click "Load Selected" before publishing. You can also delete a saved bank you no longer need. Question banks sync to your account, so they show up no matter which device or browser you log in from.' },
     { category: 'teacher', question: 'How do I publish an assessment, step by step?', answer: '1. Log in and go to your dashboard.\n2. Choose the Subject and Class.\n3. Upload a CSV or load a saved Question Bank.\n4. Set a Time Limit, Pass Mark, and optionally an Available From/Until window.\n5. Turn on Shuffle, Camera/Noise Monitoring, or turn off "Show Results & Certificate" if this is a real exam.\n6. Add your name and signature for the certificate (optional).\n7. Click Publish Assessment. You\'ll get a unique code to share with students.' },
@@ -1943,6 +1943,8 @@ async function renderTeacherPublishedList() {
 // assessment ID/code and all other settings remain unchanged.
 // Existing submitted results are never recalculated or modified.
 var currentAssessmentBeingEdited = null;
+var assessmentEditorDraftMode = false;
+var assessmentImageUploadQuestionIndex = -1;
 
 function openAssessmentEditor(assessmentId) {
     var assessment = null;
@@ -1958,7 +1960,47 @@ function openAssessmentEditor(assessmentId) {
         return;
     }
 
+    assessmentEditorDraftMode = false;
     currentAssessmentBeingEdited = JSON.parse(JSON.stringify(assessment));
+    renderAssessmentEditor();
+    var modal = document.getElementById('assessmentEditorModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+async function openTeacherQuestionImageEditor() {
+    if (!teacherQuestions || teacherQuestions.length === 0) {
+        var fileInput = document.getElementById('teacherCsvFile');
+        var file = fileInput && fileInput.files ? fileInput.files[0] : null;
+        if (!file) {
+            alert('Please upload a CSV file or load a Question Bank first.');
+            return;
+        }
+        try {
+            var text = await file.text();
+            var parsed = parseTeacherCSV(text);
+            if (!parsed.length) {
+                alert('No questions found in the CSV. Please check the format.');
+                return;
+            }
+            teacherQuestions = parsed;
+        } catch (e) {
+            alert('Could not read the CSV file. Please try again.');
+            return;
+        }
+    }
+
+    assessmentEditorDraftMode = true;
+    currentAssessmentBeingEdited = {
+        id: null,
+        code: '',
+        subject: 'New Assessment',
+        className: '',
+        teacherEmail: currentTeacher ? currentTeacher.email : '',
+        questions: JSON.parse(JSON.stringify(teacherQuestions))
+    };
     renderAssessmentEditor();
     var modal = document.getElementById('assessmentEditorModal');
     if (modal) {
@@ -1972,6 +2014,10 @@ function closeAssessmentEditor() {
     if (modal) modal.style.display = 'none';
     document.body.style.overflow = '';
     currentAssessmentBeingEdited = null;
+    assessmentEditorDraftMode = false;
+    assessmentImageUploadQuestionIndex = -1;
+    var input = document.getElementById('assessmentImageUploadInput');
+    if (input) input.value = '';
 }
 
 function escapeAssessmentEditorHtml(value) {
@@ -1986,18 +2032,32 @@ function escapeAssessmentEditorHtml(value) {
 function renderAssessmentEditor() {
     var list = document.getElementById('assessmentEditorList');
     var title = document.getElementById('assessmentEditorTitle');
+    var subtitle = document.getElementById('assessmentEditorSubtitle');
+    var saveBtn = document.getElementById('assessmentEditorSaveBtn');
     if (!list || !currentAssessmentBeingEdited) return;
 
     var a = currentAssessmentBeingEdited;
-    title.textContent = 'Edit Questions — ' + a.subject + ' (' + a.code + ')';
+    if (assessmentEditorDraftMode) {
+        title.textContent = 'Review Questions & Add Images';
+        if (subtitle) subtitle.textContent = 'These are the questions you are preparing to publish. Add or replace images now; nothing is published until you click Publish Assessment.';
+        if (saveBtn) saveBtn.textContent = 'Save Question Draft';
+    } else {
+        title.textContent = 'Edit Questions — ' + a.subject + ' (' + a.code + ')';
+        if (subtitle) subtitle.textContent = 'Changes are saved to this assessment without changing its code. Existing submitted results are not recalculated.';
+        if (saveBtn) saveBtn.textContent = 'Save Changes';
+    }
 
     var questions = a.questions || [];
     var html = '';
 
     for (var i = 0; i < questions.length; i++) {
         var q = questions[i] || {};
-        var opts = Array.isArray(q.options) ? q.options : ['', '', '', ''];
+        var opts = Array.isArray(q.options) ? q.options.slice(0, 4) : ['', '', '', ''];
         while (opts.length < 4) opts.push('');
+        var imageUrl = String(q.image || '').trim();
+        var imagePreview = imageUrl ?
+            '<div class="assessment-editor-image-preview"><img src="' + escapeAssessmentEditorHtml(imageUrl) + '" alt="Question image" onerror="this.parentElement.classList.add(\"broken\"); this.style.display=\"none\";"><span class="assessment-editor-image-broken-text">Image could not be displayed.</span></div>' :
+            '<div class="assessment-editor-no-image">No image attached</div>';
 
         html += '<div class="assessment-editor-card" data-question-index="' + i + '">' +
             '<div class="assessment-editor-card-head">' +
@@ -2021,8 +2081,15 @@ function renderAssessmentEditor() {
                         '<option value="D"' + (String(q.correctAnswer || '').toUpperCase() === 'D' ? ' selected' : '') + '>D</option>' +
                     '</select>' +
                 '</div>' +
-                '<div style="flex:3; min-width:220px;"><label>Image URL (optional)</label>' +
-                    '<input class="form-input assessment-editor-image" value="' + escapeAssessmentEditorHtml(q.image || '') + '" placeholder="https://...">' +
+                '<div class="assessment-editor-image-box">' +
+                    '<label>Question Image (optional)</label>' +
+                    imagePreview +
+                    '<div class="assessment-editor-image-actions">' +
+                        '<button type="button" class="secondary-btn" onclick="chooseAssessmentImage(' + i + ')">📷 ' + (imageUrl ? 'Change Image' : 'Upload Image') + '</button>' +
+                        (imageUrl ? '<button type="button" class="assessment-editor-remove-image" onclick="removeAssessmentImage(' + i + ')">Remove</button>' : '') +
+                    '</div>' +
+                    '<input class="form-input assessment-editor-image" value="' + escapeAssessmentEditorHtml(imageUrl) + '" placeholder="Or paste an image URL (optional)">' +
+                    '<p class="helper-text" style="margin:5px 0 0;">JPG, PNG, WEBP or GIF • max 5 MB</p>' +
                 '</div>' +
             '</div>' +
         '</div>';
@@ -2033,6 +2100,78 @@ function renderAssessmentEditor() {
     }
 
     list.innerHTML = html;
+}
+
+function chooseAssessmentImage(index) {
+    if (!currentAssessmentBeingEdited) return;
+    syncAssessmentEditorFromDOM();
+    assessmentImageUploadQuestionIndex = index;
+    var input = document.getElementById('assessmentImageUploadInput');
+    if (!input) return;
+    input.value = '';
+    input.click();
+}
+
+function removeAssessmentImage(index) {
+    if (!currentAssessmentBeingEdited) return;
+    syncAssessmentEditorFromDOM();
+    if (!currentAssessmentBeingEdited.questions[index]) return;
+    currentAssessmentBeingEdited.questions[index].image = '';
+    renderAssessmentEditor();
+}
+
+async function handleAssessmentImageUpload(input) {
+    if (!input || !input.files || !input.files[0] || !currentAssessmentBeingEdited) return;
+    var index = assessmentImageUploadQuestionIndex;
+    var file = input.files[0];
+    input.value = '';
+
+    if (!/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) {
+        alert('Please choose a JPG, PNG, WEBP or GIF image.');
+        return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Image is too large. Please choose an image no larger than 5 MB.');
+        return;
+    }
+    if (index < 0 || !currentAssessmentBeingEdited.questions[index]) return;
+
+    var reader = new FileReader();
+    reader.onload = async function(e) {
+        var teacherToken = localStorage.getItem('cleverment_teacher_token');
+        var card = document.querySelector('#assessmentEditorList .assessment-editor-card[data-question-index="' + index + '"]');
+        var uploadButton = card ? card.querySelector('.assessment-editor-image-actions button') : null;
+        var oldText = uploadButton ? uploadButton.textContent : '';
+        if (uploadButton) {
+            uploadButton.disabled = true;
+            uploadButton.textContent = 'Uploading...';
+        }
+
+        try {
+            var res = await fetch(BACKEND_URL + '/api/teacher/assessment-images', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + teacherToken
+                },
+                body: JSON.stringify({ dataUrl: e.target.result })
+            });
+            var data = await res.json();
+            if (!res.ok || !data.url) {
+                throw new Error(data.error || 'Image upload failed.');
+            }
+            syncAssessmentEditorFromDOM();
+            currentAssessmentBeingEdited.questions[index].image = data.url;
+            renderAssessmentEditor();
+        } catch (err) {
+            alert('Could not upload the image: ' + (err.message || 'Please try again.'));
+            if (uploadButton) {
+                uploadButton.disabled = false;
+                uploadButton.textContent = oldText || 'Upload Image';
+            }
+        }
+    };
+    reader.readAsDataURL(file);
 }
 
 function syncAssessmentEditorFromDOM() {
@@ -2122,6 +2261,13 @@ async function saveAssessmentEditorChanges() {
             return;
         }
         q.correctAnswer = String(q.correctAnswer).toUpperCase();
+    }
+
+    if (assessmentEditorDraftMode) {
+        teacherQuestions = JSON.parse(JSON.stringify(questions));
+        closeAssessmentEditor();
+        alert('Question draft saved. Your images and edits will be included when you publish this assessment.');
+        return;
     }
 
     var teacherToken = localStorage.getItem('cleverment_teacher_token');

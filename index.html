@@ -582,7 +582,10 @@
             <div class="form-group">
                 <label for="teacherCsvFile">Upload Questions (CSV)</label>
                 <input type="file" id="teacherCsvFile" accept=".csv" class="form-input">
-                <p class="helper-text" style="margin-top:4px;">CSV Format: Question, Option A, Option B, Option C, Option D, Correct Answer, Image URL (optional). For equations, wrap them in $...$ (e.g. $x^2 + 5x - 6 = 0$) or $$...$$ for a standalone equation. If a question or option contains a comma, wrap that whole cell in double quotes.</p>
+                <p class="helper-text" style="margin-top:4px;">CSV Format: Question, Option A, Option B, Option C, Option D, Correct Answer, Image URL (optional). You can also add images directly after loading the questions. For equations, wrap them in $...$ (e.g. $x^2 + 5x - 6 = 0$) or $$...$$ for a standalone equation. If a question or option contains a comma, wrap that whole cell in double quotes.</p>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                    <button type="button" onclick="openTeacherQuestionImageEditor()" class="secondary-btn" style="background:#eef6ff; color:#1d5fbf; border-color:#cfe1ff;">🖼️ Review Questions &amp; Add Images</button>
+                </div>
             </div>
             <button onclick="teacherPublishAssessment()" class="primary-btn full-width">Publish Assessment</button>
         </div>
@@ -1001,11 +1004,12 @@
         <div style="padding:16px 18px; border-bottom:1px solid #e7edf3; display:flex; justify-content:space-between; align-items:center; gap:10px;">
             <div>
                 <h3 id="assessmentEditorTitle" style="margin:0; color:#172033;">Edit Questions</h3>
-                <p style="margin:4px 0 0; color:#6b7a8f; font-size:12px;">Changes are saved to this assessment without changing its code. Existing submitted results are not recalculated.</p>
+                <p id="assessmentEditorSubtitle" style="margin:4px 0 0; color:#6b7a8f; font-size:12px;">Changes are saved to this assessment without changing its code. Existing submitted results are not recalculated.</p>
             </div>
             <button type="button" onclick="closeAssessmentEditor()" aria-label="Close" style="border:0; background:#f1f5f9; width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:20px; color:#475569;">&times;</button>
         </div>
         <div id="assessmentEditorList" style="overflow:auto; padding:16px;"></div>
+        <input type="file" id="assessmentImageUploadInput" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none;" onchange="handleAssessmentImageUpload(this)">
         <div style="padding:12px 16px; border-top:1px solid #e7edf3; display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; background:#f8fafc;">
             <button type="button" class="secondary-btn" onclick="addAssessmentEditorQuestion()">+ Add Question</button>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
