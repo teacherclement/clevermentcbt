@@ -1928,10 +1928,260 @@ async function renderTeacherPublishedList() {
             '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
             '<span style="background:#eef6ff; padding:4px 12px; border-radius:6px; font-weight:600; font-size:13px; color:#2d6cdf;">Code: ' + a.code + '</span>' +
             '<button onclick="copyAssessmentCode(\'' + a.code + '\')" class="secondary-btn" style="font-size:12px; padding:4px 12px;">Copy Code</button>' +
+            '<button onclick="openAssessmentEditor(' + a.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#2d6cdf; color:white;">Edit Questions</button>' +
             '<button onclick="deletePublishedAssessment(' + a.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#dc3545; color:white;">Delete</button>' +
             '</div></div>';
     }
     container.innerHTML = html;
+}
+
+
+// ============================================================
+// TEACHER: EDIT PUBLISHED ASSESSMENT QUESTIONS
+// ============================================================
+// Edits update only the existing assessment's question set. The
+// assessment ID/code and all other settings remain unchanged.
+// Existing submitted results are never recalculated or modified.
+var currentAssessmentBeingEdited = null;
+
+function openAssessmentEditor(assessmentId) {
+    var assessment = null;
+    for (var i = 0; i < teacherAssessmentsCache.length; i++) {
+        if (String(teacherAssessmentsCache[i].id) === String(assessmentId)) {
+            assessment = teacherAssessmentsCache[i];
+            break;
+        }
+    }
+
+    if (!assessment) {
+        alert('Could not find that published assessment. Please refresh the Published Assessments section and try again.');
+        return;
+    }
+
+    currentAssessmentBeingEdited = JSON.parse(JSON.stringify(assessment));
+    renderAssessmentEditor();
+    var modal = document.getElementById('assessmentEditorModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeAssessmentEditor() {
+    var modal = document.getElementById('assessmentEditorModal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+    currentAssessmentBeingEdited = null;
+}
+
+function escapeAssessmentEditorHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function renderAssessmentEditor() {
+    var list = document.getElementById('assessmentEditorList');
+    var title = document.getElementById('assessmentEditorTitle');
+    if (!list || !currentAssessmentBeingEdited) return;
+
+    var a = currentAssessmentBeingEdited;
+    title.textContent = 'Edit Questions — ' + a.subject + ' (' + a.code + ')';
+
+    var questions = a.questions || [];
+    var html = '';
+
+    for (var i = 0; i < questions.length; i++) {
+        var q = questions[i] || {};
+        var opts = Array.isArray(q.options) ? q.options : ['', '', '', ''];
+        while (opts.length < 4) opts.push('');
+
+        html += '<div class="assessment-editor-card" data-question-index="' + i + '">' +
+            '<div class="assessment-editor-card-head">' +
+                '<strong>Question ' + (i + 1) + '</strong>' +
+                '<button type="button" class="assessment-editor-delete" onclick="deleteAssessmentEditorQuestion(' + i + ')">Delete</button>' +
+            '</div>' +
+            '<label>Question</label>' +
+            '<textarea class="form-input assessment-editor-question" rows="3">' + escapeAssessmentEditorHtml(q.question) + '</textarea>' +
+            '<div class="assessment-editor-options">' +
+                '<div><label>Option A</label><input class="form-input assessment-editor-option" value="' + escapeAssessmentEditorHtml(opts[0]) + '"></div>' +
+                '<div><label>Option B</label><input class="form-input assessment-editor-option" value="' + escapeAssessmentEditorHtml(opts[1]) + '"></div>' +
+                '<div><label>Option C</label><input class="form-input assessment-editor-option" value="' + escapeAssessmentEditorHtml(opts[2]) + '"></div>' +
+                '<div><label>Option D</label><input class="form-input assessment-editor-option" value="' + escapeAssessmentEditorHtml(opts[3]) + '"></div>' +
+            '</div>' +
+            '<div class="assessment-editor-bottom">' +
+                '<div style="flex:1; min-width:180px;"><label>Correct Answer</label>' +
+                    '<select class="form-input assessment-editor-correct">' +
+                        '<option value="A"' + (String(q.correctAnswer || '').toUpperCase() === 'A' ? ' selected' : '') + '>A</option>' +
+                        '<option value="B"' + (String(q.correctAnswer || '').toUpperCase() === 'B' ? ' selected' : '') + '>B</option>' +
+                        '<option value="C"' + (String(q.correctAnswer || '').toUpperCase() === 'C' ? ' selected' : '') + '>C</option>' +
+                        '<option value="D"' + (String(q.correctAnswer || '').toUpperCase() === 'D' ? ' selected' : '') + '>D</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div style="flex:3; min-width:220px;"><label>Image URL (optional)</label>' +
+                    '<input class="form-input assessment-editor-image" value="' + escapeAssessmentEditorHtml(q.image || '') + '" placeholder="https://...">' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }
+
+    if (!questions.length) {
+        html = '<p class="helper-text">No questions yet. Click "Add Question" to create one.</p>';
+    }
+
+    list.innerHTML = html;
+}
+
+function syncAssessmentEditorFromDOM() {
+    if (!currentAssessmentBeingEdited) return;
+
+    var cards = document.querySelectorAll('#assessmentEditorList .assessment-editor-card');
+    var questions = [];
+
+    for (var i = 0; i < cards.length; i++) {
+        var card = cards[i];
+        var options = card.querySelectorAll('.assessment-editor-option');
+        var q = {
+            question: (card.querySelector('.assessment-editor-question') || {}).value || '',
+            options: [
+                options[0] ? options[0].value : '',
+                options[1] ? options[1].value : '',
+                options[2] ? options[2].value : '',
+                options[3] ? options[3].value : ''
+            ],
+            correctAnswer: (card.querySelector('.assessment-editor-correct') || {}).value || '',
+            image: (card.querySelector('.assessment-editor-image') || {}).value || ''
+        };
+        questions.push(q);
+    }
+
+    currentAssessmentBeingEdited.questions = questions;
+}
+
+function addAssessmentEditorQuestion() {
+    if (!currentAssessmentBeingEdited) return;
+    syncAssessmentEditorFromDOM();
+
+    currentAssessmentBeingEdited.questions.push({
+        question: '',
+        options: ['', '', '', ''],
+        correctAnswer: 'A',
+        image: ''
+    });
+
+    renderAssessmentEditor();
+
+    setTimeout(function() {
+        var cards = document.querySelectorAll('#assessmentEditorList .assessment-editor-card');
+        if (cards.length) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+}
+
+function deleteAssessmentEditorQuestion(index) {
+    if (!currentAssessmentBeingEdited) return;
+    syncAssessmentEditorFromDOM();
+
+    if (currentAssessmentBeingEdited.questions.length <= 1) {
+        alert('An assessment must contain at least one question.');
+        return;
+    }
+
+    if (!confirm('Delete Question ' + (index + 1) + '?')) return;
+
+    currentAssessmentBeingEdited.questions.splice(index, 1);
+    renderAssessmentEditor();
+}
+
+async function saveAssessmentEditorChanges() {
+    if (!currentAssessmentBeingEdited) return;
+
+    syncAssessmentEditorFromDOM();
+
+    var questions = currentAssessmentBeingEdited.questions || [];
+    if (!questions.length) {
+        alert('An assessment must contain at least one question.');
+        return;
+    }
+
+    for (var i = 0; i < questions.length; i++) {
+        var q = questions[i];
+        if (!String(q.question || '').trim()) {
+            alert('Question ' + (i + 1) + ' is empty.');
+            return;
+        }
+        if (!Array.isArray(q.options) || q.options.length < 4 ||
+            q.options.some(function(o) { return !String(o || '').trim(); })) {
+            alert('Question ' + (i + 1) + ' must have all four options (A–D).');
+            return;
+        }
+        if (!/^[ABCD]$/.test(String(q.correctAnswer || '').toUpperCase())) {
+            alert('Question ' + (i + 1) + ' must have a correct answer of A, B, C or D.');
+            return;
+        }
+        q.correctAnswer = String(q.correctAnswer).toUpperCase();
+    }
+
+    var teacherToken = localStorage.getItem('cleverment_teacher_token');
+    var saveBtn = document.getElementById('assessmentEditorSaveBtn');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+    }
+
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/assessments/' + encodeURIComponent(currentAssessmentBeingEdited.id), {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + teacherToken
+            },
+            body: JSON.stringify({ questions: questions })
+        });
+
+        var data = await res.json();
+        if (!res.ok) {
+            alert('Could not save changes: ' + (data.error || 'Unknown error.'));
+            return;
+        }
+
+        var updated = normalizeAssessmentRow(data.assessment);
+
+        // Update the in-memory cache without changing the assessment code.
+        for (var j = 0; j < teacherAssessmentsCache.length; j++) {
+            if (String(teacherAssessmentsCache[j].id) === String(updated.id)) {
+                teacherAssessmentsCache[j] = updated;
+                break;
+            }
+        }
+
+        // Keep the local fallback copy consistent as well.
+        var localPublished = getPublishedAssessmentsLocal();
+        for (var k = 0; k < localPublished.length; k++) {
+            if (String(localPublished[k].id) === String(updated.id) ||
+                String(localPublished[k].code) === String(updated.code)) {
+                localPublished[k].questions = JSON.parse(JSON.stringify(updated.questions));
+                localPublished[k].code = updated.code;
+                break;
+            }
+        }
+        localStorage.setItem('cleverment_published', JSON.stringify(localPublished));
+
+        logTeacherActivity(updated.teacherEmail, 'edit_assessment', 'Edited questions: ' + updated.subject + ' | Class: ' + updated.className + ' | Code: ' + updated.code);
+
+        closeAssessmentEditor();
+        await renderTeacherPublishedList();
+        alert('Assessment questions updated successfully. The assessment code remains ' + updated.code + '. Existing submitted results were not changed.');
+    } catch (e) {
+        alert('Could not save changes. Please check your connection and try again.');
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Changes';
+        }
+    }
 }
 
 // ============================================================

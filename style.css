@@ -1636,3 +1636,54 @@ html, body {
 @keyframes cleverBotTyping{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
 @keyframes cleverBotPulse{50%{transform:scale(1.06)}}
 @media(max-width:600px){#cleverBotFloat{right:14px;bottom:72px;width:44px;height:44px}.cleverbot-panel{right:12px;bottom:124px;width:calc(100vw - 24px);height:min(560px,calc(100vh - 145px))}}
+
+
+/* Published assessment question editor */
+.assessment-editor-card {
+    border: 1px solid #e3eaf2;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: #fff;
+}
+.assessment-editor-card-head {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:12px;
+}
+.assessment-editor-card label {
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:#526276;
+    margin:0 0 5px;
+}
+.assessment-editor-options {
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+    margin-top:10px;
+}
+.assessment-editor-bottom {
+    display:flex;
+    gap:10px;
+    margin-top:10px;
+    align-items:flex-end;
+    flex-wrap:wrap;
+}
+.assessment-editor-delete {
+    border:0;
+    border-radius:6px;
+    padding:6px 10px;
+    background:#fdecec;
+    color:#c62828;
+    cursor:pointer;
+    font-size:12px;
+    font-weight:600;
+}
+@media (max-width: 640px) {
+    .assessment-editor-options { grid-template-columns:1fr; }
+    #assessmentEditorModal { padding:7px !important; }
+}
