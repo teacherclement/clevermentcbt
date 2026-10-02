@@ -1700,3 +1700,38 @@ html, body {
 .assessment-editor-remove-image{border:1px solid #f2c6c6;border-radius:6px;padding:6px 10px;background:#fff5f5;color:#c62828;cursor:pointer;font-size:12px}
 .assessment-editor-remove-image:hover{background:#fdecec}
 @media(max-width:640px){.assessment-editor-image-box{min-width:100%}}
+
+
+/* Student access attempt log */
+.teacher-access-log-table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: #ffffff;
+}
+.teacher-access-log-table th,
+.teacher-access-log-table td {
+    border-bottom: 1px solid #e7edf4;
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+.teacher-access-log-table th {
+    background: #eef4fa;
+    color: #243447;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.cm-access-status {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.cm-access-success { background: #e7f7ed; color: #217a43; }
+.cm-access-warning { background: #fff3d9; color: #946200; }
+.cm-access-info { background: #e9f2ff; color: #245ea8; }
+.cm-access-error { background: #fdebec; color: #b4232f; }

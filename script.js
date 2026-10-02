@@ -3018,6 +3018,25 @@ function backToStudentAccess() {
     updateURL('student');
 }
 
+
+function reportStudentAccessNetworkError(code, studentName, admissionNumber, source) {
+    try {
+        var payload = JSON.stringify({
+            code: code || '',
+            studentName: studentName || '',
+            admissionNumber: admissionNumber || '',
+            source: source || 'student'
+        });
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon(BACKEND_URL + '/api/quiz/access-log-client', new Blob([payload], { type: 'application/json' }));
+        } else {
+            fetch(BACKEND_URL + '/api/quiz/access-log-client', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true
+            }).catch(function() {});
+        }
+    } catch (e) {}
+}
+
 async function verifyAssessmentCode() {
     var codeFromURL = getCodeFromURL();
     var code = codeFromURL || document.getElementById('assessmentCode').value.trim().toUpperCase();
@@ -3070,6 +3089,7 @@ async function verifyAssessmentCode() {
             showAssessmentForm();
         }
     } catch (e) {
+        reportStudentAccessNetworkError(code, '', '', 'assessment_code');
         alert('Could not reach the server. Please check your connection and try again.');
     }
 }
@@ -3609,14 +3629,19 @@ async function startStudentQuiz() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 code: currentAssessmentCode,
+                studentName: studentName,
                 admissionNumber: studentAdmissionNumber
             })
         });
         var eligibility = await eligibilityRes.json().catch(function() { return {}; });
 
         if (!eligibilityRes.ok || !eligibility.allowed) {
-            if (eligibility.reason === 'not_on_roster') {
-                alert('Admission number "' + studentAdmissionNumber + '" was not found on the class roster for ' + currentAssessment.className + '. Please check your admission number, or contact your teacher if you believe this is a mistake.');
+            if (eligibility.reason === 'invalid_name') {
+                alert('Unable to start assessment: the name you entered does not match the class roster. Please check your name and try again.');
+            } else if (eligibility.reason === 'invalid_admission') {
+                alert('Unable to start assessment: the admission number you entered does not match the class roster. Please check it and try again.');
+            } else if (eligibility.reason === 'invalid_name_and_admission' || eligibility.reason === 'not_on_roster') {
+                alert('Unable to start assessment: your name and/or admission number do not match the class roster. Please check your details and try again.');
             } else if (eligibility.reason === 'already_submitted') {
                 alert('A student with admission number "' + studentAdmissionNumber + '" has already submitted this assessment (Code: ' + currentAssessmentCode + '). Each student can only take a given assessment once. If this is a mistake, please contact your teacher.');
             } else if (eligibility.reason === 'not_yet_open' || eligibility.reason === 'closed') {
@@ -3631,6 +3656,7 @@ async function startStudentQuiz() {
             return;
         }
     } catch (e) {
+        reportStudentAccessNetworkError(currentAssessmentCode, studentName, studentAdmissionNumber, 'start_check');
         alert('Could not verify your assessment status. Please check your connection and try again.');
         if (startBtn) {
             startBtn.disabled = false;
@@ -4118,14 +4144,26 @@ async function studentSubmitQuiz() {
     if (overlay) overlay.remove();
     studentStopTimer();
 
-    var unanswered = studentAnswers.some(function(ans) { return ans === null; });
+    var unansweredIndexes = [];
+    for (var ua = 0; ua < studentAnswers.length; ua++) {
+        if (studentAnswers[ua] === null) unansweredIndexes.push(ua);
+    }
+    var unanswered = unansweredIndexes.length > 0;
     if (unanswered && !studentIsTimeUp && studentEndReason !== 'misconduct') {
-        var count = studentAnswers.filter(function(ans) { return ans === null; }).length;
-        var confirmSubmit = confirm('You have ' + count + ' unanswered question(s). Submit anyway?');
-        if (!confirmSubmit) {
-            studentStartTimer();
-            return;
+        var count = unansweredIndexes.length;
+        var firstUnanswered = unansweredIndexes[0];
+        alert('Unable to submit assessment. Please complete all ' + count + ' unanswered question(s) before submitting. You will be taken to the first unanswered question.');
+        studentCurrentIndex = firstUnanswered;
+        studentDisplayQuestion();
+        studentUpdateNavigationButtons();
+        studentUpdateQuestionBoxes();
+        var questionArea = document.getElementById('studentQuestionText');
+        if (questionArea && questionArea.scrollIntoView) {
+            questionArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+        saveQuizState();
+        studentStartTimer();
+        return;
     }
 
     var submitBtn = document.getElementById('studentSubmitBtn');
@@ -5805,6 +5843,9 @@ function showTeacherSection(panelId, btn) {
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
         loadTeacherAnalytics();
     }
+    if (panelId === 'accessLogsSection') {
+        loadTeacherAccessLogs();
+    }
     if (panelId === 'liveSection') {
         startTeacherLivePolling();
     } else {
@@ -5814,6 +5855,72 @@ function showTeacherSection(panelId, btn) {
 
 function showAdminSection(panelId, btn) {
     showDashSection('adminDashboard', panelId, btn);
+}
+
+
+// ============================================================
+// TEACHER: STUDENT ACCESS LOGS
+// ============================================================
+function accessLogStatusLabel(status) {
+    var labels = {
+        successful_access: 'Successful access',
+        duplicate_attempt: 'Duplicate attempt',
+        invalid_name: 'Invalid name',
+        invalid_admission: 'Invalid admission number',
+        invalid_name_and_admission: 'Invalid name & admission number',
+        network_error: 'Network/server error',
+        not_yet_open: 'Not yet open',
+        closed: 'Assessment closed'
+    };
+    return labels[status] || status || 'Unknown';
+}
+
+function accessLogStatusClass(status) {
+    if (status === 'successful_access') return 'cm-access-success';
+    if (status === 'duplicate_attempt') return 'cm-access-warning';
+    if (status === 'not_yet_open' || status === 'closed') return 'cm-access-info';
+    return 'cm-access-error';
+}
+
+async function loadTeacherAccessLogs() {
+    var container = document.getElementById('teacherAccessLogsContainer');
+    if (!container) return;
+    var token = localStorage.getItem('cleverment_teacher_token');
+    if (!token) {
+        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">Teacher session missing. Please log in again.</p>';
+        return;
+    }
+    container.innerHTML = '<p class="helper-text">Loading access attempts...</p>';
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/access-logs', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not load access logs.');
+        var logs = data.logs || [];
+        if (!logs.length) {
+            container.innerHTML = '<p class="helper-text">No student access attempts have been recorded yet.</p>';
+            return;
+        }
+        var html = '<div style="overflow-x:auto; -webkit-overflow-scrolling:touch;"><table class="teacher-access-log-table"><thead><tr>' +
+            '<th>Date & Time</th><th>Assessment</th><th>Student Name</th><th>Admission No.</th><th>Status</th><th>Details</th>' +
+            '</tr></thead><tbody>';
+        for (var i = 0; i < logs.length; i++) {
+            var x = logs[i];
+            html += '<tr>' +
+                '<td style="white-space:nowrap;">' + escapeHtml(new Date(x.timestamp).toLocaleString()) + '</td>' +
+                '<td><strong>' + escapeHtml(x.code || '') + '</strong><br><span style="font-size:12px;color:#6b7a8f;">' + escapeHtml((x.subject || '') + (x.className ? ' • ' + x.className : '')) + '</span></td>' +
+                '<td>' + escapeHtml(x.studentName || '—') + '</td>' +
+                '<td>' + escapeHtml(x.admissionNumber || '—') + '</td>' +
+                '<td><span class="cm-access-status ' + accessLogStatusClass(x.status) + '">' + escapeHtml(accessLogStatusLabel(x.status)) + '</span></td>' +
+                '<td style="min-width:260px;">' + escapeHtml(x.message || '') + '</td>' +
+                '</tr>';
+        }
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">Could not load access attempts: ' + escapeHtml(e.message) + '</p>';
+    }
 }
 
 // ============================================================
