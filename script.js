@@ -5892,9 +5892,14 @@ async function loadTeacherAccessLogs() {
     }
     container.innerHTML = '<p class="helper-text">Loading access attempts...</p>';
     try {
-        var res = await fetch(BACKEND_URL + '/api/teacher/access-logs', {
+        var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        var timeoutId = controller ? setTimeout(function() { controller.abort(); }, 10000) : null;
+        var fetchOptions = {
             headers: { 'Authorization': 'Bearer ' + token }
-        });
+        };
+        if (controller) fetchOptions.signal = controller.signal;
+        var res = await fetch(BACKEND_URL + '/api/teacher/access-logs', fetchOptions);
+        if (timeoutId) clearTimeout(timeoutId);
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not load access logs.');
         var logs = data.logs || [];
@@ -5919,7 +5924,10 @@ async function loadTeacherAccessLogs() {
         html += '</tbody></table></div>';
         container.innerHTML = html;
     } catch (e) {
-        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">Could not load access attempts: ' + escapeHtml(e.message) + '</p>';
+        var msg = (e && e.name === 'AbortError')
+            ? 'The access log is taking too long to respond. Tap Refresh to try again.'
+            : ('Could not load access attempts: ' + (e.message || 'Unknown error'));
+        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(msg) + '</p>';
     }
 }
 
