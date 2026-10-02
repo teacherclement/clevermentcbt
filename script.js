@@ -4379,8 +4379,8 @@ function buildCertificateElement(data) {
     content.style.cssText = 'position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;';
 
     var logo = document.createElement('img');
-    logo.src = 'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg';
-    logo.style.cssText = 'width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
+    logo.src = 'logo.png';
+    logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
     content.appendChild(logo);
 
     var h1 = document.createElement('div');
@@ -4626,8 +4626,8 @@ function downloadCertificateImage() {
     content.style.cssText = 'position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;';
     
     var logo = document.createElement('img');
-    logo.src = 'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg';
-    logo.style.cssText = 'width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
+    logo.src = 'logo.png';
+    logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
     content.appendChild(logo);
     
     var h1 = document.createElement('div');
