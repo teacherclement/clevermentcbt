@@ -8,12 +8,13 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-v22';
+var CACHE_NAME = 'cleverment-v23';
 var urlsToCache = [
     '/',
     '/index.html',
     '/style.css',
     '/script.js',
+    '/cleverment-3d.js',
     'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap',
     'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css',
     'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js',

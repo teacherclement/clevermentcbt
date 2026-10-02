@@ -1735,3 +1735,26 @@ html, body {
 .cm-access-warning { background: #fff3d9; color: #946200; }
 .cm-access-info { background: #e9f2ff; color: #245ea8; }
 .cm-access-error { background: #fdebec; color: #b4232f; }
+
+
+/* ============================================================================
+   CLEVERMENT 3D LAYER OVERRIDES  (additive — original rules preserved above)
+   ============================================================================ */
+#cleverment-3d-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;   /* never blocks clicks, typing, or proctoring */
+}
+
+/* Keep the app floating above the 3D canvas */
+.container {
+    position: relative;
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.92);
+}
+
+/* Floating panels/modals must always stay above the 3D scene */
+.modal, .overlay, [class*="modal"], [class*="Modal"] {
+    z-index: 100;
+}
