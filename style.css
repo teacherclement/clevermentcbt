@@ -1737,6 +1737,7 @@ html, body {
 .cm-access-error { background: #fdebec; color: #b4232f; }
 
 
+
 /* ============================================================================
    CLEVERMENT 3D LAYER OVERRIDES  (additive — original rules preserved above)
    ============================================================================ */
@@ -1747,14 +1748,52 @@ html, body {
     pointer-events: none;   /* never blocks clicks, typing, or proctoring */
 }
 
-/* Keep the app floating above the 3D canvas */
+/* App floats above the 3D world — glassy so the 3D shines through */
 .container {
     position: relative;
     z-index: 1;
-    background: rgba(255, 255, 255, 0.92);
+    background: rgba(255, 255, 255, 0.45);
+    -webkit-backdrop-filter: blur(14px) saturate(1.25);
+    backdrop-filter: blur(14px) saturate(1.25);
+    box-shadow: 0 25px 80px rgba(45, 108, 223, 0.14);
 }
 
-/* Floating panels/modals must always stay above the 3D scene */
-.modal, .overlay, [class*="modal"], [class*="Modal"] {
-    z-index: 100;
+/* Major panels become frosted glass */
+.studentQuestionContainer,
+.studentOptionsContainer,
+.studentResultsSection,
+.studentCertificateSection,
+.scrollable-panel,
+.quiz-stats,
+.stat-card,
+.uploadSection,
+.adminSection,
+.teacherPublishedList,
+.adminTeacherList,
+.dash-sidebar {
+    background: rgba(255, 255, 255, 0.55) !important;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-radius: 14px;
 }
+
+/* Popups stay readable glass */
+.time-up-box,
+.cleverbot-panel {
+    background: rgba(255, 255, 255, 0.75) !important;
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+}
+
+/* Inputs: readable but still glassy */
+.form-input,
+#assessmentCode {
+    background: rgba(255, 255, 255, 0.72) !important;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+}
+
+/* Certificate preview + editor stay opaque (print/export quality) */
+.studentCertificatePreview,
+.assessment-editor-card,
+.time-up-overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
