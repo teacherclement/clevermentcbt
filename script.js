@@ -19,6 +19,28 @@ function getPageFromURL() {
 function updateURL(page) {
     var newURL = window.location.pathname + '?page=' + page;
     window.history.pushState({ page: page }, '', newURL);
+    // Remember where the person was, so a logged-in teacher/admin can be
+    // returned to their dashboard if the app is re-opened without ?page=.
+    try { localStorage.setItem('cleverment_last_page', page); } catch (e) {}
+}
+
+// If the app is opened without a ?page= in the address (home-screen icon,
+// a plain link, or a reload that lost it) and a teacher/admin is still logged
+// in, put them back on their dashboard instead of the landing screen.
+// Logging out overwrites the remembered page, so this never fires after logout.
+function resumeSignedInDashboard() {
+    var last = '';
+    try { last = localStorage.getItem('cleverment_last_page') || ''; } catch (e) {}
+    var target = '';
+    if (last === 'teacher-dashboard' && currentTeacher && localStorage.getItem('cleverment_teacher_token')) {
+        target = 'teacher-dashboard';
+    } else if (last === 'admin-dashboard' && localStorage.getItem('cleverment_admin_session') === 'true' && localStorage.getItem('cleverment_admin_token')) {
+        target = 'admin-dashboard';
+    }
+    if (!target) return false;
+    window.history.replaceState({ page: target }, '', window.location.pathname + '?page=' + target);
+    showPageFromURL(target);
+    return true;
 }
 
 // Dashboard branding lives inside each dashboard sidebar. Hide the global
@@ -731,6 +753,11 @@ function showStudentAccess() {
 }
 
 function showTeacherLogin() {
+    if (currentTeacher && localStorage.getItem('cleverment_teacher_token')) {
+        showPageFromURL('teacher-dashboard');
+        updateURL('teacher-dashboard');
+        return;
+    }
     var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
     for (var i = 0; i < sections.length; i++) {
         var el = document.querySelector(sections[i]);
@@ -742,6 +769,11 @@ function showTeacherLogin() {
 }
 
 function showAdminLogin() {
+    if (localStorage.getItem('cleverment_admin_session') === 'true' && localStorage.getItem('cleverment_admin_token')) {
+        showPageFromURL('admin-dashboard');
+        updateURL('admin-dashboard');
+        return;
+    }
     var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
     for (var i = 0; i < sections.length; i++) {
         var el = document.querySelector(sections[i]);
@@ -1079,6 +1111,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!quizWasRestored) {
                     var page = getPageFromURL();
                     if (page) showPageFromURL(page);
+                    else if (!getCodeFromURL()) resumeSignedInDashboard();
                 }
             });
         });
@@ -3178,6 +3211,11 @@ async function restoreQuizState() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 code: state.currentAssessmentCode,
+                // The server's start-check REQUIRES the student's name (it also
+                // checks it against the class roster). Without it the server
+                // always answered "missing_details", so every refresh threw the
+                // student back to the name page and erased their progress.
+                studentName: state.studentName || '',
                 admissionNumber: state.studentAdmissionNumber
             })
         });
@@ -5861,6 +5899,18 @@ function showAdminSection(panelId, btn) {
 // ============================================================
 // TEACHER: STUDENT ACCESS LOGS
 // ============================================================
+// Safely turns text into HTML-safe text (so a student's name can never inject
+// markup into the teacher's table). loadTeacherAccessLogs() below depends on
+// this; it was previously missing, which made the panel load forever.
+function escapeHtml(value) {
+    return String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function accessLogStatusLabel(status) {
     var labels = {
         successful_access: 'Successful access',
