@@ -16,7 +16,7 @@
        * Click shockwave ripples through the particle field
        * Confetti burst + rotating rainbow torus knot on quiz results
        * Auto-calm during an active quiz, pause when tab hidden,
-         respects prefers-reduced-motion, on-screen "3D" toggle
+         respects prefers-reduced-motion. Always on (no on-screen toggle).
    ============================================================================ */
 (function () {
     'use strict';
@@ -29,10 +29,12 @@
         if (!window.HTMLCanvasElement || !document.body) return;
 
         /* ---------- preferences ---------- */
-        var STORE_KEY = 'cleverment-3d-enabled';
         var reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        /* The 3D scene is always on. The old on-screen "3D" toggle was removed,
+           so any previously saved "off" choice is cleared to avoid a device
+           being stuck with the scene hidden and no way to bring it back. */
         var enabled = true;
-        try { enabled = localStorage.getItem(STORE_KEY) !== '0'; } catch (e) {}
+        try { localStorage.removeItem('cleverment-3d-enabled'); } catch (e) {}
 
         /* ---------- canvas ---------- */
         var canvas = document.createElement('canvas');
@@ -567,34 +569,5 @@
 
         if (reducedMotion && enabled) drawStatic();
         requestAnimationFrame(frame);
-
-        /* ================= 3D TOGGLE ================= */
-        var btn = document.createElement('button');
-        btn.id = 'cleverment-3d-toggle';
-        btn.type = 'button';
-        btn.textContent = '✨ 3D';
-        btn.title = 'Toggle 3D background effects';
-        btn.setAttribute('aria-label', 'Toggle 3D background effects');
-        btn.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:600;' +
-            'background:rgba(255,255,255,0.92);color:#2d6cdf;border:1.5px solid #2d6cdf;' +
-            'border-radius:20px;padding:7px 14px;font:700 13px Inter,sans-serif;' +
-            'cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,0.18);transition:all .2s;';
-        function paintBtn() {
-            btn.style.opacity = enabled ? '1' : '0.55';
-            btn.style.filter = enabled ? 'none' : 'grayscale(1)';
-        }
-        btn.addEventListener('click', function () {
-            enabled = !enabled;
-            try { localStorage.setItem(STORE_KEY, enabled ? '1' : '0'); } catch (e) {}
-            if (!enabled && ctx) ctx.clearRect(0, 0, W, H);
-            if (enabled && reducedMotion) drawStatic();
-            paintBtn();
-        });
-        paintBtn();
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function () { document.body.appendChild(btn); });
-        } else {
-            document.body.appendChild(btn);
-        }
     }
 })();
