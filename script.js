@@ -19,28 +19,6 @@ function getPageFromURL() {
 function updateURL(page) {
     var newURL = window.location.pathname + '?page=' + page;
     window.history.pushState({ page: page }, '', newURL);
-    // Remember where the person was, so a logged-in teacher/admin can be
-    // returned to their dashboard if the app is re-opened without ?page=.
-    try { localStorage.setItem('cleverment_last_page', page); } catch (e) {}
-}
-
-// If the app is opened without a ?page= in the address (home-screen icon,
-// a plain link, or a reload that lost it) and a teacher/admin is still logged
-// in, put them back on their dashboard instead of the landing screen.
-// Logging out overwrites the remembered page, so this never fires after logout.
-function resumeSignedInDashboard() {
-    var last = '';
-    try { last = localStorage.getItem('cleverment_last_page') || ''; } catch (e) {}
-    var target = '';
-    if (last === 'teacher-dashboard' && currentTeacher && localStorage.getItem('cleverment_teacher_token')) {
-        target = 'teacher-dashboard';
-    } else if (last === 'admin-dashboard' && localStorage.getItem('cleverment_admin_session') === 'true' && localStorage.getItem('cleverment_admin_token')) {
-        target = 'admin-dashboard';
-    }
-    if (!target) return false;
-    window.history.replaceState({ page: target }, '', window.location.pathname + '?page=' + target);
-    showPageFromURL(target);
-    return true;
 }
 
 // Dashboard branding lives inside each dashboard sidebar. Hide the global
@@ -520,8 +498,6 @@ var EMAILJS_TEMPLATE_ID = 'template_q8w0apk';
 // ============================================================
 
 var BACKEND_URL = 'https://clevermentcbt-backend.onrender.com';
-// Wake the free-plan server early so the first CleverBot message is not slow.
-try { fetch(BACKEND_URL + '/', { mode: 'no-cors', cache: 'no-store' }).catch(function(){}); } catch (e) {}
 
 
 if (typeof emailjs !== 'undefined' && emailjs.init) {
@@ -755,11 +731,6 @@ function showStudentAccess() {
 }
 
 function showTeacherLogin() {
-    if (currentTeacher && localStorage.getItem('cleverment_teacher_token')) {
-        showPageFromURL('teacher-dashboard');
-        updateURL('teacher-dashboard');
-        return;
-    }
     var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
     for (var i = 0; i < sections.length; i++) {
         var el = document.querySelector(sections[i]);
@@ -771,11 +742,6 @@ function showTeacherLogin() {
 }
 
 function showAdminLogin() {
-    if (localStorage.getItem('cleverment_admin_session') === 'true' && localStorage.getItem('cleverment_admin_token')) {
-        showPageFromURL('admin-dashboard');
-        updateURL('admin-dashboard');
-        return;
-    }
     var sections = ['#landingPage', '#studentAccess', '#studentAssessmentView', '#teacherAuth', '#teacherDashboard', '#adminAuth', '#adminDashboard'];
     for (var i = 0; i < sections.length; i++) {
         var el = document.querySelector(sections[i]);
@@ -1113,7 +1079,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!quizWasRestored) {
                     var page = getPageFromURL();
                     if (page) showPageFromURL(page);
-                    else if (!getCodeFromURL()) resumeSignedInDashboard();
                 }
             });
         });
@@ -3213,11 +3178,6 @@ async function restoreQuizState() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 code: state.currentAssessmentCode,
-                // The server's start-check REQUIRES the student's name (it also
-                // checks it against the class roster). Without it the server
-                // always answered "missing_details", so every refresh threw the
-                // student back to the name page and erased their progress.
-                studentName: state.studentName || '',
                 admissionNumber: state.studentAdmissionNumber
             })
         });
@@ -4419,8 +4379,8 @@ function buildCertificateElement(data) {
     content.style.cssText = 'position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;';
 
     var logo = document.createElement('img');
-    logo.src = 'logo.png';
-    logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
+    logo.src = 'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg';
+    logo.style.cssText = 'width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
     content.appendChild(logo);
 
     var h1 = document.createElement('div');
@@ -4666,8 +4626,8 @@ function downloadCertificateImage() {
     content.style.cssText = 'position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;';
     
     var logo = document.createElement('img');
-    logo.src = 'logo.png';
-    logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
+    logo.src = 'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg';
+    logo.style.cssText = 'width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
     content.appendChild(logo);
     
     var h1 = document.createElement('div');
@@ -5901,18 +5861,6 @@ function showAdminSection(panelId, btn) {
 // ============================================================
 // TEACHER: STUDENT ACCESS LOGS
 // ============================================================
-// Safely turns text into HTML-safe text (so a student's name can never inject
-// markup into the teacher's table). loadTeacherAccessLogs() below depends on
-// this; it was previously missing, which made the panel load forever.
-function escapeHtml(value) {
-    return String(value === null || value === undefined ? '' : value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
 function accessLogStatusLabel(status) {
     var labels = {
         successful_access: 'Successful access',
@@ -6093,195 +6041,6 @@ if (document.readyState === 'loading') {
 }
 
 // ============================================================
-// CLEVERBOT HELPERS - markdown display + CleverMent CSV tools
-// (top-level so they can be tested on their own)
-// ============================================================
-
-// Escapes text so it can never become live HTML (XSS-safe).
-function cbEsc(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-// Bold / italic / inline code / links / math inside one line of ALREADY-ESCAPED text.
-function cbInline(escaped) {
-    var stash = [];
-    function keep(html) { stash.push(html); return '\u0001' + (stash.length - 1) + '\u0002'; }
-    var s = escaped;
-    s = s.replace(/`([^`\n]+)`/g, function (_, c) { return keep('<code class="cb-inline">' + c + '</code>'); });
-    // Math is kept exactly as written so KaTeX can draw it afterwards.
-    s = s.replace(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$(?!\s)[^$\n]*?[^\s$]\$(?!\d)|\$[^\s$]\$(?!\d)/g, function (m) { return keep(m); });
-    s = s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, function (_, t, u) {
-        return keep('<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + t + '</a>');
-    });
-    s = s.replace(/\*\*([^\s*](?:[^*]*?[^\s*])?)\*\*/g, '<strong>$1</strong>');
-    s = s.replace(/(^|[^\w])__([^\s_](?:[^_]*?[^\s_])?)__(?!\w)/g, '$1<strong>$2</strong>');
-    s = s.replace(/(^|[^*\w])\*([^\s*](?:[^*]*?[^\s*])?)\*(?![*\w])/g, '$1<em>$2</em>');
-    s = s.replace(/(^|[^\w])_([^\s_](?:[^_]*?[^\s_])?)_(?!\w)/g, '$1<em>$2</em>');
-    s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
-    s = s.replace(/\u0001(\d+)\u0002/g, function (_, i) { return stash[+i]; });
-    return s;
-}
-
-// Same comma/quote logic CleverMent's own importer (parseTeacherCSV) uses.
-function cbSplitCsvLine(line) {
-    var cols = [], cur = '', q = false;
-    for (var j = 0; j < line.length; j++) {
-        var ch = line[j];
-        if (ch === '"') { q = !q; cur += ch; }
-        else if (ch === ',' && !q) { cols.push(cur); cur = ''; }
-        else cur += ch;
-    }
-    cols.push(cur);
-    return cols;
-}
-
-// Does this text look like CleverMent question CSV?
-function cleverBotLooksLikeCsv(code) {
-    var lines = String(code || '').split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
-    if (lines.length < 2) return false;
-    if (/^"?question"?\s*,\s*"?option\s*a/i.test(lines[0])) return true;
-    var ok = 0;
-    lines.forEach(function (l) {
-        var c = cbSplitCsvLine(l);
-        if (c.length >= 6 && /^"?\s*[A-Da-d]\s*"?$/.test(c[5].trim())) ok++;
-    });
-    return ok >= 2 && ok / lines.length >= 0.6;
-}
-
-// Makes the CSV safe to import: guarantees the header row (the importer always
-// skips line 1), a capital answer letter, and 7 columns. Drops chatter lines.
-function cleverBotNormalizeCsv(code) {
-    var HEADER = 'Question,Option A,Option B,Option C,Option D,Correct Answer,';
-    var lines = String(code || '').replace(/\r\n?/g, '\n').split('\n')
-        .map(function (l) { return l.replace(/\s+$/, ''); })
-        .filter(function (l) { return l.trim() !== ''; });
-    if (!lines.length) return '';
-    // Any header-looking line (even one after stray chatter) is replaced by the standard one.
-    var body = lines.filter(function (l) { return !/^\s*"?question"?\s*,\s*"?option\s*a/i.test(l); });
-    var rows = [];
-    body.forEach(function (l) {
-        var c = cbSplitCsvLine(l);
-        if (c.length < 6) return;
-        var ans = c[5].trim().replace(/^"|"$/g, '').trim();
-        if (/^[a-d]$/i.test(ans)) c[5] = ans.toUpperCase();
-        if (c.length === 6) c.push('');
-        rows.push(c.join(','));
-    });
-    return [HEADER].concat(rows).join('\n');
-}
-
-function cbCodeBlock(lang, code, finalize) {
-    var csv = lang === 'csv' ? code.split('\n').length >= 2 : cleverBotLooksLikeCsv(code);
-    if (csv && finalize) code = cleverBotNormalizeCsv(code);
-    var label = csv ? 'CleverMent CSV' : (lang || 'text');
-    return '<div class="cb-code' + (csv ? ' cb-csv' : '') + '"><div class="cb-code-head"><span class="cb-lang">' + cbEsc(label) + '</span>' +
-        '<span class="cb-actions"><button type="button" class="cb-btn" data-cb="copy">Copy</button>' +
-        (csv ? '<button type="button" class="cb-btn" data-cb="download">Download .csv</button>' : '') +
-        '</span></div><pre><code>' + cbEsc(code) + '</code></pre></div>';
-}
-
-function cbList(items) {
-    var html = '', stack = [];
-    function open(it) {
-        var tag = it.ordered ? 'ol' : 'ul';
-        html += '<' + tag + (it.ordered && it.start && it.start !== 1 ? ' start="' + it.start + '"' : '') + '>';
-        stack.push({ indent: it.indent, tag: tag });
-    }
-    items.forEach(function (it) {
-        while (stack.length && it.indent < stack[stack.length - 1].indent) html += '</li></' + stack.pop().tag + '>';
-        var top = stack[stack.length - 1];
-        if (!top || it.indent > top.indent) { open(it); html += '<li>' + cbInline(cbEsc(it.text)); }
-        else if (top.tag !== (it.ordered ? 'ol' : 'ul')) { html += '</li></' + stack.pop().tag + '>'; open(it); html += '<li>' + cbInline(cbEsc(it.text)); }
-        else html += '</li><li>' + cbInline(cbEsc(it.text));
-    });
-    while (stack.length) html += '</li></' + stack.pop().tag + '>';
-    return html;
-}
-
-function cbTableCells(line) {
-    var t = line.trim().replace(/^\|/, '').replace(/\|$/, '');
-    return t.split('|').map(function (c) { return c.trim(); });
-}
-
-// Turns the assistant's Markdown into safe HTML. opts.final = streaming finished.
-function cleverBotRenderMarkdown(raw, opts) {
-    opts = opts || {};
-    var lines = String(raw || '').replace(/\r\n?/g, '\n').split('\n');
-    var out = [], i = 0;
-    var isBlank = function (l) { return /^\s*$/.test(l); };
-    var listRe = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
-    var tableSep = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
-    function startsBlock(l, next) {
-        return /^\s*(```|~~~)/.test(l) || /^\s{0,3}#{1,6}\s+\S/.test(l) || /^\s{0,3}(-{3,}|\*{3,})\s*$/.test(l) ||
-            /^\s*>/.test(l) || listRe.test(l) || (l.indexOf('|') !== -1 && next !== undefined && tableSep.test(next));
-    }
-    while (i < lines.length) {
-        var line = lines[i];
-        if (isBlank(line)) { i++; continue; }
-
-        var fm = line.match(/^\s*(```|~~~)\s*([\w+#.-]*)\s*$/);
-        if (fm) {
-            var fence = fm[1], lang = (fm[2] || '').toLowerCase(), buf = [];
-            i++;
-            while (i < lines.length && lines[i].replace(/\s+$/, '').replace(/^\s+/, '') !== fence) { buf.push(lines[i]); i++; }
-            i++;
-            out.push(cbCodeBlock(lang, buf.join('\n'), !!opts.final));
-            continue;
-        }
-        var hm = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
-        if (hm) { out.push('<div class="cb-h cb-h' + hm[1].length + '">' + cbInline(cbEsc(hm[2])) + '</div>'); i++; continue; }
-        if (/^\s{0,3}(-{3,}|\*{3,})\s*$/.test(line)) { out.push('<hr>'); i++; continue; }
-        if (/^\s*>/.test(line)) {
-            var q = [];
-            while (i < lines.length && /^\s*>/.test(lines[i])) { q.push(lines[i].replace(/^\s*>\s?/, '')); i++; }
-            out.push('<blockquote>' + q.map(function (l) { return cbInline(cbEsc(l)); }).join('<br>') + '</blockquote>');
-            continue;
-        }
-        if (line.indexOf('|') !== -1 && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
-            var head = cbTableCells(line); i += 2;
-            var rowsHtml = '';
-            while (i < lines.length && lines[i].indexOf('|') !== -1 && !isBlank(lines[i])) {
-                rowsHtml += '<tr>' + cbTableCells(lines[i]).map(function (c) { return '<td>' + cbInline(cbEsc(c)) + '</td>'; }).join('') + '</tr>'; i++;
-            }
-            out.push('<div class="cb-table-wrap"><table><thead><tr>' + head.map(function (c) { return '<th>' + cbInline(cbEsc(c)) + '</th>'; }).join('') + '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>');
-            continue;
-        }
-        var lm = line.match(listRe);
-        if (lm) {
-            var items = [];
-            while (i < lines.length) {
-                var m2 = lines[i].match(listRe);
-                if (m2) {
-                    var ordered = /\d/.test(m2[2]);
-                    items.push({ indent: m2[1].replace(/\t/g, '    ').length, ordered: ordered, start: ordered ? parseInt(m2[2], 10) : 0, text: m2[3] });
-                    i++;
-                } else if (!isBlank(lines[i]) && /^\s{2,}\S/.test(lines[i]) && items.length) {
-                    items[items.length - 1].text += ' ' + lines[i].trim(); i++;
-                } else break;
-            }
-            out.push(cbList(items));
-            continue;
-        }
-        var para = [];
-        while (i < lines.length && !isBlank(lines[i]) && !(para.length && startsBlock(lines[i], lines[i + 1]))) { para.push(lines[i]); i++; }
-        out.push('<p>' + para.map(function (l) { return cbInline(cbEsc(l)); }).join('<br>') + '</p>');
-    }
-    return out.join('');
-}
-
-// What the Copy button should copy: if the whole reply is one code block
-// (e.g. the CSV), copy ONLY the code - never the ``` marks.
-function cleverBotCopyValue(raw) {
-    var t = String(raw || '').trim();
-    var m = t.match(/^(```|~~~)[\w+#.-]*\s*\n([\s\S]*?)\n\s*\1\s*$/);
-    if (m) {
-        var inner = m[2];
-        return cleverBotLooksLikeCsv(inner) ? cleverBotNormalizeCsv(inner) : inner;
-    }
-    return t;
-}
-
-// ============================================================
 // CLEVERBOT - floating answer-only AI assistant
 // ============================================================
 (function initCleverBot(){
@@ -6363,37 +6122,59 @@ function cleverBotCopyValue(raw) {
     }
 
     function cleanBotText(text){
-        // Formatting is now rendered properly, so nothing is stripped here.
-        // (Stripping "__" used to destroy fill-in blanks such as _____ .)
-        return String(text || '');
+        return String(text || '').replace(/\*\*/g, '').replace(/__+/g, '');
     }
-    function renderBotBody(target, text, final){
-        target.raw = text;
-        target.body.classList.add('md');
-        target.body.innerHTML = cleverBotRenderMarkdown(text, { final: !!final });
+    function extractCleverMentCsv(text){
+        var raw=String(text||'').replace(/\r/g,'');
+        var m=raw.match(/```(?:csv)?\s*([\s\S]*?)```/i);
+        if(m) raw=m[1];
+        raw=raw.trim();
+        var first=raw.split('\n')[0].trim().replace(/,$/,'');
+        if(!/^Question\s*,\s*Option A\s*,\s*Option B\s*,\s*Option C\s*,\s*Option D\s*,\s*Correct Answer$/i.test(first)) return '';
+        return raw;
     }
     function copyText(value, done){
-        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(value).then(done).catch(function(){ fallbackCopy(value, done); });
-        else fallbackCopy(value, done);
+        if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(value).then(done).catch(function(){fallbackCopy(value,done);});
+        else fallbackCopy(value,done);
     }
+    function renderCleverMentCsv(body, csv){
+        body.innerHTML='';
+        var wrap=document.createElement('div');
+        wrap.style.cssText='border:1px solid #263750;border-radius:16px;overflow:hidden;background:#0b1425;color:#eaf1ff;box-shadow:0 8px 22px rgba(15,31,55,.16);';
+        var top=document.createElement('div');
+        top.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;background:#18253a;color:#8bd3ff;font-weight:800;letter-spacing:.5px;';
+        var title=document.createElement('span'); title.textContent='CLEVERMENT CSV';
+        var actions=document.createElement('div'); actions.style.cssText='display:flex;gap:6px;';
+        function makeBtn(label,fn){var b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='border:1px solid #415675;background:#0f1a2d;color:#fff;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer;';b.onclick=fn;return b;}
+        actions.appendChild(makeBtn('Copy',function(){copyText(csv,function(){});}));
+        actions.appendChild(makeBtn('Download .csv',function(){var blob=new Blob([csv+'\n'],{type:'text/csv;charset=utf-8'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='cleverment_questions.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);}));
+        top.appendChild(title);top.appendChild(actions);wrap.appendChild(top);
+        var pre=document.createElement('pre'); pre.textContent=csv; pre.style.cssText='margin:0;padding:14px;max-height:380px;overflow:auto;white-space:pre;font:14px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#f4f7fb;';
+        wrap.appendChild(pre); body.appendChild(wrap);
+    }
+
     function createStreamingMessage(){
         var el=document.createElement('div'); el.className='cleverbot-msg bot';
         var body=document.createElement('div'); body.className='cleverbot-msg-body'; body.textContent=''; el.appendChild(body);
+        var target={el:el,body:body,copyValue:''};
         var copyBtn=document.createElement('button'); copyBtn.type='button'; copyBtn.className='cleverbot-copy';
         copyBtn.setAttribute('aria-label','Copy CleverBot response'); copyBtn.title='Copy entire response';
         copyBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg><span>Copy</span>';
         copyBtn.style.display='none';
-        var streamTarget={el:el, body:body, copyBtn:copyBtn, raw:''};
         copyBtn.addEventListener('click',function(){
-            var value=cleverBotCopyValue(streamTarget.raw || body.textContent || '');
+            var value=target.copyValue || body.textContent || '';
             function copied(){ copyBtn.classList.add('copied'); copyBtn.querySelector('span').textContent='Copied'; setTimeout(function(){copyBtn.classList.remove('copied');copyBtn.querySelector('span').textContent='Copy';},1400); }
-            if(navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(value).then(copied).catch(function(){fallbackCopy(value,copied);}); else fallbackCopy(value,copied);
+            copyText(value,copied);
         });
         el.appendChild(copyBtn); messages.appendChild(el); messages.scrollTop=messages.scrollHeight;
-        return streamTarget;
+        target.copyBtn=copyBtn;
+        return target;
     }
 
-    // Gemini can stream data to the backend in chunks, but a hosting proxy can
+    // DeepSeek streams through the backend; the small client-side queue keeps the
+    // visible answer progressive even if a proxy batches several SSE chunks.
+
+    // DeepSeek can stream data to the backend in chunks, but a hosting proxy can
     // sometimes deliver several chunks together. We therefore render the
     // received text through a small client-side typewriter queue as well. This
     // guarantees that CleverBot visibly "types" its answer even when the
@@ -6412,7 +6193,7 @@ function cleverBotCopyValue(raw) {
                 var take=Math.min(speed, queue.length);
                 displayed += queue.slice(0,take);
                 queue = queue.slice(take);
-                renderBotBody(target, cleanBotText(displayed), false);
+                target.body.textContent = cleanBotText(displayed);
                 messages.scrollTop=messages.scrollHeight;
                 timer=setTimeout(tick, 22);
                 return;
@@ -6430,16 +6211,23 @@ function cleverBotCopyValue(raw) {
                 if (!timer) tick();
                 return;
             }
-            renderBotBody(target, cleanBotText(displayed).trim(), true);
-            renderMathIn(target.body);
-            if (target.copyBtn) target.copyBtn.style.display = target.raw ? 'inline-flex' : 'none';
-            if (resolveDone) { var r=resolveDone; resolveDone=null; r(cleanBotText(displayed).trim()); }
+            var finalText=cleanBotText(displayed).trim();
+            var csv=extractCleverMentCsv(finalText);
+            if(csv){
+                target.copyValue=csv;
+                renderCleverMentCsv(target.body,csv);
+            } else {
+                target.copyValue=finalText;
+                target.body.textContent=finalText;
+            }
+            if (target.copyBtn) target.copyBtn.style.display = finalText ? 'inline-flex' : 'none';
+            if (resolveDone) { var r=resolveDone; resolveDone=null; r(finalText); }
         }
         function getText(){ return cleanBotText(displayed).trim(); }
         return {push:push, finish:finish, getText:getText, done:donePromise};
     }
 
-    async function consumeCleverBotStream(res, target, onActivity){
+    async function consumeCleverBotStream(res, target){
         if(!res.ok){
             var errorText=await res.text();
             var errorMsg='CleverBot is temporarily unavailable.';
@@ -6452,7 +6240,6 @@ function cleverBotCopyValue(raw) {
         var streamer=createTextStreamer(target);
         while(true){
             var part=await reader.read();
-            if(onActivity) onActivity();
             if(part.done) break;
             buffer += decoder.decode(part.value,{stream:true});
             var events=buffer.split(/\r?\n\r?\n/); buffer=events.pop()||'';
@@ -6463,15 +6250,7 @@ function cleverBotCopyValue(raw) {
                     try{
                         var obj=JSON.parse(raw);
                         if(obj.error) throw new Error(obj.error);
-                        if(obj.status){
-                            if(!target.statusEl){ target.statusEl=document.createElement('div'); target.statusEl.className='cleverbot-status'; target.el.insertBefore(target.statusEl, target.copyBtn); }
-                            target.statusEl.textContent=obj.status; target.statusEl.dataset.temp=obj.temp?'1':'';
-                            messages.scrollTop=messages.scrollHeight;
-                        }
-                        if(obj.text){
-                            if(target.statusEl && target.statusEl.dataset.temp==='1'){ target.statusEl.parentNode && target.statusEl.parentNode.removeChild(target.statusEl); target.statusEl=null; }
-                            streamer.push(obj.text);
-                        }
+                        if(obj.text) streamer.push(obj.text);
                     }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
                 });
             });
@@ -6484,7 +6263,6 @@ function cleverBotCopyValue(raw) {
                 if(obj.text) streamer.push(obj.text);
             }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
         }
-        if(target.statusEl && target.statusEl.parentNode){ target.statusEl.parentNode.removeChild(target.statusEl); target.statusEl=null; }
         streamer.finish();
         // Do not expose the Copy button until the visible typewriter animation
         // has finished. This also ensures the final text is what gets copied.
@@ -6521,11 +6299,9 @@ function cleverBotCopyValue(raw) {
         }
         return parts.join('\n');
     }
-    var lastWarmPing=0;
     function openBot(){
         if (isStudentAssessment()) return;
         panel.hidden=false;
-        if (Date.now()-lastWarmPing>240000) { lastWarmPing=Date.now(); try { fetch(BACKEND_URL+'/',{mode:'no-cors',cache:'no-store'}).catch(function(){}); } catch(e){} }
         if (!messages.dataset.greeted) {
             addMessage('Hello! 👋 I’m CleverBot, your CleverMent assistant. How can I be of help today?', 'bot');
             messages.dataset.greeted='1';
@@ -6569,6 +6345,43 @@ function cleverBotCopyValue(raw) {
         }
         return chunks.join('\n\n').slice(0, maxChars);
     }
+    async function extractOfficeText(file){
+        if (!window.JSZip) return '';
+        var zip=await window.JSZip.loadAsync(await file.arrayBuffer());
+        var names=Object.keys(zip.files||{});
+        var targets=[];
+        var name=(file.name||'').toLowerCase();
+        if(name.endsWith('.docx')) targets=names.filter(function(n){return /^word\/document\.xml$/i.test(n);});
+        else if(name.endsWith('.pptx')) targets=names.filter(function(n){return /^ppt\/slides\/slide\d+\.xml$/i.test(n);}).sort();
+        else return '';
+        var out=[];
+        for(var i=0;i<targets.length;i++){
+            var xml=await zip.files[targets[i]].async('text');
+            xml=xml.replace(/<w:tab\/>/g,'\t').replace(/<a:br\s*\/?>/g,'\n').replace(/<w:br\s*\/?>/g,'\n').replace(/<[^>]+>/g,' ');
+            xml=xml.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim();
+            if(xml) out.push(targets[i]+'\n'+xml);
+        }
+        return out.join('\n\n').slice(0,1400000);
+    }
+    async function extractSpreadsheetText(file){
+        if(!window.XLSX) return '';
+        var wb=window.XLSX.read(await file.arrayBuffer(),{type:'array'});
+        var out=[];
+        wb.SheetNames.forEach(function(sheet){
+            var ws=wb.Sheets[sheet];
+            var csv=window.XLSX.utils.sheet_to_csv(ws);
+            if(csv.trim()) out.push('SHEET: '+sheet+'\n'+csv);
+        });
+        return out.join('\n\n').slice(0,1400000);
+    }
+    async function extractTextAttachment(file){
+        var name=(file.name||'').toLowerCase();
+        if(/^text\/(plain|csv)/i.test(file.type||'') || /\.(txt|csv)$/i.test(name)) return (await file.text()).slice(0,1400000);
+        if(/\.pdf$/i.test(name) || file.type==='application/pdf') return await extractPdfText(file);
+        if(/\.(docx|pptx)$/i.test(name)) return await extractOfficeText(file);
+        if(/\.(xlsx|xls)$/i.test(name)) return await extractSpreadsheetText(file);
+        return '';
+    }
     fileInput.addEventListener('change', function(){
         var files=Array.prototype.slice.call(fileInput.files||[]);
         files.forEach(function(f){
@@ -6580,72 +6393,6 @@ function cleverBotCopyValue(raw) {
     });
     attachBtn.addEventListener('click', function(){ fileInput.click(); });
 
-    // Copy / Download buttons inside code blocks (one listener for all messages).
-    messages.addEventListener('click', function(e){
-        var btn = e.target && e.target.closest ? e.target.closest('[data-cb]') : null;
-        if (!btn) return;
-        var box = btn.closest('.cb-code');
-        var codeEl = box && box.querySelector('pre code');
-        if (!codeEl) return;
-        var code = codeEl.textContent || '';
-        var label = btn.textContent;
-        function flash(text){
-            btn.textContent = text;
-            setTimeout(function(){ btn.textContent = label; }, 1400);
-        }
-        if (btn.getAttribute('data-cb') === 'download') {
-            var csv = cleverBotNormalizeCsv(code);
-            var blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-            var link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'cleverment_questions_' + new Date().toISOString().slice(0,10) + '.csv';
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-            setTimeout(function(){ URL.revokeObjectURL(link.href); }, 1500);
-            flash('Downloaded');
-            return;
-        }
-        var value = btn.closest('.cb-csv') ? cleverBotNormalizeCsv(code) : code;
-        copyText(value, function(){ flash('Copied'); });
-    });
-
-    // Reads the text out of Word / PowerPoint / Excel / text files in the browser,
-    // because the AI service cannot open those formats directly.
-    async function extractFileText(file){
-        var name = (file.name || '').toLowerCase();
-        if (/\.(txt|csv|md|json)$/.test(name) || /^text\//.test(file.type || '')) return await file.text();
-        var buffer = await file.arrayBuffer();
-        if (/\.(xlsx|xls)$/.test(name)) {
-            if (!window.XLSX) return '';
-            var wb = window.XLSX.read(buffer, { type: 'array' });
-            return wb.SheetNames.map(function(n){ return 'SHEET ' + n + '\n' + window.XLSX.utils.sheet_to_csv(wb.Sheets[n]); }).join('\n\n');
-        }
-        if (!window.JSZip) return '';
-        var zip = await window.JSZip.loadAsync(buffer);
-        function xmlToText(xml, paragraphEnd){
-            return xml.replace(paragraphEnd, '\n').replace(/<w:tab\/>/g, '\t').replace(/<w:br\/>/g, '\n').replace(/<\/w:tc>/g, '\t')
-                .replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
-        }
-        if (/\.docx$/.test(name)) {
-            var doc = zip.file('word/document.xml');
-            if (!doc) return '';
-            return xmlToText(await doc.async('string'), /<\/w:p>/g).replace(/\n{3,}/g, '\n\n');
-        }
-        if (/\.pptx$/.test(name)) {
-            var slideNames = Object.keys(zip.files).filter(function(k){ return /^ppt\/slides\/slide\d+\.xml$/.test(k); })
-                .sort(function(a, b){ return parseInt(a.match(/(\d+)\.xml/)[1], 10) - parseInt(b.match(/(\d+)\.xml/)[1], 10); });
-            var parts = [];
-            for (var si = 0; si < slideNames.length; si++) {
-                var slideXml = await zip.file(slideNames[si]).async('string');
-                var slideText = xmlToText(slideXml, /<\/a:p>/g).replace(/\n{3,}/g, '\n\n').trim();
-                if (slideText) parts.push('SLIDE ' + (si + 1) + '\n' + slideText);
-            }
-            return parts.join('\n\n');
-        }
-        return '';
-    }
-    var lastAttachments = null; // the most recent file(s), kept so follow-ups like "10 more" still see them
-    var FOLLOW_UP_RE = /\b(file|files|image|picture|photo|document|doc|pdf|attached|attachment|above|same|more|another|again|next|rest|remaining|previous|earlier|format|csv|questions?|mcqs?|redo|regenerate|replace|change|fix|harder|easier|summar\w*|explain|this|that|these|those|it|them|page|chapter|slide|diagram|figure|table)\b/i;
-
     async function sendMessage(){
         var text=input.value.trim();
         if (!text && !pendingFiles.length) return;
@@ -6655,116 +6402,76 @@ function cleverBotCopyValue(raw) {
         input.value=''; input.style.height='auto'; sendBtn.disabled=true;
         var typing=addTyping();
         var streamMessage=null;
-        var coldTimer=null, hardTimer=null, watchdog=null, lastActivity=Date.now();
-        var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
         try {
             var attachments=[];
             var totalRawBytes=0;
             for (var i=0;i<files.length;i++) {
                 var file=files[i];
                 totalRawBytes += file.size || 0;
-                if (totalRawBytes > 16*1024*1024) {
-                    throw new Error('The attached files are too large together. Please attach one file at a time or use smaller files.');
-                }
+                if (totalRawBytes > 18*1024*1024) throw new Error('The attached files are too large together. Please attach one file at a time or use smaller files.');
                 var mime=file.type||'application/octet-stream';
-                if (mime === 'application/pdf' || /\.pdf$/i.test(file.name||'')) {
-                    var pdfText='';
-                    try { pdfText=await extractPdfText(file); } catch (pdfErr) { pdfText=''; }
-                    if (pdfText.trim()) {
-                        attachments.push({name:file.name,mimeType:'text/plain',text:pdfText});
-                        continue;
-                    }
-                }
-                var lowerName=(file.name||'').toLowerCase();
-                if (/\.(docx|pptx|xlsx|xls|txt|csv|md|json)$/.test(lowerName) || mime==='text/plain' || mime==='text/csv') {
-                    var fileText='';
-                    try { fileText=await extractFileText(file); } catch (extractErr) { fileText=''; }
-                    if (fileText.trim()) attachments.push({name:file.name,mimeType:'text/plain',text:fileText.slice(0,1000000)});
-                    else addMessage('I could not find any readable text in “'+file.name+'”. If it is a scan or only pictures, please attach it as a PDF or image instead.','system');
-                    continue;
-                }
-                if (/\.(doc|ppt)$/.test(lowerName)) {
-                    addMessage('“'+file.name+'” is an old Word/PowerPoint format that I cannot read. Please save it as .docx / .pptx or PDF and attach it again.','system');
-                    continue;
-                }
-                if (mime==='application/octet-stream' || !mime) {
-                    var guess={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',heic:'image/heic',heif:'image/heif'}[(lowerName.split('.').pop()||'')];
-                    if (guess) mime=guess;
-                }
-                if (!(/^image\//.test(mime) || mime==='application/pdf')) {
-                    addMessage('I cannot read “'+file.name+'” (unsupported file type). Please attach a PDF, image, Word, PowerPoint, Excel or text file.','system');
-                    continue;
-                }
-                attachments.push({name:file.name,mimeType:mime,data:await fileToBase64(file)});
-            }
-            // Keep the file for follow-up messages ("now give me 10 more"), re-sending it when the new message refers to it.
-            if (attachments.length) {
-                lastAttachments={items:attachments.slice(), names:files.map(function(f){return f.name;})};
-            } else if (lastAttachments && lastAttachments.items.length && text && FOLLOW_UP_RE.test(text)) {
-                var binaryChars=0;
-                lastAttachments.items.forEach(function(it){ if (it.data) binaryChars += it.data.length; });
-                var reusable=lastAttachments.items.filter(function(it){ return binaryChars <= 12000000 || !it.data; });
-                if (reusable.length) {
-                    attachments=reusable.slice();
-                    addMessage('Using your earlier file: '+lastAttachments.names.join(', '),'system');
+                var extracted='';
+                try { extracted=await extractTextAttachment(file); } catch(extractErr) { extracted=''; }
+                if (extracted.trim()) {
+                    attachments.push({name:file.name,mimeType:'text/plain',text:extracted});
+                } else if (/^image\/(jpeg|png|gif|webp)$/i.test(mime)) {
+                    attachments.push({name:file.name,mimeType:mime,data:await fileToBase64(file)});
+                } else {
+                    attachments.push({name:file.name,mimeType:mime,text:'[CleverBot could not extract text from this file in the browser. If it is a scanned PDF/image, please attach it as an image/PDF or use a text-readable version.]'});
                 }
             }
-            if (!attachments.length && !text) {
-                if (typing.parentNode) typing.parentNode.removeChild(typing);
-                return;
-            }
-            var history=botHistory.slice(-20);
+            var history=botHistory.slice(-12);
             history=history.filter(function(h){ return !(h.role==='user' && /^📎 /.test(h.text)); });
-            coldTimer=setTimeout(function(){ var l=typing.querySelector('.cleverbot-typing-label'); if(l) l.textContent='Waking up the server (can take up to a minute)'; },6000);
-            if (ctrl) hardTimer=setTimeout(function(){ ctrl.abort(); },300000);
-            var res=await fetch(BACKEND_URL+'/api/cleverbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history,context:getContext(),attachments:attachments}),signal:ctrl?ctrl.signal:undefined});
-            clearTimeout(coldTimer);
+            var res=await fetch(BACKEND_URL+'/api/cleverbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history,context:getContext(),attachments:attachments})});
             if (typing.parentNode) typing.parentNode.removeChild(typing);
             streamMessage=createStreamingMessage();
-            // The server sends a heartbeat every second; 30 seconds of total silence means the connection died.
-            lastActivity=Date.now();
-            watchdog=setInterval(function(){ if(Date.now()-lastActivity>30000 && ctrl) ctrl.abort(); },5000);
-            var reply=await consumeCleverBotStream(res,streamMessage,function(){ lastActivity=Date.now(); });
+            var reply=await consumeCleverBotStream(res,streamMessage);
             if(!reply){ streamMessage.el.parentNode && streamMessage.el.parentNode.removeChild(streamMessage.el); addMessage('I’m sorry, I could not generate a response.','bot'); }
             else botHistory.push({role:'assistant',text:reply});
         } catch(e){
             if (typing.parentNode) typing.parentNode.removeChild(typing);
             if(streamMessage && streamMessage.el.parentNode) streamMessage.el.parentNode.removeChild(streamMessage.el);
-            var shown=(e && e.name==='AbortError') ? 'CleverBot took too long to respond. Please try again.' : (e.message||'I could not connect to CleverBot right now. Please check your internet connection and try again.');
-            addMessage(shown,'bot');
-        } finally { clearTimeout(coldTimer); clearTimeout(hardTimer); clearInterval(watchdog); sendBtn.disabled=false; input.focus(); }
+            addMessage(e.message||'I could not connect to CleverBot right now. Please check your internet connection and try again.','bot');
+        } finally { sendBtn.disabled=false; input.focus(); }
     }
     sendBtn.addEventListener('click',sendMessage);
     input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
     input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,100)+'px'; });
 
-    async function blobToBase64(blob){ return await fileToBase64(new File([blob],'voice-message.webm',{type:blob.type||'audio/webm'})); }
-    micBtn.addEventListener('click',async function(){
-        if (recorder && recorder.state==='recording'){ recorder.stop(); return; }
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ addMessage('Voice recording is not supported by this browser.','system'); return; }
-        try {
-            var stream=await navigator.mediaDevices.getUserMedia({audio:true});
-            audioChunks=[]; recorder=new MediaRecorder(stream);
-            recorder.ondataavailable=function(e){if(e.data.size)audioChunks.push(e.data);};
-            recorder.onstop=async function(){
-                stream.getTracks().forEach(function(t){t.stop();}); micBtn.classList.remove('recording'); micBtn.innerHTML='<svg class="mic-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>';
-                var blob=new Blob(audioChunks,{type:recorder.mimeType||'audio/webm'});
-                if(blob.size>8*1024*1024){addMessage('That recording is too large. Please record a shorter message.','system');return;}
-                addMessage('🎤 Voice message','user'); var typing=addTyping();
-                try{
-                    var data64=await blobToBase64(blob);
-                    var transRes=await fetch(BACKEND_URL+'/api/cleverbot/voice-transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:data64,mimeType:blob.type||'audio/webm'})});
-                    var transText=await transRes.text(); var transData={};
-                    try{transData=JSON.parse(transText);}catch(_){transData={error:transText};}
-                    if(typing.parentNode)typing.parentNode.removeChild(typing);
-                    if(!transRes.ok || !transData.transcript){ addMessage(transData.error||'I could not recognize the speech in that recording. Please try again.','bot'); return; }
-                    input.value=transData.transcript;
-                    input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,100)+'px';
-                    await sendMessage();
-                }catch(e){if(typing.parentNode)typing.parentNode.removeChild(typing);addMessage(e.message||'I could not process the voice message. Please try again.','bot');}
-            };
-            recorder.start(); micBtn.classList.add('recording'); micBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/></svg>';
-        } catch(e){ addMessage('Microphone access was not granted. Please allow microphone access and try again.','system'); }
+    // Voice input uses the browser's speech-recognition engine, so CleverBot no
+    // longer depends on a cloud AI service for audio transcription.
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var speechRecognizer = null;
+    var speechListening = false;
+    micBtn.addEventListener('click',function(){
+        if(!SpeechRecognition){ addMessage('Voice input is not available in this browser. Please use Chrome on Android or type your message.','system'); return; }
+        if(speechListening && speechRecognizer){ speechRecognizer.stop(); return; }
+        speechRecognizer=new SpeechRecognition();
+        speechRecognizer.lang='en-NG';
+        speechRecognizer.interimResults=true;
+        speechRecognizer.continuous=false;
+        var finalText='';
+        speechRecognizer.onstart=function(){ speechListening=true; micBtn.classList.add('recording'); micBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/></svg>'; };
+        speechRecognizer.onresult=function(event){
+            var interim='';
+            for(var i=event.resultIndex;i<event.results.length;i++){
+                var part=event.results[i][0].transcript;
+                if(event.results[i].isFinal) finalText+=part+' '; else interim+=part;
+            }
+            input.value=(finalText+interim).trim();
+            input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,100)+'px';
+        };
+        speechRecognizer.onerror=function(event){
+            speechListening=false; micBtn.classList.remove('recording');
+            micBtn.innerHTML='<svg class="mic-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>';
+            if(event.error!=='aborted') addMessage('I could not recognize that voice message. Please try again or type it.','bot');
+        };
+        speechRecognizer.onend=function(){
+            speechListening=false; micBtn.classList.remove('recording');
+            micBtn.innerHTML='<svg class="mic-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3.5M8.5 21.5h7"/></svg>';
+            if(finalText.trim()){ input.value=finalText.trim(); input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,100)+'px'; sendMessage(); }
+        };
+        try{ speechRecognizer.start(); }catch(e){ speechListening=false; }
     });
 
     // Draggable floating icon; position persists locally.
