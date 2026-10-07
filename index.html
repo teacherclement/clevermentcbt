@@ -31,7 +31,7 @@
     <!-- Header -->
     <div class="header" id="mainHeader">
         <div class="logo">
-            <img src="logo.png" alt="CleverMent Logo" class="logo-image">
+            <img src="https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg" alt="CleverMent Logo" class="logo-image">
         </div>
         <p class="tagline">Intelligent Assessment. Instant Feedback.</p>
     </div>
@@ -214,7 +214,7 @@
                     <div style="position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center;">
 
                         <!-- LOGO -->
-                        <img src="logo.png" alt="CleverMent Logo" style="width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
+                        <img src="https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg" alt="CleverMent Logo" style="width:27mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact;">
 
                         <!-- CERTIFICATE TITLE -->
                         <h1 style="margin:0; font-size:32pt; line-height:1.05; letter-spacing:4px; color:#1a1a2e; font-weight:bold; text-transform:uppercase; font-family:Georgia, 'Times New Roman', serif;">CERTIFICATE</h1>
@@ -392,7 +392,7 @@
             <aside class="dash-sidebar">
                 <button type="button" class="sidebar-collapse-toggle" onclick="toggleDashSidebarCollapse('teacherDashboard', this)" aria-label="Collapse sidebar" title="Collapse sidebar"><span aria-hidden="true">‹</span></button>
                 <div class="dash-branding">
-                    <img src="logo.png" alt="CleverMent Logo" class="dash-logo-image">
+                    <img src="https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg" alt="CleverMent Logo" class="dash-logo-image">
                     <p class="dash-tagline">Intelligent Assessment. Instant Feedback.</p>
                 </div>
                 <nav>
@@ -756,7 +756,7 @@
             <aside class="dash-sidebar">
                 <button type="button" class="sidebar-collapse-toggle" onclick="toggleDashSidebarCollapse('adminDashboard', this)" aria-label="Collapse sidebar" title="Collapse sidebar"><span aria-hidden="true">‹</span></button>
                 <div class="dash-branding">
-                    <img src="logo.png" alt="CleverMent Logo" class="dash-logo-image">
+                    <img src="https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg" alt="CleverMent Logo" class="dash-logo-image">
                     <p class="dash-tagline">Intelligent Assessment. Instant Feedback.</p>
                 </div>
                 <nav>
@@ -979,12 +979,26 @@
 <!-- ===== CleverBot floating AI assistant ===== -->
 <div id="cleverBotRoot" aria-live="polite">
   <button id="cleverBotFloat" type="button" aria-label="Open CleverBot" title="CleverBot">
-    <span class="cleverbot-mark">✦</span>
+    <svg class="cleverbot-icon cleverbot-icon-float" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="5" y="6" width="14" height="13" rx="4"></rect>
+      <path d="M9 6V4.5M15 6V4.5M12 4.5V3"></path>
+      <circle cx="9.5" cy="12" r="1"></circle>
+      <circle cx="14.5" cy="12" r="1"></circle>
+      <path d="M9 15.5c1.7 1 4.3 1 6 0"></path>
+    </svg>
   </button>
   <section id="cleverBotPanel" class="cleverbot-panel" aria-label="CleverBot chat" hidden>
     <header class="cleverbot-header">
       <div class="cleverbot-title-wrap">
-        <div class="cleverbot-avatar">✦</div>
+        <div class="cleverbot-avatar" aria-hidden="true">
+          <svg class="cleverbot-icon cleverbot-icon-avatar" viewBox="0 0 24 24" focusable="false">
+            <rect x="5" y="6" width="14" height="13" rx="4"></rect>
+            <path d="M9 6V4.5M15 6V4.5M12 4.5V3"></path>
+            <circle cx="9.5" cy="12" r="1"></circle>
+            <circle cx="14.5" cy="12" r="1"></circle>
+            <path d="M9 15.5c1.7 1 4.3 1 6 0"></path>
+          </svg>
+        </div>
         <div><strong>CleverBot</strong><small>Your CleverMent assistant</small></div>
       </div>
       <button id="cleverBotClose" class="cleverbot-close" type="button" aria-label="Close CleverBot">×</button>
@@ -1009,8 +1023,6 @@
 </div>
 
 <script src="script.js"></script>
-    <!-- CleverMent 3D layer: additive decorative effects, fails silently -->
-    <script src="cleverment-3d.js"></script>
 
 <!-- ===== PUBLISHED ASSESSMENT QUESTION EDITOR ===== -->
 <div id="assessmentEditorModal" style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(15,23,42,.62); align-items:center; justify-content:center; padding:14px; box-sizing:border-box;">
