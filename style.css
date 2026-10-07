@@ -1835,3 +1835,7 @@ html, body {
 .cb-btn:hover{background:#334155}
 .cb-code pre{margin:0;padding:10px 12px;overflow:auto;max-height:360px;white-space:pre;color:#e2e8f0;font:11.5px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;-webkit-overflow-scrolling:touch}
 .cb-code pre code{white-space:pre;background:none;padding:0;font:inherit;color:inherit}
+
+/* CleverBot live status line (shown while the answer is being prepared) */
+.cleverbot-status{font-size:12px;font-style:italic;opacity:.75;margin-top:6px;animation:cleverbotStatusPulse 1.4s ease-in-out infinite}
+@keyframes cleverbotStatusPulse{0%,100%{opacity:.45}50%{opacity:.9}}

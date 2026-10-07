@@ -520,6 +520,8 @@ var EMAILJS_TEMPLATE_ID = 'template_q8w0apk';
 // ============================================================
 
 var BACKEND_URL = 'https://clevermentcbt-backend.onrender.com';
+// Wake the free-plan server early so the first CleverBot message is not slow.
+try { fetch(BACKEND_URL + '/', { mode: 'no-cors', cache: 'no-store' }).catch(function(){}); } catch (e) {}
 
 
 if (typeof emailjs !== 'undefined' && emailjs.init) {
@@ -6437,7 +6439,7 @@ function cleverBotCopyValue(raw) {
         return {push:push, finish:finish, getText:getText, done:donePromise};
     }
 
-    async function consumeCleverBotStream(res, target){
+    async function consumeCleverBotStream(res, target, onActivity){
         if(!res.ok){
             var errorText=await res.text();
             var errorMsg='CleverBot is temporarily unavailable.';
@@ -6450,6 +6452,7 @@ function cleverBotCopyValue(raw) {
         var streamer=createTextStreamer(target);
         while(true){
             var part=await reader.read();
+            if(onActivity) onActivity();
             if(part.done) break;
             buffer += decoder.decode(part.value,{stream:true});
             var events=buffer.split(/\r?\n\r?\n/); buffer=events.pop()||'';
@@ -6460,7 +6463,15 @@ function cleverBotCopyValue(raw) {
                     try{
                         var obj=JSON.parse(raw);
                         if(obj.error) throw new Error(obj.error);
-                        if(obj.text) streamer.push(obj.text);
+                        if(obj.status){
+                            if(!target.statusEl){ target.statusEl=document.createElement('div'); target.statusEl.className='cleverbot-status'; target.el.insertBefore(target.statusEl, target.copyBtn); }
+                            target.statusEl.textContent=obj.status; target.statusEl.dataset.temp=obj.temp?'1':'';
+                            messages.scrollTop=messages.scrollHeight;
+                        }
+                        if(obj.text){
+                            if(target.statusEl && target.statusEl.dataset.temp==='1'){ target.statusEl.parentNode && target.statusEl.parentNode.removeChild(target.statusEl); target.statusEl=null; }
+                            streamer.push(obj.text);
+                        }
                     }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
                 });
             });
@@ -6473,6 +6484,7 @@ function cleverBotCopyValue(raw) {
                 if(obj.text) streamer.push(obj.text);
             }catch(e){ if(e && e.message && !/Unexpected token|JSON/.test(e.message)) throw e; }
         }
+        if(target.statusEl && target.statusEl.parentNode){ target.statusEl.parentNode.removeChild(target.statusEl); target.statusEl=null; }
         streamer.finish();
         // Do not expose the Copy button until the visible typewriter animation
         // has finished. This also ensures the final text is what gets copied.
@@ -6509,9 +6521,11 @@ function cleverBotCopyValue(raw) {
         }
         return parts.join('\n');
     }
+    var lastWarmPing=0;
     function openBot(){
         if (isStudentAssessment()) return;
         panel.hidden=false;
+        if (Date.now()-lastWarmPing>240000) { lastWarmPing=Date.now(); try { fetch(BACKEND_URL+'/',{mode:'no-cors',cache:'no-store'}).catch(function(){}); } catch(e){} }
         if (!messages.dataset.greeted) {
             addMessage('Hello! 👋 I’m CleverBot, your CleverMent assistant. How can I be of help today?', 'bot');
             messages.dataset.greeted='1';
@@ -6641,6 +6655,8 @@ function cleverBotCopyValue(raw) {
         input.value=''; input.style.height='auto'; sendBtn.disabled=true;
         var typing=addTyping();
         var streamMessage=null;
+        var coldTimer=null, hardTimer=null, watchdog=null, lastActivity=Date.now();
+        var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
         try {
             var attachments=[];
             var totalRawBytes=0;
@@ -6699,17 +6715,24 @@ function cleverBotCopyValue(raw) {
             }
             var history=botHistory.slice(-20);
             history=history.filter(function(h){ return !(h.role==='user' && /^📎 /.test(h.text)); });
-            var res=await fetch(BACKEND_URL+'/api/cleverbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history,context:getContext(),attachments:attachments})});
+            coldTimer=setTimeout(function(){ var l=typing.querySelector('.cleverbot-typing-label'); if(l) l.textContent='Waking up the server (can take up to a minute)'; },6000);
+            if (ctrl) hardTimer=setTimeout(function(){ ctrl.abort(); },300000);
+            var res=await fetch(BACKEND_URL+'/api/cleverbot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,history:history,context:getContext(),attachments:attachments}),signal:ctrl?ctrl.signal:undefined});
+            clearTimeout(coldTimer);
             if (typing.parentNode) typing.parentNode.removeChild(typing);
             streamMessage=createStreamingMessage();
-            var reply=await consumeCleverBotStream(res,streamMessage);
+            // The server sends a heartbeat every second; 30 seconds of total silence means the connection died.
+            lastActivity=Date.now();
+            watchdog=setInterval(function(){ if(Date.now()-lastActivity>30000 && ctrl) ctrl.abort(); },5000);
+            var reply=await consumeCleverBotStream(res,streamMessage,function(){ lastActivity=Date.now(); });
             if(!reply){ streamMessage.el.parentNode && streamMessage.el.parentNode.removeChild(streamMessage.el); addMessage('I’m sorry, I could not generate a response.','bot'); }
             else botHistory.push({role:'assistant',text:reply});
         } catch(e){
             if (typing.parentNode) typing.parentNode.removeChild(typing);
             if(streamMessage && streamMessage.el.parentNode) streamMessage.el.parentNode.removeChild(streamMessage.el);
-            addMessage(e.message||'I could not connect to CleverBot right now. Please check your internet connection and try again.','bot');
-        } finally { sendBtn.disabled=false; input.focus(); }
+            var shown=(e && e.name==='AbortError') ? 'CleverBot took too long to respond. Please try again.' : (e.message||'I could not connect to CleverBot right now. Please check your internet connection and try again.');
+            addMessage(shown,'bot');
+        } finally { clearTimeout(coldTimer); clearTimeout(hardTimer); clearInterval(watchdog); sendBtn.disabled=false; input.focus(); }
     }
     sendBtn.addEventListener('click',sendMessage);
     input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
