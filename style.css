@@ -1849,7 +1849,7 @@ html, body {
     padding:0!important;margin:0!important;border:0!important;border-radius:50%!important;aspect-ratio:1/1;flex:none;
     background:#2d6cdf!important;color:#fff;font-size:0;line-height:1;
     box-shadow:0 6px 20px rgba(45,108,223,.5),0 0 0 3px rgba(255,255,255,.12)!important;
-    display:flex!important;align-items:center;justify-content:center;
+    display:flex;align-items:center;justify-content:center;
 }
 #cleverBotFloat svg{width:30px;height:30px;display:block}
 @media(max-width:600px){#cleverBotFloat{width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important;max-width:52px!important;max-height:52px!important}}
@@ -1887,3 +1887,10 @@ html, body {
 
 /* Hide the floating WhatsApp button while a student is taking an assessment */
 body.cb-assessment-active #whatsappFloatBtn{display:none!important}
+
+/* Students taking an assessment never see CleverBot (teacher tool) or WhatsApp */
+body.cb-assessment-active #cleverBotFloat,
+body.cb-assessment-active #cleverBotPanel{display:none!important}
+
+/* Collapsed sidebar shows the CM emblem only (browsers without support just show the small full logo) */
+.dash-layout.sidebar-collapsed .dash-logo-image{content:url('logo-icon.png')}

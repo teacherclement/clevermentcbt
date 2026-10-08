@@ -1,3 +1,15 @@
+// Brand icons: browser tab icon and home-screen icon use the CleverMent logo files.
+(function setBrandIcons(){
+    try {
+        var apple = document.querySelector('link[rel="apple-touch-icon"]');
+        if (!apple) { apple = document.createElement('link'); apple.rel = 'apple-touch-icon'; document.head.appendChild(apple); }
+        apple.href = 'apple-touch-icon.png';
+        var fav = document.querySelector('link[rel="icon"]');
+        if (!fav) { fav = document.createElement('link'); fav.rel = 'icon'; document.head.appendChild(fav); }
+        fav.type = 'image/png'; fav.href = 'favicon-64.png';
+    } catch (e) {}
+})();
+
 // ============================================================
 // READ CODE FROM URL
 // ============================================================
