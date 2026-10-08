@@ -6297,6 +6297,17 @@ function cleverBotCopyValue(raw) {
     var attachBox = document.getElementById('cleverBotAttachments');
     if (!floatBtn || !panel || !messages || !input) return;
 
+    // One robot icon for the floating button and the chat header (replaces the old dark oval / sparkle).
+    var BOT_ICON_SVG = '<svg viewBox="0 0 32 32" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M16 8V5"/><circle cx="16" cy="3.8" r="1.6" fill="#fff" stroke="none"/>' +
+        '<rect x="6" y="8" width="20" height="15" rx="5"/>' +
+        '<circle cx="12" cy="15" r="2" fill="#fff" stroke="none"/><circle cx="20" cy="15" r="2" fill="#fff" stroke="none"/>' +
+        '<path d="M12.5 19.3c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2"/>' +
+        '<path d="M3 14v5M29 14v5"/></svg>';
+    floatBtn.innerHTML = BOT_ICON_SVG;
+    var headerAvatar = panel.querySelector('.cleverbot-avatar');
+    if (headerAvatar) headerAvatar.innerHTML = BOT_ICON_SVG;
+
     var botHistory = [];
     var pendingFiles = [];
     var recorder = null;
@@ -6367,10 +6378,28 @@ function cleverBotCopyValue(raw) {
         // (Stripping "__" used to destroy fill-in blanks such as _____ .)
         return String(text || '');
     }
+    // Draws equations (KaTeX) inside a chat reply. Code blocks such as the CSV box are skipped automatically.
+    function cbRenderMath(el){
+        if (typeof renderMathInElement !== 'function') return;
+        try {
+            renderMathInElement(el, {
+                delimiters: [
+                    { left: '$$', right: '$$', display: true },
+                    { left: '\\[', right: '\\]', display: true },
+                    { left: '\\(', right: '\\)', display: false },
+                    { left: '$', right: '$', display: false }
+                ],
+                throwOnError: false
+            });
+        } catch (e) {}
+    }
     function renderBotBody(target, text, final){
         target.raw = text;
         target.body.classList.add('md');
         target.body.innerHTML = cleverBotRenderMarkdown(text, { final: !!final });
+        clearTimeout(target.mathTimer);
+        if (final) cbRenderMath(target.body);
+        else target.mathTimer = setTimeout(function(){ cbRenderMath(target.body); }, 400);
     }
     function copyText(value, done){
         if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(value).then(done).catch(function(){ fallbackCopy(value, done); });

@@ -1839,3 +1839,48 @@ html, body {
 /* CleverBot live status line (shown while the answer is being prepared) */
 .cleverbot-status{font-size:12px;font-style:italic;opacity:.75;margin-top:6px;animation:cleverbotStatusPulse 1.4s ease-in-out infinite}
 @keyframes cleverbotStatusPulse{0%,100%{opacity:.45}50%{opacity:.9}}
+
+
+/* ============================================================
+   CLEVERBOT - round bot launcher + dark chat theme
+   ============================================================ */
+#cleverBotFloat{
+    width:56px!important;height:56px!important;min-width:56px!important;min-height:56px!important;max-width:56px!important;max-height:56px!important;
+    padding:0!important;margin:0!important;border:0!important;border-radius:50%!important;aspect-ratio:1/1;flex:none;
+    background:#2d6cdf!important;color:#fff;font-size:0;line-height:1;
+    box-shadow:0 6px 20px rgba(45,108,223,.5),0 0 0 3px rgba(255,255,255,.12)!important;
+    display:flex!important;align-items:center;justify-content:center;
+}
+#cleverBotFloat svg{width:30px;height:30px;display:block}
+@media(max-width:600px){#cleverBotFloat{width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important;max-width:52px!important;max-height:52px!important}}
+.cleverbot-avatar svg{width:22px;height:22px;display:block}
+
+.cleverbot-panel{background:#0f1220!important;border:1px solid #262b45!important;color:#e6e9f5;box-shadow:0 14px 45px rgba(0,0,0,.55)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+.cleverbot-header{background:#0a0c18;border-bottom:1px solid #1f2440}
+.cleverbot-messages{background:#0f1220}
+.cleverbot-msg.bot{background:#181c33;border-color:#262b45;color:#e6e9f5}
+.cleverbot-msg.user{background:#2d6cdf;color:#fff}
+.cleverbot-msg.system{background:#1a1f38;color:#9aa6c4}
+.cleverbot-copy{background:#1f2440;border-color:#2e3558;color:#c3cbe6}
+.cleverbot-copy:hover{background:#283058;color:#fff}
+.cleverbot-copy.copied{background:#12301f;border-color:#235c3a;color:#6ee7a0}
+.cleverbot-copy.copied svg{stroke:#6ee7a0}
+.cleverbot-attachments{background:#0f1220;border-top:1px solid #1f2440}
+.cleverbot-attachment-chip{background:#1f2440;color:#c3cbe6}
+.cleverbot-attachment-chip button{color:#9aa6c4}
+.cleverbot-composer{background:#0a0c18;border-top:1px solid #1f2440}
+.cleverbot-composer textarea{background:#181c33;border-color:#2e3558;color:#e6e9f5}
+.cleverbot-composer textarea::placeholder{color:#7f8aaa}
+.cleverbot-composer textarea:focus{border-color:#4d86f0}
+.cleverbot-tool{color:#a9b4d4}
+.cleverbot-tool:hover{background:#1f2440;color:#fff}
+.cleverbot-note{background:#0a0c18;color:#7f8aaa}
+.cleverbot-typing span{background:#7f8aaa}
+.cleverbot-msg-body.md a{color:#7aa7ff}
+.cleverbot-msg-body.md blockquote{border-left-color:#3a4478;color:#b6c0de;background:#141830}
+.cleverbot-msg-body.md hr{border-top-color:#2e3558}
+.cleverbot-msg-body.md code.cb-inline{background:#232a4d;color:#e6e9f5}
+.cb-table-wrap th,.cb-table-wrap td{border-color:#2e3558}
+.cb-table-wrap th{background:#1f2440}
+.cleverbot-msg-body .katex{font-size:1.05em}
+.cleverbot-msg-body .katex-display{overflow-x:auto;overflow-y:hidden;padding:2px 0}
