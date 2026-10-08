@@ -6171,10 +6171,10 @@ if (document.readyState === 'loading') {
         return target;
     }
 
-    // DeepSeek streams through the backend; the small client-side queue keeps the
+    // OpenRouter streams through the backend; the small client-side queue keeps the
     // visible answer progressive even if a proxy batches several SSE chunks.
 
-    // DeepSeek can stream data to the backend in chunks, but a hosting proxy can
+    // OpenRouter can stream data to the backend in chunks, but a hosting proxy can
     // sometimes deliver several chunks together. We therefore render the
     // received text through a small client-side typewriter queue as well. This
     // guarantees that CleverBot visibly "types" its answer even when the
