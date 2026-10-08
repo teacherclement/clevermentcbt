@@ -4432,7 +4432,7 @@ function buildCertificateElement(data) {
 
     var logo = document.createElement('img');
     logo.src = 'logo.png';
-    logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
+    logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0';
     content.appendChild(logo);
 
     var h1 = document.createElement('div');
@@ -4679,7 +4679,7 @@ function downloadCertificateImage() {
     
     var logo = document.createElement('img');
     logo.src = 'logo.png';
-    logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0; background:#ffffff;';
+    logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0';
     content.appendChild(logo);
     
     var h1 = document.createElement('div');
