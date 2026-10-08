@@ -6526,6 +6526,8 @@ function cleverBotCopyValue(raw) {
     }
     function updateVisibility(){
         var hidden = isStudentAssessment();
+        // Students taking an assessment must not be distracted: hide the WhatsApp button (see style.css).
+        document.body.classList.toggle('cb-assessment-active', !!hidden);
         floatBtn.style.display = hidden ? 'none' : 'flex';
         floatBtn.style.pointerEvents = hidden ? 'none' : 'auto';
         floatBtn.setAttribute('aria-hidden', hidden ? 'true' : 'false');

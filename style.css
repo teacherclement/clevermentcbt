@@ -1884,3 +1884,6 @@ html, body {
 .cb-table-wrap th{background:#1f2440}
 .cleverbot-msg-body .katex{font-size:1.05em}
 .cleverbot-msg-body .katex-display{overflow-x:auto;overflow-y:hidden;padding:2px 0}
+
+/* Hide the floating WhatsApp button while a student is taking an assessment */
+body.cb-assessment-active #whatsappFloatBtn{display:none!important}
