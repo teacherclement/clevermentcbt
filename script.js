@@ -563,19 +563,26 @@ async function logTeacherActivity(teacherEmail, action, details) {
 // CSV HISTORY FUNCTIONS
 // ============================================================
 
-async function saveCSVHistory(teacherEmail, filename, questions, subject, className) {
+async function saveCSVHistory(teacherEmail, filename, questions, subject, className, settings) {
     try {
-        await supabase
+        var row = {
+            teacher_email: teacherEmail,
+            filename: filename,
+            question_count: questions.length,
+            subject: subject,
+            class_name: className,
+            file_content: questions,
+            created_at: new Date().toISOString()
+        };
+        // Settings (time, pass mark, shuffle...) are stored too so "Use Again"
+        // can restore the whole assessment. If the database column has not been
+        // added yet, fall back to saving without it.
+        var result = await supabase
             .from('cleverment_csv_history')
-            .insert([{
-                teacher_email: teacherEmail,
-                filename: filename,
-                question_count: questions.length,
-                subject: subject,
-                class_name: className,
-                file_content: questions,
-                created_at: new Date().toISOString()
-            }]);
+            .insert([Object.assign({}, row, { settings: settings || null })]);
+        if (result && result.error) {
+            await supabase.from('cleverment_csv_history').insert([row]);
+        }
     } catch(e) { console.error('CSV history error:', e); }
 }
 
@@ -644,47 +651,109 @@ function renderCSVHistory() {
     });
 }
 
+function setSelectValueEnsuringOption(selectEl, value, label) {
+    if (!selectEl) return;
+    var found = false;
+    for (var i = 0; i < selectEl.options.length; i++) {
+        if (selectEl.options[i].value === String(value)) { found = true; break; }
+    }
+    if (!found) {
+        var opt = document.createElement('option');
+        opt.value = String(value);
+        opt.textContent = label || String(value);
+        selectEl.appendChild(opt);
+    }
+    selectEl.value = String(value);
+}
+
+// Puts every saved publish setting back into the publish form.
+function applyTeacherPublishSettings(st) {
+    if (!st) return;
+    var timer = document.getElementById('teacherTimerSelect');
+    if (timer && st.timeLimit !== undefined && st.timeLimit !== null) {
+        var minutes = Math.round(Number(st.timeLimit) / 60);
+        setSelectValueEnsuringOption(timer, minutes, minutes === 0 ? 'No time limit' : (minutes + ' minutes'));
+    }
+    var pass = document.getElementById('teacherPassMark');
+    if (pass && st.passMark !== undefined && st.passMark !== null) pass.value = st.passMark;
+    var map = {
+        teacherShuffleQuestions: 'shuffle',
+        teacherCameraMonitoring: 'cameraMonitoring',
+        teacherNoiseMonitoring: 'noiseMonitoring',
+        teacherShowResults: 'showResults'
+    };
+    for (var id in map) {
+        var el = document.getElementById(id);
+        if (el && st[map[id]] !== undefined && st[map[id]] !== null) el.checked = !!st[map[id]];
+    }
+    var nameInput = document.getElementById('teacherCertName');
+    if (nameInput && st.certName) nameInput.value = st.certName;
+}
+
 function reuseCSV(id) {
     getCSVHistoryById(id).then(function(item) {
-        if (item && item.file_content) {
-            teacherQuestions = JSON.parse(JSON.stringify(item.file_content));
-            alert('Loaded ' + teacherQuestions.length + ' questions from "' + item.filename + '". You can now publish this assessment.');
-            
-            if (item.subject) {
-                var subjectSelect = document.getElementById('teacherSubjectSelect');
-                var customSubject = document.getElementById('teacherCustomSubject');
-                var found = false;
-                for (var i = 0; i < subjectSelect.options.length; i++) {
-                    if (subjectSelect.options[i].value === item.subject) {
-                        subjectSelect.value = item.subject;
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    subjectSelect.value = 'Other';
-                    customSubject.value = item.subject;
-                    document.querySelector('.custom-subject-wrapper-teacher').style.display = 'block';
+        if (!item || !item.file_content) {
+            alert('Could not load this saved assessment. Please try again.');
+            return;
+        }
+        teacherQuestions = JSON.parse(JSON.stringify(item.file_content));
+        var fileInput = document.getElementById('teacherCsvFile');
+        if (fileInput) fileInput.value = '';
+
+        if (item.subject) {
+            var subjectSelect = document.getElementById('teacherSubjectSelect');
+            var customSubject = document.getElementById('teacherCustomSubject');
+            var found = false;
+            for (var i = 0; i < subjectSelect.options.length; i++) {
+                if (subjectSelect.options[i].value === item.subject) {
+                    subjectSelect.value = item.subject;
+                    found = true;
+                    break;
                 }
             }
-            
-            if (item.class_name) {
-                var classSelect = document.getElementById('teacherClassSelect');
-                var customClass = document.getElementById('teacherCustomClass');
-                var foundClass = false;
-                for (var j = 0; j < classSelect.options.length; j++) {
-                    if (classSelect.options[j].value === item.class_name) {
-                        classSelect.value = item.class_name;
-                        foundClass = true;
-                        break;
-                    }
-                }
-                if (!foundClass) {
-                    classSelect.value = 'Other';
-                    customClass.value = item.class_name;
-                    document.querySelector('.custom-class-wrapper-teacher').style.display = 'block';
+            if (!found) {
+                subjectSelect.value = 'Other';
+                customSubject.value = item.subject;
+                document.querySelector('.custom-subject-wrapper-teacher').style.display = 'block';
+            } else {
+                document.querySelector('.custom-subject-wrapper-teacher').style.display = 'none';
+            }
+        }
+
+        if (item.class_name) {
+            var classSelect = document.getElementById('teacherClassSelect');
+            var customClass = document.getElementById('teacherCustomClass');
+            var foundClass = false;
+            for (var j = 0; j < classSelect.options.length; j++) {
+                if (classSelect.options[j].value === item.class_name) {
+                    classSelect.value = item.class_name;
+                    foundClass = true;
+                    break;
                 }
             }
+            if (!foundClass) {
+                classSelect.value = 'Other';
+                customClass.value = item.class_name;
+                document.querySelector('.custom-class-wrapper-teacher').style.display = 'block';
+            } else {
+                document.querySelector('.custom-class-wrapper-teacher').style.display = 'none';
+            }
+        }
+
+        applyTeacherPublishSettings(item.settings);
+
+        // Take the teacher straight to the publish form with everything filled in.
+        var note = document.getElementById('teacherLoadedSourceNote');
+        if (note) {
+            note.textContent = '\u2713 Loaded "' + item.filename + '" with ' + teacherQuestions.length + ' questions' +
+                (item.settings ? ' and all its saved settings' : ' (older upload: only subject and class were saved)') +
+                '. No file needed - review and tap Publish Assessment.';
+            note.style.display = 'block';
+        }
+        var navBtn = document.querySelector('#teacherDashboard [data-target="uploadSection"]');
+        showTeacherSection('uploadSection', navBtn || undefined);
+        if (note && note.scrollIntoView) {
+            setTimeout(function() { note.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
         }
     });
 }
@@ -714,6 +783,12 @@ var studentTimerInterval = null;
 var studentTimeRemaining = 0;
 var studentTimeLimit = 0;
 var studentQuizStartedAt = 0;
+var studentFastAnswerWarnings = 0;
+var studentQuestionShownAt = 0;
+var studentRecentPickGaps = [];
+var studentFastWarningOpen = false;
+var studentProgressTimer = null;
+var studentProgressDebounce = null;
 var studentQuizEndsAt = 0;
 var studentName = '';
 var studentAdmissionNumber = '';
@@ -1054,16 +1129,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     var signatureInput = document.getElementById('teacherCertSignature');
     if (signatureInput) {
-        signatureInput.addEventListener('change', function(e) {
-            var preview = document.getElementById('signaturePreview');
-            var img = document.getElementById('signaturePreviewImg');
+        signatureInput.addEventListener('change', handleSignatureFileChosen);
+    }
+
+    // Choosing a different CSV file means the teacher no longer wants the
+    // questions loaded from CSV history / question bank.
+    var csvFileInput = document.getElementById('teacherCsvFile');
+    if (csvFileInput) {
+        csvFileInput.addEventListener('change', function() {
             if (this.files && this.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function(event) {
-                    img.src = event.target.result;
-                    preview.style.display = 'block';
-                };
-                reader.readAsDataURL(this.files[0]);
+                teacherQuestions = [];
+                var note = document.getElementById('teacherLoadedSourceNote');
+                if (note) note.style.display = 'none';
             }
         });
     }
@@ -1105,15 +1182,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     var codeFromURL = getCodeFromURL();
-    if (codeFromURL) {
-        setTimeout(function() {
-            var codeInput = document.getElementById('assessmentCode');
-            if (codeInput) {
-                codeInput.value = codeFromURL;
-            }
-            verifyAssessmentCode();
-        }, 500);
-    }
 
     checkForPaymentCallback().then(function(paymentHandled) {
         if (paymentHandled) return;
@@ -1126,6 +1194,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     var page = getPageFromURL();
                     if (page) showPageFromURL(page);
                     else if (!getCodeFromURL()) resumeSignedInDashboard();
+                    // A student opening the shared assessment link. This now runs
+                    // only AFTER the saved-attempt check, so it can never cover
+                    // up (or reset) an assessment that is already in progress.
+                    if (codeFromURL) {
+                        var codeInput = document.getElementById('assessmentCode');
+                        if (codeInput) codeInput.value = codeFromURL;
+                        verifyAssessmentCode();
+                    }
                 }
             });
         });
@@ -1746,6 +1822,137 @@ async function savePublishedAssessmentToDatabase(assessment) {
     }
 }
 
+
+// ============================================================
+// TEACHER PROFILE: signature + certificate name saved once
+// ============================================================
+
+var teacherProfile = { loaded: false, email: '', certName: '', signature: '' };
+
+async function loadTeacherProfile(force) {
+    var email = currentTeacher ? currentTeacher.email : '';
+    var token = localStorage.getItem('cleverment_teacher_token');
+    if (!email || !token) return;
+    if (teacherProfile.loaded && teacherProfile.email === email && !force) {
+        applyTeacherProfileToForm();
+        return;
+    }
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/profile', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        var data = await res.json();
+        if (res.ok) {
+            teacherProfile = {
+                loaded: true,
+                email: email,
+                certName: data.certName || '',
+                signature: data.signature || ''
+            };
+        }
+    } catch (e) { /* offline: the form simply shows no saved signature */ }
+    applyTeacherProfileToForm();
+}
+
+function applyTeacherProfileToForm() {
+    var box = document.getElementById('signatureSavedBox');
+    var img = document.getElementById('signaturePreviewImg');
+    if (box && img) {
+        if (teacherProfile.signature) {
+            img.src = teacherProfile.signature;
+            box.style.display = 'block';
+        } else {
+            box.style.display = 'none';
+        }
+    }
+    var nameInput = document.getElementById('teacherCertName');
+    if (nameInput && !nameInput.value.trim() && teacherProfile.certName) {
+        nameInput.value = teacherProfile.certName;
+    }
+}
+
+async function saveTeacherProfile(fields) {
+    var token = localStorage.getItem('cleverment_teacher_token');
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify(fields)
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            alert(data.error || 'Could not save your profile.');
+            return false;
+        }
+        return true;
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection and try again.');
+        return false;
+    }
+}
+
+// Shrinks the signature image (keeps transparency) so it stays small and quick.
+function prepareSignatureImage(file) {
+    return new Promise(function(resolve, reject) {
+        var reader = new FileReader();
+        reader.onerror = function() { reject(new Error('Could not read that image.')); };
+        reader.onload = function(e) {
+            var img = new Image();
+            img.onerror = function() { reject(new Error('That file is not a valid image.')); };
+            img.onload = function() {
+                var maxW = 600, maxH = 240;
+                var scale = Math.min(1, maxW / img.width, maxH / img.height);
+                var w = Math.max(1, Math.round(img.width * scale));
+                var h = Math.max(1, Math.round(img.height * scale));
+                var canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function handleSignatureFileChosen() {
+    var input = this;
+    var file = input.files && input.files[0];
+    if (!file) return;
+    try {
+        if (!/^image\//i.test(file.type)) {
+            alert('Please choose an image file (PNG or JPG).');
+            return;
+        }
+        if (file.size > 8 * 1024 * 1024) {
+            alert('That image is too large. Please choose one under 8 MB.');
+            return;
+        }
+        var dataUrl = await prepareSignatureImage(file);
+        var ok = await saveTeacherProfile({ signature: dataUrl });
+        if (ok) {
+            teacherProfile.signature = dataUrl;
+            teacherProfile.loaded = true;
+            teacherProfile.email = currentTeacher ? currentTeacher.email : teacherProfile.email;
+            applyTeacherProfileToForm();
+        }
+    } catch (err) {
+        alert(err.message || 'Could not use that image.');
+    } finally {
+        input.value = '';
+    }
+}
+
+async function removeSavedSignature() {
+    if (!confirm('Remove your saved signature? New certificates will have no signature until you upload one again.')) return;
+    var ok = await saveTeacherProfile({ signature: '' });
+    if (ok) {
+        teacherProfile.signature = '';
+        applyTeacherProfileToForm();
+    }
+}
+
 function teacherPublishAssessment() {
     var subjectSelect = document.getElementById('teacherSubjectSelect');
     var customInput = document.getElementById('teacherCustomSubject');
@@ -1784,8 +1991,6 @@ function teacherPublishAssessment() {
     }
 
     var teacherCertName = document.getElementById('teacherCertName').value.trim();
-    var signatureInput = document.getElementById('teacherCertSignature');
-    var teacherSignature = '';
 
     var availableFromRaw = document.getElementById('teacherAvailableFrom').value;
     var availableUntilRaw = document.getElementById('teacherAvailableUntil').value;
@@ -1794,15 +1999,15 @@ function teacherPublishAssessment() {
         return;
     }
 
-    if (signatureInput.files && signatureInput.files[0]) {
-        var reader = new FileReader();
-        reader.onload = function(e) {
-            teacherSignature = e.target.result;
-            proceedWithPublish(subject, className, teacherCertName, teacherSignature);
-        };
-        reader.readAsDataURL(signatureInput.files[0]);
+    // The signature comes from the teacher's saved profile - no upload needed
+    // each time.
+    function goPublish() {
+        proceedWithPublish(subject, className, teacherCertName, teacherProfile.signature || '');
+    }
+    if (!teacherProfile.loaded) {
+        loadTeacherProfile().then(goPublish);
     } else {
-        proceedWithPublish(subject, className, teacherCertName, teacherSignature);
+        goPublish();
     }
 }
 
@@ -1873,7 +2078,15 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
 
     if (teacherQuestions.length > 0) {
         var filename = subject + '_' + className + '_' + new Date().toISOString().slice(0,10) + '.csv';
-        saveCSVHistory(assessment.teacherEmail, filename, teacherQuestions, subject, className);
+        saveCSVHistory(assessment.teacherEmail, filename, teacherQuestions, subject, className, {
+            timeLimit: timeLimit,
+            shuffle: shuffle,
+            cameraMonitoring: cameraMonitoring,
+            noiseMonitoring: noiseMonitoring,
+            showResults: showResults,
+            passMark: passMark,
+            certName: teacherCertName || ''
+        });
     }
 
     var published = getPublishedAssessmentsLocal();
@@ -1911,9 +2124,15 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
     document.getElementById('teacherSubjectSelect').value = '';
     document.getElementById('teacherCustomSubject').value = '';
     document.querySelector('.custom-subject-wrapper-teacher').style.display = 'none';
-    document.getElementById('teacherCertName').value = '';
+    // Remember the certificate name for next time (the signature is already saved).
+    if (teacherCertName && teacherCertName !== teacherProfile.certName) {
+        teacherProfile.certName = teacherCertName;
+        saveTeacherProfile({ certName: teacherCertName });
+    }
+    document.getElementById('teacherCertName').value = teacherProfile.certName || '';
     document.getElementById('teacherCertSignature').value = '';
-    document.getElementById('signaturePreview').style.display = 'none';
+    var loadedNote = document.getElementById('teacherLoadedSourceNote');
+    if (loadedNote) loadedNote.style.display = 'none';
 
     alert('Assessment published successfully!\n\nAssessment Code: ' + code + '\n\nShare this code with your students.');
 
@@ -1975,7 +2194,7 @@ async function renderTeacherPublishedList() {
             '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
             '<span style="background:#eef6ff; padding:4px 12px; border-radius:6px; font-weight:600; font-size:13px; color:#2d6cdf;">Code: ' + a.code + '</span>' +
             '<button onclick="copyAssessmentCode(\'' + a.code + '\')" class="secondary-btn" style="font-size:12px; padding:4px 12px;">Copy Code</button>' +
-            '<button onclick="openAssessmentEditor(' + a.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#2d6cdf; color:white;">Edit Questions</button>' +
+            '<button onclick="openAssessmentEditor(' + a.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#2d6cdf; color:white;">Edit Assessment</button>' +
             '<button onclick="deletePublishedAssessment(' + a.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#dc3545; color:white;">Delete</button>' +
             '</div></div>';
     }
@@ -1992,6 +2211,126 @@ async function renderTeacherPublishedList() {
 var currentAssessmentBeingEdited = null;
 var assessmentEditorDraftMode = false;
 var assessmentImageUploadQuestionIndex = -1;
+
+
+// ============================================================
+// EDIT ASSESSMENT: settings panel (class, subject, certificate name, time,
+// pass mark, monitoring, shuffle, show results) shown above the questions.
+// ============================================================
+
+function aeOptionsFromSource(sourceId, current) {
+    var src = document.getElementById(sourceId);
+    var html = '';
+    var found = false;
+    if (src) {
+        for (var i = 0; i < src.options.length; i++) {
+            var o = src.options[i];
+            if (!o.value || o.value === 'Other') continue;
+            var sel = (o.value === current);
+            if (sel) found = true;
+            html += '<option value="' + escapeAssessmentEditorHtml(o.value) + '"' + (sel ? ' selected' : '') + '>' + escapeAssessmentEditorHtml(o.textContent) + '</option>';
+        }
+    }
+    if (!found && current) {
+        html = '<option value="' + escapeAssessmentEditorHtml(current) + '" selected>' + escapeAssessmentEditorHtml(current) + '</option>' + html;
+    }
+    html += '<option value="__other">Other (type a new name)...</option>';
+    return html;
+}
+
+function aeToggleOther(selectEl, inputId) {
+    var input = document.getElementById(inputId);
+    if (!input) return;
+    input.style.display = selectEl.value === '__other' ? 'block' : 'none';
+    if (selectEl.value === '__other') input.focus();
+}
+
+function renderAssessmentEditorSettings(a) {
+    var box = document.getElementById('assessmentEditorSettings');
+    if (!box) return;
+
+    var minutes = Math.round((Number(a.timeLimit) || 0) / 60);
+    var timeSrc = document.getElementById('teacherTimerSelect');
+    var timeHtml = '';
+    var timeFound = false;
+    if (timeSrc) {
+        for (var i = 0; i < timeSrc.options.length; i++) {
+            var o = timeSrc.options[i];
+            var isSel = Number(o.value) === minutes;
+            if (isSel) timeFound = true;
+            timeHtml += '<option value="' + o.value + '"' + (isSel ? ' selected' : '') + '>' + escapeAssessmentEditorHtml(o.textContent) + '</option>';
+        }
+    }
+    if (!timeFound) {
+        timeHtml = '<option value="' + minutes + '" selected>' + minutes + ' minutes</option>' + timeHtml;
+    }
+
+    function toggle(id, label, desc, checked) {
+        return '<label class="assessment-settings-toggle" for="' + id + '">' +
+            '<span>' + label + (desc ? '<br><span style="font-weight:400; color:#6b7a8f; font-size:12px;">' + desc + '</span>' : '') + '</span>' +
+            '<input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + '></label>';
+    }
+
+    box.innerHTML =
+        '<div class="assessment-settings-box">' +
+            '<h4>Assessment Settings</h4>' +
+            '<p class="helper-text" style="margin:0;">Change anything below, edit the questions if you like, then tap Save Changes. The assessment code stays the same.</p>' +
+            '<div class="assessment-settings-grid">' +
+                '<div><label for="aeSubject">Subject</label>' +
+                    '<select id="aeSubject" class="form-input" onchange="aeToggleOther(this, \'aeSubjectOther\')">' + aeOptionsFromSource('teacherSubjectSelect', a.subject) + '</select>' +
+                    '<input id="aeSubjectOther" class="form-input" style="display:none; margin-top:6px;" placeholder="Type the subject name"></div>' +
+                '<div><label for="aeClass">Class</label>' +
+                    '<select id="aeClass" class="form-input" onchange="aeToggleOther(this, \'aeClassOther\')">' + aeOptionsFromSource('teacherClassSelect', a.className) + '</select>' +
+                    '<input id="aeClassOther" class="form-input" style="display:none; margin-top:6px;" placeholder="Type the class name"></div>' +
+                '<div><label for="aeCertName">Teacher\'s name on certificate</label>' +
+                    '<input id="aeCertName" class="form-input" value="' + escapeAssessmentEditorHtml(a.teacherName || '') + '"></div>' +
+                '<div><label for="aeTime">Time limit</label>' +
+                    '<select id="aeTime" class="form-input">' + timeHtml + '</select></div>' +
+                '<div><label for="aePassMark">Pass mark (%)</label>' +
+                    '<input id="aePassMark" type="number" min="0" max="100" class="form-input" value="' + (a.passMark !== undefined && a.passMark !== null ? a.passMark : 50) + '"></div>' +
+            '</div>' +
+            '<div class="assessment-settings-toggles">' +
+                toggle('aeCamera', 'Live monitoring: Camera', 'Checks the student stays visible on camera', a.cameraMonitoring) +
+                toggle('aeNoise', 'Live monitoring: Noise', 'Warns if the surroundings are noisy', a.noiseMonitoring) +
+                toggle('aeShuffle', 'Shuffle questions &amp; options', '', a.shuffle) +
+                toggle('aeShowResults', 'Show results &amp; certificate to student', '', a.showResults !== false) +
+            '</div>' +
+        '</div>';
+    box.style.display = 'block';
+}
+
+// Reads the settings panel. Returns { error } or { settings }.
+function collectAssessmentEditorSettings() {
+    function pick(selectId, otherId, label) {
+        var sel = document.getElementById(selectId);
+        if (!sel) return { error: label + ' is missing.' };
+        var v = sel.value;
+        if (v === '__other') v = (document.getElementById(otherId).value || '').trim();
+        if (!v) return { error: 'Please enter the ' + label.toLowerCase() + '.' };
+        return { value: v };
+    }
+    var subject = pick('aeSubject', 'aeSubjectOther', 'Subject');
+    if (subject.error) return { error: subject.error };
+    var cls = pick('aeClass', 'aeClassOther', 'Class');
+    if (cls.error) return { error: cls.error };
+
+    var pm = parseInt(document.getElementById('aePassMark').value, 10);
+    if (isNaN(pm) || pm < 0 || pm > 100) return { error: 'Pass mark must be a number from 0 to 100.' };
+
+    return {
+        settings: {
+            subject: subject.value,
+            className: cls.value,
+            teacherName: (document.getElementById('aeCertName').value || '').trim(),
+            timeLimit: (parseInt(document.getElementById('aeTime').value, 10) || 0) * 60,
+            passMark: pm,
+            cameraMonitoring: document.getElementById('aeCamera').checked,
+            noiseMonitoring: document.getElementById('aeNoise').checked,
+            shuffle: document.getElementById('aeShuffle').checked,
+            showResults: document.getElementById('aeShowResults').checked
+        }
+    };
+}
 
 function openAssessmentEditor(assessmentId) {
     var assessment = null;
@@ -2010,6 +2349,7 @@ function openAssessmentEditor(assessmentId) {
     assessmentEditorDraftMode = false;
     currentAssessmentBeingEdited = JSON.parse(JSON.stringify(assessment));
     renderAssessmentEditor();
+    renderAssessmentEditorSettings(currentAssessmentBeingEdited);
     var modal = document.getElementById('assessmentEditorModal');
     if (modal) {
         modal.style.display = 'flex';
@@ -2040,6 +2380,8 @@ async function openTeacherQuestionImageEditor() {
     }
 
     assessmentEditorDraftMode = true;
+    var draftSettingsBox = document.getElementById('assessmentEditorSettings');
+    if (draftSettingsBox) { draftSettingsBox.style.display = 'none'; draftSettingsBox.innerHTML = ''; }
     currentAssessmentBeingEdited = {
         id: null,
         code: '',
@@ -2060,6 +2402,8 @@ function closeAssessmentEditor() {
     var modal = document.getElementById('assessmentEditorModal');
     if (modal) modal.style.display = 'none';
     document.body.style.overflow = '';
+    var settingsBoxToClear = document.getElementById('assessmentEditorSettings');
+    if (settingsBoxToClear) { settingsBoxToClear.style.display = 'none'; settingsBoxToClear.innerHTML = ''; }
     currentAssessmentBeingEdited = null;
     assessmentEditorDraftMode = false;
     assessmentImageUploadQuestionIndex = -1;
@@ -2089,8 +2433,8 @@ function renderAssessmentEditor() {
         if (subtitle) subtitle.textContent = 'These are the questions you are preparing to publish. Add or replace images now; nothing is published until you click Publish Assessment.';
         if (saveBtn) saveBtn.textContent = 'Save Question Draft';
     } else {
-        title.textContent = 'Edit Questions — ' + a.subject + ' (' + a.code + ')';
-        if (subtitle) subtitle.textContent = 'Changes are saved to this assessment without changing its code. Existing submitted results are not recalculated.';
+        title.textContent = 'Edit Assessment — ' + a.subject + ' (' + a.code + ')';
+        if (subtitle) subtitle.textContent = 'Update the settings and questions, then save. The assessment code does not change. Results already submitted are not recalculated.';
         if (saveBtn) saveBtn.textContent = 'Save Changes';
     }
 
@@ -2317,6 +2661,15 @@ async function saveAssessmentEditorChanges() {
         return;
     }
 
+    var collected = collectAssessmentEditorSettings();
+    if (collected.error) {
+        alert(collected.error);
+        var sb = document.getElementById('assessmentEditorSettings');
+        if (sb && sb.scrollIntoView) sb.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+    }
+    var editedSettings = collected.settings;
+
     var teacherToken = localStorage.getItem('cleverment_teacher_token');
     var saveBtn = document.getElementById('assessmentEditorSaveBtn');
     if (saveBtn) {
@@ -2331,7 +2684,7 @@ async function saveAssessmentEditorChanges() {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + teacherToken
             },
-            body: JSON.stringify({ questions: questions })
+            body: JSON.stringify(Object.assign({ questions: questions }, editedSettings))
         });
 
         var data = await res.json();
@@ -2357,16 +2710,25 @@ async function saveAssessmentEditorChanges() {
                 String(localPublished[k].code) === String(updated.code)) {
                 localPublished[k].questions = JSON.parse(JSON.stringify(updated.questions));
                 localPublished[k].code = updated.code;
+                localPublished[k].subject = updated.subject;
+                localPublished[k].className = updated.className;
+                localPublished[k].teacherName = updated.teacherName;
+                localPublished[k].timeLimit = updated.timeLimit;
+                localPublished[k].passMark = updated.passMark;
+                localPublished[k].shuffle = updated.shuffle;
+                localPublished[k].cameraMonitoring = updated.cameraMonitoring;
+                localPublished[k].noiseMonitoring = updated.noiseMonitoring;
+                localPublished[k].showResults = updated.showResults;
                 break;
             }
         }
         localStorage.setItem('cleverment_published', JSON.stringify(localPublished));
 
-        logTeacherActivity(updated.teacherEmail, 'edit_assessment', 'Edited questions: ' + updated.subject + ' | Class: ' + updated.className + ' | Code: ' + updated.code);
+        logTeacherActivity(updated.teacherEmail, 'edit_assessment', 'Edited assessment: ' + updated.subject + ' | Class: ' + updated.className + ' | Code: ' + updated.code);
 
         closeAssessmentEditor();
         await renderTeacherPublishedList();
-        alert('Assessment questions updated successfully. The assessment code remains ' + updated.code + '. Existing submitted results were not changed.');
+        alert('Assessment updated successfully. The assessment code remains ' + updated.code + '. Existing submitted results were not changed.');
     } catch (e) {
         alert('Could not save changes. Please check your connection and try again.');
     } finally {
@@ -3168,6 +3530,7 @@ function saveQuizState() {
         studentIsTimeUp: studentIsTimeUp,
         studentTabSwitchCount: studentTabSwitchCount,
         studentProctorStrikes: studentProctorStrikes,
+        studentFastAnswerWarnings: studentFastAnswerWarnings,
         assessmentTeacherName: window.assessmentTeacherName || '',
         assessmentTeacherSignature: window.assessmentTeacherSignature || ''
     };
@@ -3240,6 +3603,13 @@ async function restoreQuizState() {
             // assessment window must not strand a timed-out student. For other
             // rejection reasons (especially already_submitted), discard it.
             var deadlineExpired = savedLimit > 0 && savedEndsAt && Date.now() >= savedEndsAt;
+            if (deadlineExpired && eligibility.reason === 'already_submitted') {
+                // Time ran out while the student was away and the server has
+                // already submitted their saved answers for them.
+                clearQuizState();
+                showAutoSubmittedNotice();
+                return true;
+            }
             if (!(deadlineExpired && eligibility.reason === 'closed')) {
                 clearQuizState();
                 return false;
@@ -3267,6 +3637,7 @@ async function restoreQuizState() {
     studentIsTimeUp = state.studentIsTimeUp || false;
     studentTabSwitchCount = state.studentTabSwitchCount || 0;
     studentProctorStrikes = state.studentProctorStrikes || 0;
+    studentFastAnswerWarnings = state.studentFastAnswerWarnings || 0;
     window.assessmentTeacherName = state.assessmentTeacherName || '';
     window.assessmentTeacherSignature = state.assessmentTeacherSignature || '';
 
@@ -3312,6 +3683,7 @@ async function restoreQuizState() {
 
     updateURL('student-assessment');
     startStudentPresence();
+    startStudentProgressSync();
 
     if (currentAssessment.cameraMonitoring || currentAssessment.noiseMonitoring) {
         document.getElementById('proctorResumeOverlay').style.display = 'flex';
@@ -3340,8 +3712,15 @@ function registerTabSwitch() {
 }
 
 document.addEventListener('visibilitychange', function() {
-    if (document.hidden) registerTabSwitch();
+    if (document.hidden) {
+        registerTabSwitch();
+        syncStudentProgress(true);
+    } else {
+        studentCheckDeadlineNow();
+    }
 });
+window.addEventListener('pageshow', studentCheckDeadlineNow);
+window.addEventListener('pagehide', function() { syncStudentProgress(true); });
 
 // ============================================================
 // CAMERA & NOISE MONITORING (student quiz) - optional, per
@@ -3777,6 +4156,8 @@ function proceedToStartQuiz() {
     }
     studentTabSwitchCount = 0;
     studentProctorStrikes = 0;
+    studentFastAnswerWarnings = 0;
+    studentRecentPickGaps = [];
     studentEndReason = 'normal';
 
     document.getElementById('studentInfoForm').style.display = 'none';
@@ -3807,6 +4188,7 @@ function proceedToStartQuiz() {
     updateURL('student-assessment');
     saveQuizState();
     startStudentPresence();
+    startStudentProgressSync();
 
     if (currentAssessment.cameraMonitoring || currentAssessment.noiseMonitoring) {
         startProctorMonitoring();
@@ -3855,6 +4237,7 @@ function studentUpdateQuestionBoxes() {
 
 function studentDisplayQuestion() {
     var q = studentQuestions[studentCurrentIndex];
+    studentQuestionShownAt = Date.now();
     document.getElementById('studentQuestionText').textContent = (studentCurrentIndex + 1) + '. ' + q.question;
     document.getElementById('studentProgress').textContent = 'Q' + (studentCurrentIndex + 1) + ' of ' + studentQuestions.length;
 
@@ -3924,8 +4307,9 @@ function studentDisplayQuestion() {
 }
 
 function studentSelectOption(index) {
-    if (studentIsTimeUp) return;
+    if (studentIsTimeUp || studentFastWarningOpen) return;
     var letters = ['A', 'B', 'C', 'D'];
+    var wasFirstAnswer = studentAnswers[studentCurrentIndex] === null;
     studentAnswers[studentCurrentIndex] = letters[index];
 
     var options = document.querySelectorAll('#studentOptionsContainer .option');
@@ -3938,6 +4322,8 @@ function studentSelectOption(index) {
 
     studentUpdateQuestionBoxes();
     saveQuizState();
+    queueStudentProgressSync();
+    studentCheckFastAnswer(wasFirstAnswer);
 
     if (studentCurrentIndex < studentQuestions.length - 1) {
         setTimeout(function() {
@@ -3970,6 +4356,153 @@ function studentNextQuestion() {
 function studentUpdateNavigationButtons() {
     document.getElementById('studentPrevBtn').disabled = (studentCurrentIndex === 0);
     document.getElementById('studentNextBtn').disabled = (studentCurrentIndex === studentQuestions.length - 1);
+}
+
+// ============================================================
+// SERVER PROGRESS SAVE + DEADLINE CHECK
+// The browser saves the student's answers on the server every few seconds.
+// If the student leaves and the time runs out, the server submits those
+// answers automatically (see /api/quiz/progress in server.js).
+// ============================================================
+
+function studentQuizIsOnScreen() {
+    var sec = document.getElementById('studentQuizSection');
+    return !!sec && sec.style.display === 'block';
+}
+
+function studentCheckDeadlineNow() {
+    if (studentIsTimeUp || !studentQuizIsOnScreen()) return;
+    if (studentTimeLimit > 0 && studentQuizEndsAt && Date.now() >= studentQuizEndsAt) {
+        studentTimeUp();
+    }
+}
+
+function buildStudentAnswersPayload() {
+    var letters = ['A', 'B', 'C', 'D'];
+    var payload = [];
+    for (var i = 0; i < studentQuestions.length; i++) {
+        var q = studentQuestions[i];
+        var letterIdx = letters.indexOf(studentAnswers[i]);
+        var selectedText = letterIdx !== -1 ? (q.options[letterIdx] || null) : null;
+        payload.push({ originalIndex: q.originalIndex, selectedOptionText: selectedText });
+    }
+    return payload;
+}
+
+function syncStudentProgress(useKeepalive) {
+    if (studentIsTimeUp || !currentAssessmentCode || !studentName || !studentAdmissionNumber) return;
+    if (!studentQuestions || studentQuestions.length === 0 || !studentQuizIsOnScreen()) return;
+    try {
+        fetch(BACKEND_URL + '/api/quiz/progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            keepalive: !!useKeepalive,
+            body: JSON.stringify({
+                code: currentAssessmentCode,
+                studentName: studentName,
+                admissionNumber: studentAdmissionNumber,
+                answers: buildStudentAnswersPayload(),
+                tabSwitches: studentTabSwitchCount,
+                proctorViolations: studentProctorStrikes,
+                fastAnswerWarnings: studentFastAnswerWarnings
+            })
+        }).catch(function() { /* offline - the next sync will catch up */ });
+    } catch (e) { /* never let a background save disturb the quiz */ }
+}
+
+function queueStudentProgressSync() {
+    if (studentProgressDebounce) clearTimeout(studentProgressDebounce);
+    studentProgressDebounce = setTimeout(function() { syncStudentProgress(false); }, 1200);
+}
+
+function startStudentProgressSync() {
+    stopStudentProgressSync();
+    syncStudentProgress(false);
+    studentProgressTimer = setInterval(function() { syncStudentProgress(false); }, 10000);
+}
+
+function stopStudentProgressSync() {
+    if (studentProgressTimer) { clearInterval(studentProgressTimer); studentProgressTimer = null; }
+    if (studentProgressDebounce) { clearTimeout(studentProgressDebounce); studentProgressDebounce = null; }
+}
+
+// Shown when a student comes back after their time ended and the server has
+// already submitted their saved answers.
+function showAutoSubmittedNotice() {
+    stopStudentProgressSync();
+    document.querySelector('.header').style.display = 'block';
+    document.querySelector('.footer').style.display = 'block';
+    document.getElementById('landingPage').style.display = 'none';
+    document.getElementById('studentAccess').style.display = 'none';
+    document.getElementById('studentAssessmentView').style.display = 'block';
+    document.getElementById('studentInfoForm').style.display = 'none';
+    document.getElementById('studentQuizSection').style.display = 'none';
+    document.getElementById('studentResultsSection').style.display = 'none';
+    document.getElementById('studentCertificateSection').style.display = 'none';
+    studentEndReason = 'timeup';
+    renderSimpleSubmittedScreen();
+    updateURL('results');
+}
+
+// ============================================================
+// FAST-ANSWER DETECTION
+// If a student picks answers faster than the question could realistically
+// be read, show a warning and flag the result for the teacher.
+// ============================================================
+
+function studentCheckFastAnswer(wasFirstAnswer) {
+    if (!wasFirstAnswer || !studentQuestionShownAt) return;
+    var q = studentQuestions[studentCurrentIndex];
+    if (!q) return;
+    var text = (q.question || '') + ' ' + (q.options || []).join(' ');
+    var words = text.trim().split(/\s+/).length;
+    // About 0.12s per word, never less than 1.5s and never more than 5s.
+    var minReadMs = Math.min(5000, Math.max(1500, words * 120));
+    var gap = Date.now() - studentQuestionShownAt;
+
+    studentRecentPickGaps.push(gap < minReadMs);
+    if (studentRecentPickGaps.length > 4) studentRecentPickGaps.shift();
+
+    var fastCount = 0;
+    for (var i = 0; i < studentRecentPickGaps.length; i++) {
+        if (studentRecentPickGaps[i]) fastCount++;
+    }
+    // 3 hurried answers out of the last 4 triggers the warning.
+    if (fastCount >= 3 && !studentFastWarningOpen) {
+        studentRecentPickGaps = [];
+        studentFastAnswerWarnings++;
+        saveQuizState();
+        syncStudentProgress(false);
+        showFastAnswerWarning();
+    }
+}
+
+function showFastAnswerWarning() {
+    var overlay = document.getElementById('fastAnswerOverlay');
+    if (!overlay || studentIsTimeUp) return;
+    studentFastWarningOpen = true;
+    overlay.style.display = 'flex';
+    var btn = document.getElementById('fastAnswerOkBtn');
+    var left = 4;
+    btn.disabled = true;
+    btn.textContent = 'Please read (' + left + ')';
+    var iv = setInterval(function() {
+        left--;
+        if (left <= 0) {
+            clearInterval(iv);
+            btn.disabled = false;
+            btn.textContent = 'I will read carefully';
+        } else {
+            btn.textContent = 'Please read (' + left + ')';
+        }
+    }, 1000);
+}
+
+function dismissFastAnswerWarning() {
+    var overlay = document.getElementById('fastAnswerOverlay');
+    if (overlay) overlay.style.display = 'none';
+    studentFastWarningOpen = false;
+    studentQuestionShownAt = Date.now();
 }
 
 // ============================================================
@@ -4046,6 +4579,9 @@ function studentTimeUp() {
     studentEndReason = 'timeup';
     studentTimeRemaining = 0;
     studentStopTimer();
+    var fastOverlay = document.getElementById('fastAnswerOverlay');
+    if (fastOverlay) fastOverlay.style.display = 'none';
+    studentFastWarningOpen = false;
     var display = document.getElementById('studentTimerDisplay');
     if (display) {
         display.textContent = '00:00';
@@ -4104,6 +4640,7 @@ function normalizeResultRow(r) {
         assessmentCode: r.assessment_code,
         tabSwitches: r.tab_switches || 0,
         proctorViolations: r.proctor_violations || 0,
+        fastAnswerWarnings: r.fast_answer_warnings || 0,
         date: r.created_at ? new Date(r.created_at).toLocaleString() : ''
     };
 }
@@ -4191,9 +4728,12 @@ async function adminDeleteAssessment(id) {
     }
 }
 
+var studentAutoSubmitRetries = 0;
+
 async function studentSubmitQuiz() {
-    var overlay = document.getElementById('studentTimeUpOverlay');
-    if (overlay) overlay.remove();
+    // Note: the "Time is Up / Submitting" overlay is only removed once the
+    // submission has actually gone through, so a timed-out student never sees
+    // a half-finished screen or a confirmation prompt.
     studentStopTimer();
 
     var unansweredIndexes = [];
@@ -4245,17 +4785,48 @@ async function studentSubmitQuiz() {
                 answers: answersPayload,
                 tabSwitches: studentTabSwitchCount,
                 proctorViolations: studentProctorStrikes,
+                fastAnswerWarnings: studentFastAnswerWarnings,
                 timeTaken: studentTimeTaken
             })
         });
         data = await res.json();
         if (!res.ok) {
+            if (studentIsTimeUp || studentEndReason === 'misconduct') {
+                // Automatic submissions never ask the student for anything.
+                if (res.status === 409) {
+                    // The server already submitted this attempt for them.
+                    clearQuizState();
+                    stopProctorMonitoring();
+                    stopStudentPresence();
+                    stopStudentProgressSync();
+                    var doneOverlay = document.getElementById('studentTimeUpOverlay');
+                    if (doneOverlay) doneOverlay.remove();
+                    document.getElementById('studentQuizSection').style.display = 'none';
+                    renderSimpleSubmittedScreen();
+                    updateURL('results');
+                    return;
+                }
+                if (studentAutoSubmitRetries < 8) {
+                    studentAutoSubmitRetries++;
+                    setTimeout(studentSubmitQuiz, 3000);
+                }
+                return;
+            }
             alert('Could not submit your assessment: ' + (data.error || 'Unknown error') + '\n\nYour answers are still here - please try Submit again.');
             if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit'; }
             if (!studentIsTimeUp && studentEndReason !== 'misconduct') studentStartTimer();
             return;
         }
     } catch (e) {
+        if (studentIsTimeUp || studentEndReason === 'misconduct') {
+            // No pop-ups for automatic submissions: keep retrying quietly.
+            // (The server also holds the saved answers and will submit them.)
+            if (studentAutoSubmitRetries < 8) {
+                studentAutoSubmitRetries++;
+                setTimeout(studentSubmitQuiz, 3000);
+            }
+            return;
+        }
         alert('Could not reach the server. Please check your connection and try Submit again - your answers are still here.');
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit'; }
         if (!studentIsTimeUp && studentEndReason !== 'misconduct') studentStartTimer();
@@ -4265,6 +4836,10 @@ async function studentSubmitQuiz() {
     clearQuizState();
     stopProctorMonitoring();
     stopStudentPresence();
+    stopStudentProgressSync();
+    studentAutoSubmitRetries = 0;
+    var timeUpOverlayDone = document.getElementById('studentTimeUpOverlay');
+    if (timeUpOverlayDone) timeUpOverlayDone.remove();
 
     var helpBtn = document.getElementById('needHelpBtn');
     if (helpBtn) helpBtn.style.display = 'block';
@@ -4913,6 +5488,12 @@ function studentBackToResults() {
 
 function studentResetQuiz() {
     studentStopTimer();
+    stopStudentProgressSync();
+    studentFastWarningOpen = false;
+    var fastOv = document.getElementById('fastAnswerOverlay');
+    if (fastOv) fastOv.style.display = 'none';
+    studentFastAnswerWarnings = 0;
+    studentRecentPickGaps = [];
     clearQuizState();
     stopProctorMonitoring();
     stopStudentPresence();
@@ -4926,7 +5507,13 @@ function studentResetQuiz() {
     document.getElementById('studentCertificateSection').style.display = 'none';
     document.getElementById('studentQuizSection').style.display = 'none';
     document.getElementById('proctorWarningScreen').style.display = 'none';
-    document.getElementById('studentInfoForm').style.display = 'block';
+    // Go back to the page where a NEW assessment code is entered (not the
+    // name / admission-number page of the assessment that was just finished).
+    document.getElementById('studentInfoForm').style.display = 'none';
+    document.getElementById('studentAssessmentView').style.display = 'none';
+    document.getElementById('studentAccess').style.display = 'block';
+    var newCodeInput = document.getElementById('assessmentCode');
+    if (newCodeInput) { newCodeInput.value = ''; }
     document.getElementById('studentNameInput').value = '';
     document.getElementById('studentAdmissionNumber').value = '';
     studentQuestions = [];
@@ -4965,6 +5552,7 @@ async function attachPassMarks(results, isAdmin) {
 }
 
 async function renderTeacherDashboard() {
+    loadTeacherProfile();
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
     var allResults = await getAllResultsFromDatabase();
     var filtered = allResults.filter(function(r) { return r.teacherEmail === teacherEmail; });
@@ -5009,7 +5597,10 @@ async function renderTeacherDashboard() {
     showTeacherSection('teacherOverviewPanel');
 }
 
-function applyTeacherFilters() {
+// The results the teacher is CURRENTLY looking at (class + subject filters
+// applied, then sorted). Display, Export CSV, Clear and the multi-select tools
+// all use this one list, so they always act on exactly what is on screen.
+function getTeacherFilteredResults() {
     var filtered = teacherResultsCache.slice();
 
     var filterClass = document.getElementById('teacherAdminFilterClass');
@@ -5028,6 +5619,36 @@ function applyTeacherFilters() {
         else if (filterSort.value === 'score-high') { filtered.sort(function(a,b) { return b.score - a.score; }); }
         else if (filterSort.value === 'score-low') { filtered.sort(function(a,b) { return a.score - b.score; }); }
         else if (filterSort.value === 'name') { filtered.sort(function(a,b) { return a.studentName.localeCompare(b.studentName); }); }
+    }
+    return filtered;
+}
+
+function teacherFilterIsActive() {
+    var c = document.getElementById('teacherAdminFilterClass');
+    var su = document.getElementById('teacherAdminFilterSubject');
+    return !!((c && c.value !== 'all') || (su && su.value !== 'all'));
+}
+
+function teacherFilterDescription() {
+    var c = document.getElementById('teacherAdminFilterClass');
+    var su = document.getElementById('teacherAdminFilterSubject');
+    var parts = [];
+    if (c && c.value !== 'all') parts.push('Class: ' + c.value);
+    if (su && su.value !== 'all') parts.push('Subject: ' + su.value);
+    return parts.join(', ');
+}
+
+var teacherSelectedResultIds = {};
+
+function applyTeacherFilters() {
+    var filtered = getTeacherFilteredResults();
+
+    // Forget selections that are no longer visible, so a hidden result can
+    // never be deleted by accident.
+    var visibleIds = {};
+    for (var vi = 0; vi < filtered.length; vi++) visibleIds[String(filtered[vi].id)] = true;
+    for (var sid in teacherSelectedResultIds) {
+        if (!visibleIds[sid]) delete teacherSelectedResultIds[sid];
     }
 
     var total = filtered.length;
@@ -5054,7 +5675,8 @@ function applyTeacherFilters() {
     var tbody = document.getElementById('teacherResultsTableBody');
     if (!tbody) return;
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; color:#6b7a8f; padding:40px;">No results found.</td></tr>';
+        refreshTeacherSelectionUI();
         return;
     }
 
@@ -5064,9 +5686,11 @@ function applyTeacherFilters() {
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'teacher\',' + item.id + ')">⋮ Take Action</button></td></tr>';
+        var isSel = !!teacherSelectedResultIds[String(item.id)];
+        html += '<tr class="' + (isSel ? 'result-row-selected' : '') + '"><td class="select-cell"><input type="checkbox" class="result-select-box"' + (isSel ? ' checked' : '') + ' onchange="teacherToggleResultSelected(' + item.id + ', this)" aria-label="Select result"></td><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + item.studentName + (item.fastAnswerWarnings > 0 ? '<br><span style=\"display:inline-block; margin-top:3px; padding:1px 7px; border-radius:10px; background:#fff3cd; color:#8a6d00; font-size:11px; font-weight:700;\" title=\"Student answered too quickly to have read the questions\">&#9888; Fast answering x' + item.fastAnswerWarnings + '</span>' : '') + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'teacher\',' + item.id + ')">⋮ Take Action</button></td></tr>';
     }
     tbody.innerHTML = html;
+    refreshTeacherSelectionUI();
 }
 
 var pendingResultAction = null;
@@ -5210,49 +5834,269 @@ function setupResultActionModal() {
     }
 }
 
+function csvCell(value) {
+    return '"' + String(value === null || value === undefined ? '' : value).replace(/"/g, '""') + '"';
+}
+
+// Updates the Export / Clear button labels and the multi-select bar.
+function refreshTeacherSelectionUI() {
+    var filtered = getTeacherFilteredResults();
+    var active = teacherFilterIsActive();
+
+    var exportBtn = document.getElementById('teacherExportBtn');
+    var clearBtn = document.getElementById('teacherClearBtn');
+    if (exportBtn) exportBtn.textContent = active ? 'Export CSV (' + filtered.length + ')' : 'Export CSV';
+    if (clearBtn) clearBtn.textContent = active ? 'Clear Filtered (' + filtered.length + ')' : 'Clear All';
+
+    var count = 0;
+    for (var i = 0; i < filtered.length; i++) {
+        if (teacherSelectedResultIds[String(filtered[i].id)]) count++;
+    }
+    var bar = document.getElementById('teacherBulkBar');
+    var label = document.getElementById('teacherBulkCount');
+    if (bar) bar.style.display = count > 0 ? 'flex' : 'none';
+    if (label) label.textContent = count + ' selected';
+
+    var all = document.getElementById('teacherSelectAll');
+    if (all) {
+        all.checked = filtered.length > 0 && count === filtered.length;
+        all.indeterminate = count > 0 && count < filtered.length;
+    }
+}
+
+function teacherToggleResultSelected(id, checkbox) {
+    if (checkbox.checked) teacherSelectedResultIds[String(id)] = true;
+    else delete teacherSelectedResultIds[String(id)];
+    var row = checkbox.closest ? checkbox.closest('tr') : null;
+    if (row) row.classList.toggle('result-row-selected', checkbox.checked);
+    refreshTeacherSelectionUI();
+}
+
+function teacherToggleSelectAll(checked) {
+    var filtered = getTeacherFilteredResults();
+    for (var i = 0; i < filtered.length; i++) {
+        if (checked) teacherSelectedResultIds[String(filtered[i].id)] = true;
+        else delete teacherSelectedResultIds[String(filtered[i].id)];
+    }
+    applyTeacherFilters();
+}
+
+function teacherClearSelection() {
+    teacherSelectedResultIds = {};
+    applyTeacherFilters();
+}
+
+function getTeacherSelectedResults() {
+    var out = [];
+    var filtered = getTeacherFilteredResults();
+    for (var i = 0; i < filtered.length; i++) {
+        if (teacherSelectedResultIds[String(filtered[i].id)]) out.push(filtered[i]);
+    }
+    return out;
+}
+
+// Exports ONLY what the filters currently show.
 function teacherExportResults() {
-    var filtered = teacherResultsCache;
+    var filtered = getTeacherFilteredResults();
     if (filtered.length === 0) { alert('No results to export.'); return; }
 
-    var headers = ['Class', 'Student', 'Admission No.', 'Subject', 'Score', 'Correct', 'Total', 'Time Taken', 'Tab Switches', 'Date'];
+    var headers = ['Class', 'Student', 'Admission No.', 'Subject', 'Score', 'Correct', 'Total', 'Time Taken', 'Tab Switches', 'Cam/Noise Flags', 'Fast Answer Warnings', 'Date'];
     var csv = headers.join(',') + '\n';
     for (var i = 0; i < filtered.length; i++) {
-        var row = ['"' + filtered[i].className + '"', '"' + filtered[i].studentName + '"', '"' + (filtered[i].admissionNumber || '') + '"', '"' + filtered[i].subject + '"', filtered[i].score, filtered[i].correctAnswers, filtered[i].totalQuestions, filtered[i].timeTaken, filtered[i].tabSwitches || 0, '"' + filtered[i].date + '"'];
+        var r = filtered[i];
+        var row = [csvCell(r.className), csvCell(r.studentName), csvCell(r.admissionNumber || ''), csvCell(r.subject), r.score, r.correctAnswers, r.totalQuestions, csvCell(r.timeTaken), r.tabSwitches || 0, r.proctorViolations || 0, r.fastAnswerWarnings || 0, csvCell(r.date)];
         csv += row.join(',') + '\n';
     }
     var blob = new Blob([csv], { type: 'text/csv' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = 'cleverment_teacher_results_' + new Date().toISOString().slice(0,10) + '.csv';
+    var tag = teacherFilterIsActive() ? '_filtered' : '';
+    a.download = 'cleverment_teacher_results' + tag + '_' + new Date().toISOString().slice(0,10) + '.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
 
-async function teacherClearResults() {
-    if (!confirm('Delete all your results? This cannot be undone!')) return;
-    var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
+// Deletes the given results (by id) on the server, then refreshes the view.
+async function teacherDeleteResultsByIds(ids) {
     var teacherToken = localStorage.getItem('cleverment_teacher_token');
     try {
-        var res = await fetch(BACKEND_URL + '/api/teacher/results', {
-            method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + teacherToken }
+        var res = await fetch(BACKEND_URL + '/api/teacher/results/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + teacherToken },
+            body: JSON.stringify({ ids: ids })
         });
         var data = await res.json();
         if (!res.ok) {
-            alert('Error: ' + (data.error || 'Could not clear results.'));
-            return;
+            alert('Error: ' + (data.error || 'Could not delete the results.'));
+            return false;
         }
     } catch (e) {
         alert('Could not reach the server. Please check your connection.');
+        return false;
+    }
+
+    var gone = {};
+    for (var i = 0; i < ids.length; i++) gone[String(ids[i])] = true;
+    teacherResultsCache = teacherResultsCache.filter(function(r) { return !gone[String(r.id)]; });
+    for (var k in gone) delete teacherSelectedResultIds[k];
+    try {
+        var local = getAllResultsLocal().filter(function(r) { return !gone[String(r.id)]; });
+        localStorage.setItem('cleverment_all_results', JSON.stringify(local));
+    } catch (e) {}
+    rebuildTeacherFilterOptions();
+    applyTeacherFilters();
+    return true;
+}
+
+// Re-lists the class/subject filter choices from what is left, keeping the
+// teacher's current choice if it still exists.
+function rebuildTeacherFilterOptions() {
+    function rebuild(selectId, field, allLabel) {
+        var el = document.getElementById(selectId);
+        if (!el) return;
+        var current = el.value;
+        var values = [];
+        for (var i = 0; i < teacherResultsCache.length; i++) {
+            var v = teacherResultsCache[i][field];
+            if (values.indexOf(v) === -1) values.push(v);
+        }
+        el.innerHTML = '';
+        var all = document.createElement('option');
+        all.value = 'all';
+        all.textContent = allLabel;
+        el.appendChild(all);
+        for (var j = 0; j < values.length; j++) {
+            var o = document.createElement('option');
+            o.value = values[j];
+            o.textContent = values[j];
+            el.appendChild(o);
+        }
+        el.value = (current === 'all' || values.indexOf(current) !== -1) ? current : 'all';
+    }
+    rebuild('teacherAdminFilterClass', 'className', 'All Classes');
+    rebuild('teacherAdminFilterSubject', 'subject', 'All Subjects');
+}
+
+// "Clear All" / "Clear Filtered": removes ONLY the results currently shown.
+async function teacherClearResults() {
+    var filtered = getTeacherFilteredResults();
+    if (filtered.length === 0) { alert('There are no results to clear.'); return; }
+
+    var active = teacherFilterIsActive();
+    var message = active
+        ? 'Delete the ' + filtered.length + ' result(s) currently shown (' + teacherFilterDescription() + ')?\n\nResults outside this filter will NOT be touched. This cannot be undone.'
+        : 'Delete ALL ' + filtered.length + ' of your results? This cannot be undone!';
+    if (!confirm(message)) return;
+
+    var ids = filtered.map(function(r) { return r.id; });
+    await teacherDeleteResultsByIds(ids);
+}
+
+async function teacherDeleteSelectedResults() {
+    var picked = getTeacherSelectedResults();
+    if (picked.length === 0) { alert('Select at least one result first.'); return; }
+    if (!confirm('Delete the ' + picked.length + ' selected result(s)? This cannot be undone.')) return;
+    await teacherDeleteResultsByIds(picked.map(function(r) { return r.id; }));
+}
+
+// Certificates for every selected student: one PDF each, bundled in a ZIP.
+async function teacherDownloadSelectedCertificates() {
+    var picked = getTeacherSelectedResults();
+    if (picked.length === 0) { alert('Select at least one result first.'); return; }
+    var MAX_CERTS = 40;
+    if (picked.length > MAX_CERTS) {
+        alert('Please select up to ' + MAX_CERTS + ' students at a time. Phones can run out of memory when making many certificates at once.');
         return;
     }
-    var localResults = getAllResultsLocal();
-    var filtered = localResults.filter(function(r) { return r.teacherEmail !== teacherEmail; });
-    localStorage.setItem('cleverment_all_results', JSON.stringify(filtered));
-    renderTeacherDashboard();
+    if (typeof JSZip === 'undefined') {
+        alert('The ZIP tool did not load. Please check your internet connection and refresh the page.');
+        return;
+    }
+
+    var btn = document.getElementById('teacherBulkCertBtn');
+    var btnLabel = btn ? btn.querySelector('span') : null;
+    var originalLabel = btnLabel ? btnLabel.textContent : '';
+    if (btn) btn.disabled = true;
+
+    try {
+        var assessments = (teacherAssessmentsCache && teacherAssessmentsCache.length)
+            ? teacherAssessmentsCache
+            : await getTeacherAssessmentsFromBackend();
+        var byCode = {};
+        for (var a = 0; a < assessments.length; a++) byCode[assessments[a].code] = assessments[a];
+
+        var zip = new JSZip();
+        var usedNames = {};
+        var made = 0;
+        var skipped = 0;
+        var singleBlob = null;
+        var singleName = '';
+
+        for (var i = 0; i < picked.length; i++) {
+            var r = picked[i];
+            if (btnLabel) btnLabel.textContent = 'Preparing ' + (i + 1) + '/' + picked.length + '...';
+            var assessment = byCode[r.assessmentCode];
+            if (!assessment) { skipped++; continue; }
+
+            var blob = await generateCertificatePDFBlob({
+                studentName: r.studentName,
+                subject: r.subject,
+                score: r.score,
+                teacherName: assessment.teacherName,
+                teacherSignature: assessment.teacherSignature,
+                code: assessment.code,
+                dateObj: new Date()
+            });
+
+            var base = 'Certificate-' + String(r.studentName || 'Student').replace(/[\\/:*?"<>|]/g, '_') +
+                (r.admissionNumber ? '-' + String(r.admissionNumber).replace(/[\\/:*?"<>|]/g, '_') : '');
+            var name = base + '.pdf';
+            var n = 2;
+            while (usedNames[name]) { name = base + '-' + n + '.pdf'; n++; }
+            usedNames[name] = true;
+            zip.file(name, blob);
+            singleBlob = blob;
+            singleName = name;
+            made++;
+        }
+
+        if (made === 0) {
+            alert('Could not find the assessment details needed to create these certificates.');
+            return;
+        }
+
+        var outBlob, outName;
+        if (made === 1) {
+            outBlob = singleBlob;
+            outName = singleName;
+        } else {
+            if (btnLabel) btnLabel.textContent = 'Zipping...';
+            outBlob = await zip.generateAsync({ type: 'blob' });
+            outName = 'Certificates-' + new Date().toISOString().slice(0, 10) + '.zip';
+        }
+
+        var url = URL.createObjectURL(outBlob);
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = outName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
+
+        if (skipped > 0) {
+            alert(skipped + ' certificate(s) could not be made because their assessment no longer exists.');
+        }
+    } catch (e) {
+        console.error('Bulk certificate error:', e);
+        alert('Error generating certificates: ' + e.message);
+    } finally {
+        if (btn) btn.disabled = false;
+        if (btnLabel) btnLabel.textContent = originalLabel || 'Download certificates';
+    }
 }
 
 // ============================================================
@@ -5634,7 +6478,7 @@ function applyAdminFilters() {
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'admin\',' + item.id + ')">⋮ Take Action</button></td></tr>';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + (item.fastAnswerWarnings > 0 ? '<br><span style=\"display:inline-block; margin-top:3px; padding:1px 7px; border-radius:10px; background:#fff3cd; color:#8a6d00; font-size:11px; font-weight:700;\" title=\"Student answered too quickly to have read the questions\">&#9888; Fast answering x' + item.fastAnswerWarnings + '</span>' : '') + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'admin\',' + item.id + ')">⋮ Take Action</button></td></tr>';
     }
     tbody.innerHTML = html;
 }
