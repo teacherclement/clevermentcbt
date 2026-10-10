@@ -6141,6 +6141,11 @@ async function adminLogin() {
 }
 
 function adminLogout() {
+    stopAdminLivePolling();
+    adminActingAsEmail = '';
+    adminActingAsName = '';
+    var select = document.getElementById('adminActAsTeacherSelect');
+    if (select) select.value = '';
     localStorage.removeItem('cleverment_admin_session');
     localStorage.removeItem('cleverment_admin_token');
     document.getElementById('adminDashboard').style.display = 'none';
@@ -6234,6 +6239,8 @@ async function renderAdminTeacherList() {
             return;
         }
         var teachers = data.teachers || [];
+
+        populateAdminActAsTeacherDropdown(teachers);
 
         if (teachers.length === 0) {
             container.innerHTML = '<p class="helper-text">No teachers registered yet.</p>';
@@ -6550,6 +6557,36 @@ async function renderAdminActivityLog() {
         container.innerHTML = '<p class="helper-text">No activity recorded yet.</p>';
         return;
     }
+
+    // Build a map of email -> name so the log can show the teacher's name
+    // first, then their email in parentheses (instead of email alone).
+    var nameMap = {};
+    try {
+        var adminToken = localStorage.getItem('cleverment_admin_token');
+        if (adminToken) {
+            var res = await fetch(BACKEND_URL + '/api/admin/teachers', {
+                headers: { 'Authorization': 'Bearer ' + adminToken }
+            });
+            if (res.ok) {
+                var data = await res.json();
+                var teachers = data.teachers || [];
+                for (var t = 0; t < teachers.length; t++) {
+                    if (teachers[t].email) {
+                        nameMap[String(teachers[t].email).toLowerCase()] = teachers[t].name || '';
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        // If the teacher list can't be loaded, fall back to email-only display.
+    }
+
+    function displayName(email) {
+        var key = String(email || '').toLowerCase();
+        var name = nameMap[key];
+        if (name) return escapeHtml(name) + ' <span style="color:#6b7a8f; font-size:13px;">(' + escapeHtml(email) + ')</span>';
+        return '<strong>' + escapeHtml(email) + '</strong>';
+    }
     
     var html = '';
     for (var i = 0; i < activities.length; i++) {
@@ -6561,9 +6598,9 @@ async function renderAdminActivityLog() {
         else if (item.action === 'login') actionColor = '#6f42c1';
         
         html += '<div style="background:white; padding:10px 14px; border-radius:8px; border-left:4px solid ' + actionColor + '; margin-bottom:6px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">' +
-            '<div><strong>' + item.teacher_email + '</strong> <span style="color:#1a1a2e;">' + item.action.replace(/_/g, ' ') + '</span>' +
-            (item.details ? ' <span style="color:#6b7a8f; font-size:13px;">' + item.details + '</span>' : '') +
-            '</div><span style="color:#8a9aa8; font-size:11px;">' + date + '</span></div>';
+            '<div><strong>' + displayName(item.teacher_email) + '</strong> <span style="color:#1a1a2e;">' + escapeHtml(item.action.replace(/_/g, ' ')) + '</span>' +
+            (item.details ? ' <span style="color:#6b7a8f; font-size:13px;">' + escapeHtml(item.details) + '</span>' : '') +
+            '</div><span style="color:#8a9aa8; font-size:11px;">' + escapeHtml(date) + '</span></div>';
     }
     container.innerHTML = html;
 }
@@ -6751,6 +6788,14 @@ function showTeacherSection(panelId, btn) {
 
 function showAdminSection(panelId, btn) {
     showDashSection('adminDashboard', panelId, btn);
+    if (panelId === 'adminLiveSection') {
+        startAdminLivePolling();
+    } else {
+        stopAdminLivePolling();
+    }
+    if (panelId === 'adminAccessLogsSection') {
+        loadAdminAccessLogs();
+    }
 }
 
 
@@ -6938,6 +6983,324 @@ function stopTeacherLivePolling() {
         clearInterval(teacherLiveInterval);
         teacherLiveInterval = null;
     }
+}
+
+// ============================================================
+// ADMIN: "Live Now" panel — polls for students currently
+// taking any teacher's assessments, or filtered to the
+// selected "act as" teacher.
+// ============================================================
+
+var adminLiveInterval = null;
+
+async function loadAdminLive() {
+    var container = document.getElementById('adminLiveContainer');
+    if (!container) return;
+    var adminToken = localStorage.getItem('cleverment_admin_token');
+    if (!adminToken) return;
+    try {
+        var url = BACKEND_URL + '/api/admin/live';
+        if (adminActingAsEmail) url += '?teacherEmail=' + encodeURIComponent(adminActingAsEmail);
+        var res = await fetch(url, {
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            container.innerHTML = '<p class="helper-text">Could not load live data. Please try again.</p>';
+            return;
+        }
+        renderAdminLive(data.live || []);
+    } catch (e) {
+        // Transient network error — keep showing the previous list.
+    }
+}
+
+function renderAdminLive(list) {
+    var container = document.getElementById('adminLiveContainer');
+    if (!container) return;
+    if (!list || list.length === 0) {
+        container.innerHTML = '<p class="helper-text">No students are taking assessments right now.</p>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < list.length; i++) {
+        var s = list[i];
+        var elapsedMs = Date.now() - new Date(s.startedAt).getTime();
+        var elapsedMin = Math.max(1, Math.round(elapsedMs / 60000));
+        var teacherLabel = s.teacherEmail ? '<br><span style="color:#6b7a8f; font-size:12px;">Teacher: ' + escapeHtml(s.teacherEmail) + '</span>' : '';
+        html += '<div class="live-item">' +
+            '<span class="live-dot"></span>' +
+            '<div style="flex:1; min-width:160px;"><strong>' + escapeHtml(s.studentName) + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + escapeHtml(s.admissionNumber) + ')</span><br>' +
+            '<span style="color:#6b7a8f; font-size:13px;">' + escapeHtml(s.subject + ' - ' + s.className + ' | Code: ' + s.code) + '</span>' + teacherLabel + '</div>' +
+            '<span style="font-size:13px; color:#2d9c5c; font-weight:600; white-space:nowrap;">in progress ~' + elapsedMin + ' min</span>' +
+            '</div>';
+    }
+    container.innerHTML = html;
+}
+
+function startAdminLivePolling() {
+    stopAdminLivePolling();
+    loadAdminLive();
+    adminLiveInterval = setInterval(loadAdminLive, 8000);
+}
+
+function stopAdminLivePolling() {
+    if (adminLiveInterval) {
+        clearInterval(adminLiveInterval);
+        adminLiveInterval = null;
+    }
+}
+
+// ============================================================
+// ADMIN: Access Attempts panel
+// ============================================================
+
+async function loadAdminAccessLogs() {
+    var container = document.getElementById('adminAccessLogsContainer');
+    if (!container) return;
+    var adminToken = localStorage.getItem('cleverment_admin_token');
+    if (!adminToken) {
+        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">Admin session missing. Please log in again.</p>';
+        return;
+    }
+    container.innerHTML = '<p class="helper-text">Loading access attempts...</p>';
+    try {
+        var url = BACKEND_URL + '/api/admin/access-logs';
+        if (adminActingAsEmail) url += '?teacherEmail=' + encodeURIComponent(adminActingAsEmail);
+        var res = await fetch(url, {
+            headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not load access logs.');
+        var logs = data.logs || [];
+        if (!logs.length) {
+            container.innerHTML = '<p class="helper-text">No student access attempts have been recorded yet.</p>';
+            return;
+        }
+        var html = '<div style="overflow-x:auto; -webkit-overflow-scrolling:touch;"><table class="teacher-access-log-table"><thead><tr>' +
+            '<th>Date &amp; Time</th><th>Teacher</th><th>Assessment</th><th>Student Name</th><th>Admission No.</th><th>Status</th><th>Details</th>' +
+            '</tr></thead><tbody>';
+        for (var i = 0; i < logs.length; i++) {
+            var x = logs[i];
+            html += '<tr>' +
+                '<td style="white-space:nowrap;">' + escapeHtml(new Date(x.timestamp).toLocaleString()) + '</td>' +
+                '<td style="font-size:12px;">' + escapeHtml(x.teacherEmail || '—') + '</td>' +
+                '<td><strong>' + escapeHtml(x.code || '') + '</strong><br><span style="font-size:12px;color:#6b7a8f;">' + escapeHtml((x.subject || '') + (x.className ? ' • ' + x.className : '')) + '</span></td>' +
+                '<td>' + escapeHtml(x.studentName || '—') + '</td>' +
+                '<td>' + escapeHtml(x.admissionNumber || '—') + '</td>' +
+                '<td><span class="cm-access-status ' + accessLogStatusClass(x.status) + '">' + escapeHtml(accessLogStatusLabel(x.status)) + '</span></td>' +
+                '<td style="min-width:260px;">' + escapeHtml(x.message || '') + '</td>' +
+                '</tr>';
+        }
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml('Could not load access attempts: ' + (e.message || 'Unknown error')) + '</p>';
+    }
+}
+
+// ============================================================
+// ADMIN: "Act as Teacher" — admin selects a specific teacher
+// from a dropdown, then sees/operates exactly as that teacher
+// would (publish, rosters, analytics, results, CSV history).
+// ============================================================
+
+var adminActingAsEmail = '';
+var adminActingAsName = '';
+var adminTeachersListCache = [];
+
+function populateAdminActAsTeacherDropdown(teachers) {
+    adminTeachersListCache = teachers || [];
+    var select = document.getElementById('adminActAsTeacherSelect');
+    if (!select) return;
+    var prevValue = select.value || '';
+    select.innerHTML = '<option value="">-- Select a teacher --</option>';
+    for (var i = 0; i < adminTeachersListCache.length; i++) {
+        var opt = document.createElement('option');
+        opt.value = adminTeachersListCache[i].email;
+        opt.textContent = adminTeachersListCache[i].name + ' (' + adminTeachersListCache[i].email + ')';
+        select.appendChild(opt);
+    }
+    if (prevValue) select.value = prevValue;
+}
+
+function adminSelectActAsTeacher(email) {
+    adminActingAsEmail = email || '';
+    adminActingAsName = '';
+    if (adminActingAsEmail) {
+        for (var i = 0; i < adminTeachersListCache.length; i++) {
+            if (adminTeachersListCache[i].email === adminActingAsEmail) {
+                adminActingAsName = adminTeachersListCache[i].name || '';
+                break;
+            }
+        }
+    }
+
+    // Show/hide the "Act as Teacher" nav items.
+    var navItems = document.querySelectorAll('.admin-teacher-nav');
+    for (var j = 0; j < navItems.length; j++) {
+        navItems[j].style.display = adminActingAsEmail ? '' : 'none';
+    }
+
+    // Update teacher label spans on panels.
+    var label = adminActingAsName ? adminActingAsName + ' (' + adminActingAsEmail + ')' : '';
+    var labels = ['adminUploadSection', 'adminPublishedTeacherLabel', 'adminRosterTeacherLabel',
+                  'adminAnalyticsTeacherLabel', 'adminTeacherResultsLabel', 'adminCsvTeacherLabel',
+                  'adminLiveTeacherLabel', 'adminAccessTeacherLabel'];
+    var labelIds = {
+        adminPublishedTeacherLabel: label,
+        adminRosterTeacherLabel: label,
+        adminAnalyticsTeacherLabel: label,
+        adminTeacherResultsLabel: label,
+        adminCsvTeacherLabel: label,
+        adminLiveTeacherLabel: label,
+        adminAccessTeacherLabel: label
+    };
+    for (var id in labelIds) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = label ? '— ' + label : '';
+    }
+
+    // Show/hide panels depending on whether a teacher is selected.
+    var panelIds = ['adminUploadSection', 'adminPublishedSection', 'adminRosterSection',
+                    'adminAnalyticsSection', 'adminTeacherResultsSection', 'adminCsvHistorySection'];
+    for (var p = 0; p < panelIds.length; p++) {
+        var panel = document.getElementById(panelIds[p]);
+        if (panel) panel.style.display = adminActingAsEmail ? '' : 'none';
+    }
+
+    if (adminActingAsEmail) {
+        loadAdminPublishedAssessments();
+        loadAdminCsvHistory();
+        loadAdminTeacherResults();
+        loadAdminRosterContent();
+        loadAdminAnalyticsContent();
+        loadAdminUploadContent();
+    }
+}
+
+function adminTeacherLabel() {
+    return adminActingAsName ? adminActingAsName + ' (' + adminActingAsEmail + ')' : adminActingAsEmail;
+}
+
+// Fetch helper: admin calling a teacher endpoint as a specific teacher.
+function adminTeacherHeaders() {
+    return {
+        'Authorization': 'Bearer ' + localStorage.getItem('cleverment_admin_token'),
+        'Content-Type': 'application/json'
+    };
+}
+
+function adminTeacherUrl(path) {
+    var sep = path.indexOf('?') === -1 ? '?' : '&';
+    return BACKEND_URL + path + (adminActingAsEmail ? sep + 'teacherEmail=' + encodeURIComponent(adminActingAsEmail) : '');
+}
+
+async function loadAdminPublishedAssessments() {
+    var container = document.getElementById('adminPublishedList');
+    if (!container) return;
+    container.innerHTML = '<p class="helper-text">Loading assessments...</p>';
+    try {
+        var res = await fetch(adminTeacherUrl('/api/teacher/assessments'), {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('cleverment_admin_token') }
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not load assessments.');
+        var assessments = data.assessments || [];
+        if (!assessments.length) {
+            container.innerHTML = '<p class="helper-text">This teacher has not published any assessments yet.</p>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < assessments.length; i++) {
+            var a = assessments[i];
+            var timeDisplay = a.time_limit > 0 ? Math.floor(a.time_limit / 60) + ' min' : 'No limit';
+            html += '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
+                '<div><strong>' + escapeHtml(a.subject) + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + escapeHtml(a.class_name) + ' | ' + (a.questions ? a.questions.length : 0) + ' questions | ' + timeDisplay + ')</span><br>' +
+                '<span style="color:#6b7a8f; font-size:12px;">Published: ' + escapeHtml(a.code) + '</span></div>' +
+                '<span style="background:#eef6ff; padding:4px 12px; border-radius:6px; font-weight:600; font-size:13px; color:#2d6cdf;">Code: ' + escapeHtml(a.code) + '</span>' +
+                '</div>';
+        }
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message) + '</p>';
+    }
+}
+
+async function loadAdminCsvHistory() {
+    var container = document.getElementById('adminCsvHistoryList');
+    if (!container) return;
+    try {
+        var { data, error } = await supabase
+            .from('cleverment_csv_history')
+            .select('*')
+            .eq('teacher_email', adminActingAsEmail)
+            .order('created_at', { ascending: false });
+        if (error || !data || !data.length) {
+            container.innerHTML = '<p class="helper-text">No CSV files uploaded by this teacher yet.</p>';
+            return;
+        }
+        var html = '';
+        for (var i = 0; i < data.length; i++) {
+            var item = data[i];
+            var date = new Date(item.created_at).toLocaleString();
+            html += '<div style="background:white; padding:10px 14px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:6px;">' +
+                '<strong>' + escapeHtml(item.filename || 'CSV file') + '</strong>' +
+                ' <span style="color:#6b7a8f; font-size:13px;">' + escapeHtml(date) + '</span></div>';
+        }
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p class="helper-text">No CSV files uploaded by this teacher yet.</p>';
+    }
+}
+
+async function loadAdminTeacherResults() {
+    var container = document.getElementById('adminTeacherResultsContent');
+    if (!container) return;
+    container.innerHTML = '<p class="helper-text">Loading results...</p>';
+    try {
+        var allResults = await getAllResultsFromDatabase();
+        var filtered = allResults.filter(function(r) {
+            return String(r.teacherEmail).toLowerCase() === String(adminActingAsEmail).toLowerCase();
+        });
+        filtered = await attachPassMarks(filtered, true);
+        if (!filtered.length) {
+            container.innerHTML = '<p class="helper-text">No results for this teacher yet.</p>';
+            return;
+        }
+        var html = '<div style="overflow-x:auto;"><table class="results-table"><thead><tr>' +
+            '<th>#</th><th>Class</th><th>Student</th><th>Admission No.</th><th>Subject</th><th>Score</th><th>Questions</th><th>Tab Switches</th><th>Date</th>' +
+            '</tr></thead><tbody>';
+        for (var i = 0; i < filtered.length; i++) {
+            var item = filtered[i];
+            var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
+            html += '<tr><td>' + (i + 1) + '</td><td>' + escapeHtml(item.className) + '</td><td>' + escapeHtml(item.studentName) + '</td><td>' + escapeHtml(item.admissionNumber || '') + '</td><td>' + escapeHtml(item.subject) + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + (item.tabSwitches || 0) + '</td><td>' + escapeHtml(item.date) + '</td></tr>';
+        }
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    } catch (e) {
+        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">Could not load results.</p>';
+    }
+}
+
+function loadAdminRosterContent() {
+    var container = document.getElementById('adminRosterContent');
+    if (!container) return;
+    container.innerHTML = '<p class="helper-text">Roster management is available when acting as this teacher. Use the teacher login for full roster editing capabilities.</p>';
+}
+
+function loadAdminAnalyticsContent() {
+    var container = document.getElementById('adminAnalyticsContent');
+    if (!container) return;
+    container.innerHTML = '<p class="helper-text">Analytics are available when acting as this teacher. Use the teacher login for full analytics.</p>';
+}
+
+function loadAdminUploadContent() {
+    var container = document.getElementById('adminUploadContent');
+    if (!container) return;
+    container.innerHTML = '<div style="background:#fff8f0; border:1.5px solid #f5c98f; border-radius:10px; padding:14px 16px;">' +
+        '<p style="margin:0; color:#a15c00; font-weight:600;">You are acting as ' + escapeHtml(adminTeacherLabel()) + '</p>' +
+        '<p style="margin:8px 0 0; color:#6b7a8f; font-size:13px;">To publish an assessment, edit rosters, or run analytics on behalf of this teacher, log in with the teacher\'s account directly. Admin "act as" mode shows their assessments, results, and CSV history.</p></div>';
 }
 
 
