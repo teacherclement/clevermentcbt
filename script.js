@@ -6546,15 +6546,6 @@ async function renderAdminActivityLog() {
     if (!container) return;
     
     var activities = await getTeacherActivity();
-    var teacherNamesByEmail = {};
-    try {
-        var adminToken = localStorage.getItem('cleverment_admin_token');
-        var teacherRes = await fetch(BACKEND_URL + '/api/admin/teachers', { headers: { 'Authorization': 'Bearer ' + adminToken } });
-        var teacherData = await teacherRes.json();
-        (teacherData.teachers || []).forEach(function(teacher) {
-            teacherNamesByEmail[String(teacher.email || '').toLowerCase()] = teacher.name || '';
-        });
-    } catch (e) {}
     if (!activities || activities.length === 0) {
         container.innerHTML = '<p class="helper-text">No activity recorded yet.</p>';
         return;
@@ -6570,31 +6561,12 @@ async function renderAdminActivityLog() {
         else if (item.action === 'login') actionColor = '#6f42c1';
         
         html += '<div style="background:white; padding:10px 14px; border-radius:8px; border-left:4px solid ' + actionColor + '; margin-bottom:6px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">' +
-            '<div><strong>' + escapeHtml(teacherNamesByEmail[String(item.teacher_email || '').toLowerCase()] || 'Unknown teacher') + '</strong> <span style="color:#6b7a8f;">' + escapeHtml(item.teacher_email || '') + '</span> <span style="color:#1a1a2e;">' + escapeHtml(item.action.replace(/_/g, ' ')) + '</span>' +
+            '<div><strong>' + item.teacher_email + '</strong> <span style="color:#1a1a2e;">' + item.action.replace(/_/g, ' ') + '</span>' +
             (item.details ? ' <span style="color:#6b7a8f; font-size:13px;">' + item.details + '</span>' : '') +
             '</div><span style="color:#8a9aa8; font-size:11px;">' + date + '</span></div>';
     }
     container.innerHTML = html;
 }
-
-async function loadAdminActivityEndpoint(endpoint, containerId, emptyMessage) {
-    var container = document.getElementById(containerId);
-    if (!container) return;
-    var token = localStorage.getItem('cleverment_admin_token');
-    container.innerHTML = '<p class="helper-text">Loading...</p>';
-    try {
-        var res = await fetch(BACKEND_URL + endpoint, { headers: { 'Authorization': 'Bearer ' + token } });
-        var data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Could not load data.');
-        var rows = data.logs || data.live || data.sessions || [];
-        if (!rows.length) { container.innerHTML = '<p class="helper-text">' + emptyMessage + '</p>'; return; }
-        container.innerHTML = '<pre style="white-space:pre-wrap; margin:0;">' + escapeHtml(JSON.stringify(rows, null, 2)) + '</pre>';
-    } catch (e) {
-        container.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message) + '</p>';
-    }
-}
-function loadAdminLiveNow() { return loadAdminActivityEndpoint('/api/admin/live', 'adminLiveContainer', 'No students are currently taking an assessment.'); }
-function loadAdminAccessLogs() { return loadAdminActivityEndpoint('/api/admin/access-logs', 'adminAccessLogsContainer', 'No student access attempts have been recorded yet.'); }
 
 // ============================================================
 // ADMIN: MANAGE TEACHER FILES
