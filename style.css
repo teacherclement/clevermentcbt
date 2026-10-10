@@ -2033,3 +2033,90 @@ tr.result-row-selected td { background: #eef3fd; }
     color: #172033;
 }
 .assessment-settings-toggle input { width: 18px; height: 18px; }
+
+
+/* ===== Live messages: student banners ===== */
+.live-msg-stack {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    left: 0;
+    right: 0;
+    z-index: 99990;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    pointer-events: none;
+}
+.live-msg-card {
+    pointer-events: auto;
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 12px;
+    background: #172033;
+    color: #fff;
+    border-left: 5px solid #C9A84C;
+    border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+    animation: liveMsgIn .35s ease-out;
+}
+@keyframes liveMsgIn { from { transform: translateY(-24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.live-msg-icon { color: #C9A84C; flex: 0 0 auto; display: flex; }
+.live-msg-body { flex: 1; min-width: 0; }
+.live-msg-from { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: #C9A84C; margin-bottom: 2px; }
+.live-msg-text { font-size: 14.5px; line-height: 1.4; word-wrap: break-word; }
+.live-msg-ok {
+    flex: 0 0 auto;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 12px;
+    background: #C9A84C;
+    color: #172033;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+/* ===== Live Now: message buttons ===== */
+.live-toolbar { margin-bottom: 10px; }
+.live-msg-all-btn, .live-msg-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+.live-msg-all-btn { background: #172033; color: #fff; padding: 9px 14px; }
+.live-msg-btn { background: #eef3fd; color: #2d6cdf; padding: 7px 11px; border: 1.5px solid #cfe1ff; }
+.live-last-msg { font-size: 12px; color: #6b7a8f; }
+
+/* ===== Live message dialog ===== */
+.live-msg-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100001;
+    background: rgba(15, 23, 42, 0.6);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.live-msg-dialog {
+    background: #fff;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 460px;
+    max-height: 92vh;
+    overflow: auto;
+    padding: 20px 18px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+}
+.live-msg-dialog h3 { margin: 0 0 4px; color: #172033; }
+.live-msg-label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 4px; }
+.live-msg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }

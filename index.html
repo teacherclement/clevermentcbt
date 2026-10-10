@@ -1121,5 +1121,27 @@
         </div>
     </div>
 </div>
+
+    <!-- ===== Live messages: student banner stack ===== -->
+    <div id="liveMessageStack" class="live-msg-stack" aria-live="polite"></div>
+
+    <!-- ===== Live message dialog (teacher + admin) ===== -->
+    <div id="liveMessageOverlay" class="live-msg-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="liveMsgTitle">
+        <div class="live-msg-dialog">
+            <h3 id="liveMsgTitle">Message student</h3>
+            <p id="liveMsgTo" class="helper-text" style="margin:0 0 12px; font-weight:600;"></p>
+            <label for="liveMsgPreset" class="live-msg-label">Choose a message</label>
+            <select id="liveMsgPreset" class="form-input" onchange="onLivePresetChange(this)"></select>
+            <label for="liveMsgText" class="live-msg-label" style="margin-top:12px;">Message (you can edit it)</label>
+            <textarea id="liveMsgText" class="form-input" rows="4" maxlength="300" oninput="updateLiveMsgCount()" placeholder="Type your own message here..."></textarea>
+            <div style="text-align:right; font-size:12px; color:#6b7a8f;" id="liveMsgCount">0/300</div>
+            <p id="liveMsgStatus" style="min-height:20px; margin:8px 0 0; font-size:13px; font-weight:600;"></p>
+            <div class="live-msg-actions">
+                <button type="button" class="secondary-btn" onclick="closeLiveMessageDialog()">Cancel</button>
+                <button type="button" id="liveMsgSendBtn" class="primary-btn" onclick="sendLiveMessage()">Send message</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

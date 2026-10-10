@@ -7006,25 +7006,144 @@ async function loadTeacherAccessLogs() {
 
 var studentPresenceInterval = null;
 
+var studentPendingMessageAcks = [];
+var studentSeenMessageIds = {};
+var studentAudioCtx = null;
+
 function sendPresenceHeartbeat() {
     if (!currentAssessmentCode || !studentName || !studentAdmissionNumber) return;
+    var acksBeingSent = studentPendingMessageAcks.slice(0, 50);
     fetch(BACKEND_URL + '/api/quiz/presence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             code: currentAssessmentCode,
             studentName: studentName,
-            admissionNumber: studentAdmissionNumber
+            admissionNumber: studentAdmissionNumber,
+            ackIds: acksBeingSent
         })
+    }).then(function(res) {
+        if (!res.ok) return null;
+        return res.json();
+    }).then(function(data) {
+        if (!data) return;
+        // The server has the confirmations now.
+        studentPendingMessageAcks = studentPendingMessageAcks.filter(function(id) {
+            return acksBeingSent.indexOf(id) === -1;
+        });
+        if (data.messages && data.messages.length) handleIncomingTeacherMessages(data.messages);
     }).catch(function() {
         // Offline or server asleep - the next heartbeat retries.
     });
 }
 
+// ---- Messages from the teacher / admin, shown while the quiz continues ----
+
+function unlockStudentAudio() {
+    try {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        if (!studentAudioCtx) studentAudioCtx = new AC();
+        if (studentAudioCtx.state === 'suspended') studentAudioCtx.resume();
+    } catch (e) { /* sound is a bonus - never break the quiz */ }
+}
+// Browsers only allow sound after the person has touched the page once. Students
+// tap answers constantly, so the first tap unlocks the chime.
+['pointerdown', 'touchstart', 'keydown', 'click'].forEach(function(ev) {
+    document.addEventListener(ev, unlockStudentAudio, { passive: true });
+});
+
+function playMessageChime() {
+    try {
+        unlockStudentAudio();
+        var ctx = studentAudioCtx;
+        if (!ctx) return;
+        var now = ctx.currentTime;
+        [[784, 0], [1047, 0.2]].forEach(function(n) {
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = n[0];
+            gain.gain.setValueAtTime(0.0001, now + n[1]);
+            gain.gain.exponentialRampToValueAtTime(0.3, now + n[1] + 0.03);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + n[1] + 0.45);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + n[1]);
+            osc.stop(now + n[1] + 0.5);
+        });
+    } catch (e) { /* ignore */ }
+}
+
+function handleIncomingTeacherMessages(messages) {
+    var gotNew = false;
+    for (var i = 0; i < messages.length; i++) {
+        var m = messages[i];
+        if (!m || !m.id) continue;
+        // Always (re)confirm so the sender sees "Seen", but only show each message once.
+        if (studentPendingMessageAcks.indexOf(m.id) === -1) studentPendingMessageAcks.push(m.id);
+        if (studentSeenMessageIds[m.id]) continue;
+        studentSeenMessageIds[m.id] = true;
+        showTeacherMessage(m);
+        gotNew = true;
+    }
+    if (gotNew) {
+        playMessageChime();
+        // Confirm straight away so the teacher sees "Seen" without waiting.
+        sendPresenceHeartbeat();
+    }
+}
+
+function showTeacherMessage(m) {
+    var stack = document.getElementById('liveMessageStack');
+    if (!stack) return;
+
+    var card = document.createElement('div');
+    card.className = 'live-msg-card';
+    card.setAttribute('role', 'status');
+
+    var icon = document.createElement('div');
+    icon.className = 'live-msg-icon';
+    icon.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+
+    var body = document.createElement('div');
+    body.className = 'live-msg-body';
+    var from = document.createElement('div');
+    from.className = 'live-msg-from';
+    from.textContent = m.from === 'admin' ? 'Message from the school admin' : 'Message from your teacher';
+    var text = document.createElement('div');
+    text.className = 'live-msg-text';
+    text.textContent = m.text;
+    body.appendChild(from);
+    body.appendChild(text);
+
+    var ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'live-msg-ok';
+    ok.textContent = 'Got it';
+    function remove() { if (card.parentNode) card.parentNode.removeChild(card); }
+    ok.addEventListener('click', remove);
+
+    card.appendChild(icon);
+    card.appendChild(body);
+    card.appendChild(ok);
+    stack.insertBefore(card, stack.firstChild);
+
+    // Keep at most 3 on screen; tidy up after 90 seconds.
+    while (stack.children.length > 3) stack.removeChild(stack.lastChild);
+    setTimeout(remove, 90000);
+}
+
+function clearLiveMessageBanners() {
+    var stack = document.getElementById('liveMessageStack');
+    if (stack) stack.innerHTML = '';
+}
+
 function startStudentPresence() {
     stopStudentPresence();
     sendPresenceHeartbeat();
-    studentPresenceInterval = setInterval(sendPresenceHeartbeat, 20000);
+    // Every 8 seconds: keeps "Live Now" fresh and delivers teacher messages quickly.
+    studentPresenceInterval = setInterval(sendPresenceHeartbeat, 8000);
 }
 
 function stopStudentPresence() {
@@ -7032,6 +7151,8 @@ function stopStudentPresence() {
         clearInterval(studentPresenceInterval);
         studentPresenceInterval = null;
     }
+    clearLiveMessageBanners();
+    studentPendingMessageAcks = [];
 }
 
 // ============================================================
@@ -7061,26 +7182,186 @@ async function loadTeacherLive() {
     }
 }
 
+var liveListCache = { teacher: [], admin: [] };
+
+function liveLastMessageHtml(s) {
+    if (!s.lastMessage) return '';
+    var t = String(s.lastMessage.text || '');
+    if (t.length > 70) t = t.slice(0, 70) + '...';
+    return '<br><span class="live-last-msg">&#9993; ' + escapeHtml(t) + ' &mdash; ' +
+        (s.lastMessage.seenAt ? '<b style="color:#2d9c5c;">&#10003; Seen</b>' : '<span style="color:#b7791f;">sent, waiting for student</span>') + '</span>';
+}
+
+function liveMessageButtonHtml(role, s) {
+    return '<button type="button" class="live-msg-btn" data-role="' + role + '" data-mode="one" data-code="' + escapeHtml(s.code || '') + '" data-adm="' + escapeHtml(s.admissionNumber || '') + '" data-name="' + escapeHtml(s.studentName || '') + '" onclick="openLiveMessageDialogFromBtn(this)" aria-label="Send a message to ' + escapeHtml(s.studentName || 'student') + '">' +
+        '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
+        '<span>Message</span></button>';
+}
+
+function liveMessageAllButtonHtml(role, count) {
+    return '<div class="live-toolbar"><button type="button" class="live-msg-all-btn" data-role="' + role + '" data-mode="all" onclick="openLiveMessageDialogFromBtn(this)">' +
+        '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' +
+        '<span>Message all students (' + count + ')</span></button></div>';
+}
+
 function renderTeacherLive(list) {
     var container = document.getElementById('teacherLiveContainer');
     if (!container) return;
+    liveListCache.teacher = list || [];
     if (!list || list.length === 0) {
         container.innerHTML = '<p class="helper-text">No students are taking your assessments right now.</p>';
         return;
     }
-    var html = '';
+    var html = liveMessageAllButtonHtml('teacher', list.length);
     for (var i = 0; i < list.length; i++) {
         var s = list[i];
         var elapsedMs = Date.now() - new Date(s.startedAt).getTime();
         var elapsedMin = Math.max(1, Math.round(elapsedMs / 60000));
         html += '<div class="live-item">' +
             '<span class="live-dot"></span>' +
-            '<div style="flex:1; min-width:160px;"><strong>' + s.studentName + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + s.admissionNumber + ')</span><br>' +
-            '<span style="color:#6b7a8f; font-size:13px;">' + s.subject + ' - ' + s.className + ' | Code: ' + s.code + '</span></div>' +
+            '<div style="flex:1; min-width:160px;"><strong>' + escapeHtml(s.studentName) + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + escapeHtml(s.admissionNumber) + ')</span><br>' +
+            '<span style="color:#6b7a8f; font-size:13px;">' + escapeHtml(s.subject) + ' - ' + escapeHtml(s.className) + ' | Code: ' + escapeHtml(s.code) + '</span>' +
+            liveLastMessageHtml(s) + '</div>' +
             '<span style="font-size:13px; color:#2d9c5c; font-weight:600; white-space:nowrap;">in progress ~' + elapsedMin + ' min</span>' +
+            liveMessageButtonHtml('teacher', s) +
             '</div>';
     }
     container.innerHTML = html;
+}
+
+
+// ============================================================
+// LIVE MESSAGE DIALOG (teacher + admin): pick a ready-made message or write
+// your own, then send it to one student or to everyone taking an assessment.
+// ============================================================
+
+var LIVE_MESSAGE_PRESETS = [
+    "I can see you are currently doing your assessment. Well done!",
+    "Make sure you do your assessment carefully. Don't rush!",
+    "Please read each question fully before choosing an answer.",
+    "Keep going - you are doing great!",
+    "Remember to watch the time and manage it wisely.",
+    "Please stay on this page until you submit your assessment.",
+    "Please keep your eyes on your own screen.",
+    "Do not switch to other apps or tabs during the assessment.",
+    "If a question is hard, move on and come back to it later.",
+    "Take a deep breath and stay calm. You can do this!",
+    "Please review your answers before you submit.",
+    "Time is running out. Check any unanswered questions now.",
+    "Make sure every question has an answer before you submit.",
+    "Stay focused. Your best effort matters.",
+    "Please keep quiet so others can concentrate.",
+    "Your assessment is being monitored live. Please be honest in your work.",
+    "Don't pick answers too fast. Think about each option carefully.",
+    "If you have a problem with your device or network, tell the supervisor in the room.",
+    "Almost there! Finish strong.",
+    "Please put away your notes and any other devices."
+];
+
+var liveMessageTarget = null;
+
+function openLiveMessageDialogFromBtn(btn) {
+    var role = btn.getAttribute('data-role') === 'admin' ? 'admin' : 'teacher';
+    if (btn.getAttribute('data-mode') === 'all') {
+        openLiveMessageDialog({ role: role, mode: 'all', count: (liveListCache[role] || []).length });
+    } else {
+        openLiveMessageDialog({
+            role: role,
+            mode: 'one',
+            code: btn.getAttribute('data-code') || '',
+            admissionNumber: btn.getAttribute('data-adm') || '',
+            studentName: btn.getAttribute('data-name') || 'this student'
+        });
+    }
+}
+
+function openLiveMessageDialog(target) {
+    liveMessageTarget = target;
+    var title = document.getElementById('liveMsgTitle');
+    var to = document.getElementById('liveMsgTo');
+    if (target.mode === 'all') {
+        title.textContent = 'Message all students';
+        to.textContent = 'To: everyone taking an assessment right now (' + target.count + ')';
+    } else {
+        title.textContent = 'Message student';
+        to.textContent = 'To: ' + target.studentName;
+    }
+    var sel = document.getElementById('liveMsgPreset');
+    var html = '<option value="">Choose a message...</option>';
+    for (var i = 0; i < LIVE_MESSAGE_PRESETS.length; i++) {
+        html += '<option value="' + i + '">' + escapeHtml(LIVE_MESSAGE_PRESETS[i]) + '</option>';
+    }
+    html += '<option value="__custom">Write my own message...</option>';
+    sel.innerHTML = html;
+    sel.value = '';
+    document.getElementById('liveMsgText').value = '';
+    document.getElementById('liveMsgStatus').textContent = '';
+    updateLiveMsgCount();
+    document.getElementById('liveMsgSendBtn').disabled = false;
+    document.getElementById('liveMessageOverlay').style.display = 'flex';
+}
+
+function closeLiveMessageDialog() {
+    document.getElementById('liveMessageOverlay').style.display = 'none';
+    liveMessageTarget = null;
+}
+
+function onLivePresetChange(sel) {
+    var ta = document.getElementById('liveMsgText');
+    if (sel.value === '__custom') {
+        ta.value = '';
+        ta.focus();
+    } else if (sel.value !== '') {
+        ta.value = LIVE_MESSAGE_PRESETS[parseInt(sel.value, 10)] || '';
+    }
+    updateLiveMsgCount();
+}
+
+function updateLiveMsgCount() {
+    var ta = document.getElementById('liveMsgText');
+    document.getElementById('liveMsgCount').textContent = ta.value.length + '/300';
+}
+
+async function sendLiveMessage() {
+    if (!liveMessageTarget) return;
+    var text = document.getElementById('liveMsgText').value.replace(/\s+/g, ' ').trim();
+    var status = document.getElementById('liveMsgStatus');
+    if (!text) { status.style.color = '#dc3545'; status.textContent = 'Please choose a message or write your own.'; return; }
+    if (text.length > 300) { status.style.color = '#dc3545'; status.textContent = 'That message is too long (300 characters at most).'; return; }
+
+    var role = liveMessageTarget.role;
+    var token = localStorage.getItem(role === 'admin' ? 'cleverment_admin_token' : 'cleverment_teacher_token');
+    var body = { text: text, target: liveMessageTarget.mode };
+    if (liveMessageTarget.mode === 'one') {
+        body.code = liveMessageTarget.code;
+        body.admissionNumber = liveMessageTarget.admissionNumber;
+    }
+    var btn = document.getElementById('liveMsgSendBtn');
+    btn.disabled = true;
+    status.style.color = '#6b7a8f';
+    status.textContent = 'Sending...';
+    try {
+        var res = await fetch(BACKEND_URL + '/api/' + role + '/live/message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify(body)
+        });
+        var data = await res.json();
+        if (!res.ok) {
+            status.style.color = '#dc3545';
+            status.textContent = data.error || 'Could not send the message.';
+            btn.disabled = false;
+            return;
+        }
+        status.style.color = '#2d9c5c';
+        status.textContent = '\u2713 Sent to ' + data.sent + ' student' + (data.sent === 1 ? '' : 's') + '. It appears on their screen within a few seconds.';
+        if (role === 'admin') loadAdminLive(); else loadTeacherLive();
+        setTimeout(closeLiveMessageDialog, 1600);
+    } catch (e) {
+        status.style.color = '#dc3545';
+        status.textContent = 'Could not reach the server. Please try again.';
+        btn.disabled = false;
+    }
 }
 
 function startTeacherLivePolling() {
@@ -7112,11 +7393,12 @@ async function loadAdminLive() {
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not load live students.');
         var list = data.live || [];
+        liveListCache.admin = list;
         if (!list.length) { container.innerHTML = '<p class="helper-text">No students are taking assessments right now.</p>'; return; }
-        var html = '';
+        var html = liveMessageAllButtonHtml('admin', list.length);
         list.forEach(function(s) {
             var elapsedMin = Math.max(1, Math.round((Date.now() - new Date(s.startedAt).getTime()) / 60000));
-            html += '<div class="live-item"><span class="live-dot"></span><div style="flex:1;min-width:160px;"><strong>' + escapeHtml(s.studentName || 'Unknown student') + '</strong> <span style="color:#6b7a8f;font-size:13px;">(' + escapeHtml(s.admissionNumber || '—') + ')</span><br><span style="color:#6b7a8f;font-size:13px;">' + escapeHtml(s.subject || '') + ' - ' + escapeHtml(s.className || '') + ' | Code: ' + escapeHtml(s.code || '') + '</span>' + (s.teacherName || s.teacherEmail ? '<br><span style="font-size:12px;color:#6b7a8f;">Teacher: ' + escapeHtml(s.teacherName || 'Unknown') + (s.teacherEmail ? ' (' + escapeHtml(s.teacherEmail) + ')' : '') + '</span>' : '') + '</div><span style="font-size:13px;color:#2d9c5c;font-weight:600;white-space:nowrap;">in progress ~' + elapsedMin + ' min</span></div>';
+            html += '<div class="live-item"><span class="live-dot"></span><div style="flex:1;min-width:160px;"><strong>' + escapeHtml(s.studentName || 'Unknown student') + '</strong> <span style="color:#6b7a8f;font-size:13px;">(' + escapeHtml(s.admissionNumber || '—') + ')</span><br><span style="color:#6b7a8f;font-size:13px;">' + escapeHtml(s.subject || '') + ' - ' + escapeHtml(s.className || '') + ' | Code: ' + escapeHtml(s.code || '') + '</span>' + (s.teacherName || s.teacherEmail ? '<br><span style="font-size:12px;color:#6b7a8f;">Teacher: ' + escapeHtml(s.teacherName || 'Unknown') + (s.teacherEmail ? ' (' + escapeHtml(s.teacherEmail) + ')' : '') + '</span>' : '') + liveLastMessageHtml(s) + '</div><span style="font-size:13px;color:#2d9c5c;font-weight:600;white-space:nowrap;">in progress ~' + elapsedMin + ' min</span>' + liveMessageButtonHtml('admin', s) + '</div>';
         });
         container.innerHTML = html;
     } catch (e) { container.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load live data.') + '</p>'; }
