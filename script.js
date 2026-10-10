@@ -1,3 +1,32 @@
+// Admin teacher-workspace mode: teacher API calls use the selected teacher scope.
+// The server independently validates the admin JWT and selected teacher before allowing access.
+var adminActAsTeacher = (function(){ try { return localStorage.getItem('cleverment_admin_act_as_teacher') || ''; } catch(e) { return ''; } })();
+(function installAdminTeacherFetchScope(){
+    if (typeof window === 'undefined' || !window.fetch || window.__clevermentTeacherScopeFetchInstalled) return;
+    var nativeFetch = window.fetch.bind(window);
+    window.fetch = function(input, init){
+        var url = typeof input === 'string' ? input : (input && input.url) || '';
+        var selectedEmail = '';
+        try { selectedEmail = localStorage.getItem('cleverment_admin_act_as_teacher') || ''; } catch(e) {}
+        if (selectedEmail && url.indexOf('/api/teacher/') !== -1) {
+            init = init ? Object.assign({}, init) : {};
+            var headers = {};
+            if (init.headers) {
+                if (typeof Headers !== 'undefined' && init.headers instanceof Headers) init.headers.forEach(function(v,k){ headers[k] = v; });
+                else if (Array.isArray(init.headers)) init.headers.forEach(function(pair){ headers[pair[0]] = pair[1]; });
+                else Object.keys(init.headers).forEach(function(k){ headers[k] = init.headers[k]; });
+            } else if (input && input.headers) {
+                if (typeof Headers !== 'undefined' && input.headers instanceof Headers) input.headers.forEach(function(v,k){ headers[k] = v; });
+                else if (!Array.isArray(input.headers)) Object.keys(input.headers).forEach(function(k){ headers[k] = input.headers[k]; });
+            }
+            headers['X-CleverMent-Act-As-Teacher'] = selectedEmail;
+            init.headers = headers;
+        }
+        return nativeFetch(input, init);
+    };
+    window.__clevermentTeacherScopeFetchInstalled = true;
+})();
+
 // Brand icons: browser tab icon and home-screen icon use the CleverMent logo files.
 (function setBrandIcons(){
     try {
@@ -94,8 +123,16 @@ function showPageFromURL(page) {
             setDashboardHeaderVisible(false);
             document.getElementById('teacherDashboard').style.display = 'block';
             restoreDashSidebarState('teacherDashboard');
-            document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + currentTeacher.name + '!';
-            document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email;
+            if (adminActAsTeacher || localStorage.getItem('cleverment_admin_act_as_teacher')) {
+                adminActAsTeacher = localStorage.getItem('cleverment_admin_act_as_teacher') || adminActAsTeacher;
+                document.getElementById('teacherDashboardName').textContent = 'Admin Workspace — ' + currentTeacher.name;
+                document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email + ' · You are acting on behalf of this teacher';
+                var workspaceExit = document.getElementById('teacherDashboardExitButton');
+                if (workspaceExit) { workspaceExit.textContent = '← Back to Admin'; workspaceExit.onclick = returnToAdminDashboard; }
+            } else {
+                document.getElementById('teacherDashboardName').textContent = 'Welcome, ' + currentTeacher.name + '!';
+                document.getElementById('teacherDashboardEmail').textContent = currentTeacher.email;
+            }
             renderTeacherDashboard();
             renderTeacherPublishedList();
             populateTeacherQuestionBankSelect();
@@ -548,12 +585,16 @@ if (typeof emailjs !== 'undefined' && emailjs.init) {
 
 async function logTeacherActivity(teacherEmail, action, details) {
     try {
+        var activityDetails = details || '';
+        if (adminActAsTeacher || (function(){ try { return !!localStorage.getItem('cleverment_admin_act_as_teacher'); } catch(e) { return false; } })()) {
+            activityDetails = '[ADMIN ACTION ON BEHALF OF ' + String(teacherEmail || adminActAsTeacher || '').toLowerCase() + '] ' + activityDetails;
+        }
         await supabase
             .from('cleverment_teacher_activity')
             .insert([{
                 teacher_email: teacherEmail,
                 action: action,
-                details: details || '',
+                details: activityDetails,
                 created_at: new Date().toISOString()
             }]);
     } catch(e) { console.error('Activity log error:', e); }
@@ -1485,6 +1526,10 @@ async function teacherLogin() {
 }
 
 function teacherLogout() {
+    if (adminActAsTeacher || localStorage.getItem('cleverment_admin_act_as_teacher')) {
+        returnToAdminDashboard();
+        return;
+    }
     currentTeacher = null;
     localStorage.removeItem('cleverment_teacher_session');
     localStorage.removeItem('cleverment_teacher_token');
@@ -6153,12 +6198,108 @@ function adminLogout() {
 async function renderAdminDashboard() {
     renderAdminReactivationFee();
     renderAdminTeacherList();
+    loadAdminTeacherWorkspaceOptions();
     renderAdminAssessmentList();
     renderAdminResults();
     renderAdminActivityLog();
     renderAdminFileList();
     renderAdminFaqList();
     showAdminSection('adminOverviewPanel');
+}
+
+async function loadAdminTeacherWorkspaceOptions() {
+    var select = document.getElementById('adminSelectTeacherWorkspace');
+    var status = document.getElementById('adminSelectTeacherStatus');
+    if (!select) return;
+    select.innerHTML = '<option value="">Loading teachers...</option>';
+    try {
+        var token = localStorage.getItem('cleverment_admin_token');
+        var response = await fetch(BACKEND_URL + '/api/admin/teachers', { headers: { 'Authorization': 'Bearer ' + token } });
+        var data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load teachers.');
+        var teachers = data.teachers || [];
+        select.innerHTML = '<option value="">Choose a teacher...</option>';
+        teachers.forEach(function(t) {
+            var opt = document.createElement('option');
+            opt.value = t.email;
+            opt.textContent = (t.name || 'Unnamed teacher') + ' — ' + t.email + (t.paused ? ' (paused)' : '');
+            opt.dataset.name = t.name || '';
+            opt.dataset.id = t.id;
+            select.appendChild(opt);
+        });
+        if (status) status.textContent = teachers.length ? 'Select a teacher to manage assessments, class rosters, results, analytics, CSV history, and teacher settings in their workspace.' : 'No teachers are registered yet.';
+    } catch (e) {
+        select.innerHTML = '<option value="">Could not load teachers</option>';
+        if (status) status.textContent = e.message || 'Could not load teachers.';
+    }
+}
+
+async function startAdminTeacherWorkspace() {
+    var select = document.getElementById('adminSelectTeacherWorkspace');
+    var status = document.getElementById('adminSelectTeacherStatus');
+    var email = select ? String(select.value || '').trim().toLowerCase() : '';
+    if (!email) { alert('Please select a teacher first.'); return; }
+    var opt = select.options[select.selectedIndex];
+    var adminToken = localStorage.getItem('cleverment_admin_token');
+    if (!adminToken || localStorage.getItem('cleverment_admin_session') !== 'true') { alert('Your administrator session has expired. Please log in again.'); return; }
+    try {
+        var response = await fetch(BACKEND_URL + '/api/admin/teachers', { headers: { 'Authorization': 'Bearer ' + adminToken } });
+        var data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not verify selected teacher.');
+        var teacher = (data.teachers || []).find(function(t){ return String(t.email || '').toLowerCase() === email; });
+        if (!teacher) throw new Error('The selected teacher could not be found. Refresh the teacher list and try again.');
+        if (!localStorage.getItem('cleverment_admin_workspace_started')) {
+            localStorage.setItem('cleverment_admin_previous_teacher_token', localStorage.getItem('cleverment_teacher_token') || '__none__');
+            localStorage.setItem('cleverment_admin_previous_teacher_session', localStorage.getItem('cleverment_teacher_session') || '__none__');
+            localStorage.setItem('cleverment_admin_workspace_started', '1');
+        }
+        adminActAsTeacher = email;
+        localStorage.setItem('cleverment_admin_act_as_teacher', email);
+        localStorage.setItem('cleverment_teacher_token', adminToken);
+        currentTeacher = { id: teacher.id, name: teacher.name || 'Teacher', email: teacher.email };
+        localStorage.setItem('cleverment_teacher_session', JSON.stringify(currentTeacher));
+        document.getElementById('adminDashboard').style.display = 'none';
+        document.getElementById('teacherAuth').style.display = 'none';
+        document.getElementById('teacherDashboard').style.display = 'block';
+        setDashboardHeaderVisible(false);
+        var heading = document.getElementById('teacherDashboardName');
+        var emailLine = document.getElementById('teacherDashboardEmail');
+        if (heading) heading.textContent = 'Admin Workspace — ' + currentTeacher.name;
+        if (emailLine) emailLine.textContent = currentTeacher.email + ' · You are acting on behalf of this teacher';
+        var exit = document.getElementById('teacherDashboardExitButton');
+        if (exit) { exit.textContent = '← Back to Admin'; exit.onclick = returnToAdminDashboard; }
+        if (status) status.textContent = '';
+        await renderTeacherDashboard();
+        await renderTeacherPublishedList();
+        populateTeacherQuestionBankSelect();
+        renderCSVHistory();
+        updateURL('teacher-dashboard');
+    } catch (e) { alert(e.message || 'Could not open teacher workspace.'); }
+}
+
+function returnToAdminDashboard() {
+    try { stopTeacherLivePolling(); } catch(e) {}
+    adminActAsTeacher = '';
+    localStorage.removeItem('cleverment_admin_act_as_teacher');
+    var oldToken = localStorage.getItem('cleverment_admin_previous_teacher_token');
+    var oldSession = localStorage.getItem('cleverment_admin_previous_teacher_session');
+    if (oldToken === '__none__' || oldToken === null) localStorage.removeItem('cleverment_teacher_token');
+    else if (oldToken) localStorage.setItem('cleverment_teacher_token', oldToken);
+    if (oldSession === '__none__' || oldSession === null) localStorage.removeItem('cleverment_teacher_session');
+    else if (oldSession) localStorage.setItem('cleverment_teacher_session', oldSession);
+    localStorage.removeItem('cleverment_admin_previous_teacher_token');
+    localStorage.removeItem('cleverment_admin_previous_teacher_session');
+    localStorage.removeItem('cleverment_admin_workspace_started');
+    currentTeacher = null;
+    var saved = localStorage.getItem('cleverment_teacher_session');
+    if (saved) { try { currentTeacher = JSON.parse(saved); } catch(e) {} }
+    document.getElementById('teacherDashboard').style.display = 'none';
+    document.getElementById('adminDashboard').style.display = 'block';
+    setDashboardHeaderVisible(false);
+    var exit = document.getElementById('teacherDashboardExitButton');
+    if (exit) { exit.textContent = 'Logout'; exit.onclick = teacherLogout; }
+    updateURL('admin-dashboard');
+    renderAdminDashboard();
 }
 
 async function renderAdminReactivationFee() {
@@ -6544,26 +6685,38 @@ async function getTeacherActivity() {
 async function renderAdminActivityLog() {
     var container = document.getElementById('adminActivityLog');
     if (!container) return;
-    
     var activities = await getTeacherActivity();
     if (!activities || activities.length === 0) {
         container.innerHTML = '<p class="helper-text">No activity recorded yet.</p>';
         return;
     }
-    
+    // Resolve the teacher's display name from the registered-teacher list, then show name before email.
+    var teacherNames = {};
+    try {
+        var adminToken = localStorage.getItem('cleverment_admin_token') || '';
+        var response = await fetch(BACKEND_URL + '/api/admin/teachers', { headers: { 'Authorization': 'Bearer ' + adminToken } });
+        if (response.ok) {
+            var teacherData = await response.json();
+            (teacherData.teachers || []).forEach(function(t) {
+                if (t.email) teacherNames[String(t.email).toLowerCase()] = t.name || '';
+            });
+        }
+    } catch (e) { /* If lookup fails, still show the email clearly. */ }
     var html = '';
     for (var i = 0; i < activities.length; i++) {
-        var item = activities[i];
-        var date = new Date(item.created_at).toLocaleString();
+        var item = activities[i] || {};
+        var email = String(item.teacher_email || 'Unknown email');
+        var teacherName = teacherNames[email.toLowerCase()] || 'Teacher name unavailable';
+        var date = item.created_at ? new Date(item.created_at).toLocaleString() : '';
+        var action = String(item.action || 'activity').replace(/_/g, ' ');
         var actionColor = '#2d6cdf';
         if (item.action === 'signup') actionColor = '#2d9c5c';
         else if (item.action === 'publish_assessment') actionColor = '#e67e22';
         else if (item.action === 'login') actionColor = '#6f42c1';
-        
         html += '<div style="background:white; padding:10px 14px; border-radius:8px; border-left:4px solid ' + actionColor + '; margin-bottom:6px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;">' +
-            '<div><strong>' + item.teacher_email + '</strong> <span style="color:#1a1a2e;">' + item.action.replace(/_/g, ' ') + '</span>' +
-            (item.details ? ' <span style="color:#6b7a8f; font-size:13px;">' + item.details + '</span>' : '') +
-            '</div><span style="color:#8a9aa8; font-size:11px;">' + date + '</span></div>';
+            '<div><strong>' + escapeHtml(teacherName) + '</strong> <span style="color:#6b7a8f; font-size:12px;">(' + escapeHtml(email) + ')</span> <span style="color:#1a1a2e;">' + escapeHtml(action) + '</span>' +
+            (item.details ? ' <span style="color:#6b7a8f; font-size:13px;">' + escapeHtml(item.details) + '</span>' : '') +
+            '</div><span style="color:#8a9aa8; font-size:11px;">' + escapeHtml(date) + '</span></div>';
     }
     container.innerHTML = html;
 }
@@ -6751,6 +6904,9 @@ function showTeacherSection(panelId, btn) {
 
 function showAdminSection(panelId, btn) {
     showDashSection('adminDashboard', panelId, btn);
+    if (panelId === 'adminAccessLogsSection') loadAdminAccessLogs();
+    if (panelId === 'adminLiveSection') startAdminLivePolling();
+    else stopAdminLivePolling();
 }
 
 
@@ -6938,6 +7094,54 @@ function stopTeacherLivePolling() {
         clearInterval(teacherLiveInterval);
         teacherLiveInterval = null;
     }
+}
+
+
+// ============================================================
+// ADMIN: ALL-STUDENT LIVE PRESENCE AND ACCESS LOGS
+// ============================================================
+var adminLiveInterval = null;
+
+async function loadAdminLive() {
+    var container = document.getElementById('adminLiveContainer');
+    if (!container) return;
+    var token = localStorage.getItem('cleverment_admin_token');
+    if (!token) { container.innerHTML = '<p class="helper-text">Admin session missing. Please log in again.</p>'; return; }
+    try {
+        var res = await fetch(BACKEND_URL + '/api/admin/live', { headers: { 'Authorization': 'Bearer ' + token } });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not load live students.');
+        var list = data.live || [];
+        if (!list.length) { container.innerHTML = '<p class="helper-text">No students are taking assessments right now.</p>'; return; }
+        var html = '';
+        list.forEach(function(s) {
+            var elapsedMin = Math.max(1, Math.round((Date.now() - new Date(s.startedAt).getTime()) / 60000));
+            html += '<div class="live-item"><span class="live-dot"></span><div style="flex:1;min-width:160px;"><strong>' + escapeHtml(s.studentName || 'Unknown student') + '</strong> <span style="color:#6b7a8f;font-size:13px;">(' + escapeHtml(s.admissionNumber || '—') + ')</span><br><span style="color:#6b7a8f;font-size:13px;">' + escapeHtml(s.subject || '') + ' - ' + escapeHtml(s.className || '') + ' | Code: ' + escapeHtml(s.code || '') + '</span>' + (s.teacherName || s.teacherEmail ? '<br><span style="font-size:12px;color:#6b7a8f;">Teacher: ' + escapeHtml(s.teacherName || 'Unknown') + (s.teacherEmail ? ' (' + escapeHtml(s.teacherEmail) + ')' : '') + '</span>' : '') + '</div><span style="font-size:13px;color:#2d9c5c;font-weight:600;white-space:nowrap;">in progress ~' + elapsedMin + ' min</span></div>';
+        });
+        container.innerHTML = html;
+    } catch (e) { container.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load live data.') + '</p>'; }
+}
+function startAdminLivePolling() { stopAdminLivePolling(); loadAdminLive(); adminLiveInterval = setInterval(loadAdminLive, 8000); }
+function stopAdminLivePolling() { if (adminLiveInterval) { clearInterval(adminLiveInterval); adminLiveInterval = null; } }
+
+async function loadAdminAccessLogs() {
+    var container = document.getElementById('adminAccessLogsContainer');
+    if (!container) return;
+    var token = localStorage.getItem('cleverment_admin_token');
+    if (!token) { container.innerHTML = '<p class="helper-text">Admin session missing. Please log in again.</p>'; return; }
+    container.innerHTML = '<p class="helper-text">Loading access logs...</p>';
+    try {
+        var res = await fetch(BACKEND_URL + '/api/admin/access-logs', { headers: { 'Authorization': 'Bearer ' + token } });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not load access logs.');
+        var logs = data.logs || [];
+        if (!logs.length) { container.innerHTML = '<p class="helper-text">No student access attempts have been recorded yet.</p>'; return; }
+        var html = '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table class="teacher-access-log-table"><thead><tr><th>Date & Time</th><th>Teacher</th><th>Assessment</th><th>Student Name</th><th>Admission No.</th><th>Status</th><th>Details</th></tr></thead><tbody>';
+        logs.forEach(function(x) {
+            html += '<tr><td style="white-space:nowrap;">' + escapeHtml(x.timestamp ? new Date(x.timestamp).toLocaleString() : '') + '</td><td><strong>' + escapeHtml(x.teacherName || 'Unknown teacher') + '</strong><br><span style="font-size:12px;color:#6b7a8f;">' + escapeHtml(x.teacherEmail || '') + '</span></td><td><strong>' + escapeHtml(x.code || '') + '</strong><br><span style="font-size:12px;color:#6b7a8f;">' + escapeHtml((x.subject || '') + (x.className ? ' • ' + x.className : '')) + '</span></td><td>' + escapeHtml(x.studentName || '—') + '</td><td>' + escapeHtml(x.admissionNumber || '—') + '</td><td><span class="cm-access-status ' + accessLogStatusClass(x.status) + '">' + escapeHtml(accessLogStatusLabel(x.status)) + '</span></td><td style="min-width:220px;">' + escapeHtml(x.message || '') + '</td></tr>';
+        });
+        container.innerHTML = html + '</tbody></table></div>';
+    } catch (e) { container.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load access logs.') + '</p>'; }
 }
 
 
