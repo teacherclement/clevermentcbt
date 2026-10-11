@@ -8,7 +8,7 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-v40';
+var CACHE_NAME = 'cleverment-v41';
 var urlsToCache = [
     '/',
     '/index.html',
@@ -75,6 +75,11 @@ self.addEventListener('activate', function(event) {
 // Fetch: NETWORK-FIRST, cache as a fallback for offline use.
 self.addEventListener('fetch', function(event) {
     if (event.request.method !== 'GET') return;
+    // Only handle this site's own files. Calls to the backend (a different address) go straight to the network,
+    // so a bad connection can never be answered with an empty cached response, and quiz data is never cached.
+    try {
+        if (new URL(event.request.url).origin !== self.location.origin) return;
+    } catch (e) { return; }
 
     event.respondWith(
         fetch(event.request)

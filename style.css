@@ -2120,3 +2120,99 @@ tr.result-row-selected td { background: #eef3fd; }
 .live-msg-dialog h3 { margin: 0 0 4px; color: #172033; }
 .live-msg-label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 4px; }
 .live-msg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+
+
+/* ===== Update 1 additions ===== */
+.assessment-editor-credit {
+    margin-left: auto;
+    margin-right: 8px;
+    border: 1.5px solid #cfe1ff;
+    background: #eef3fd;
+    color: #2d6cdf;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.whatsapp-share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    padding: 4px 12px;
+    background: #25D366 !important;
+    color: #fff !important;
+}
+
+
+/* ===== Connecting banner ===== */
+.connect-banner {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    left: 10px;
+    right: 10px;
+    max-width: 520px;
+    margin: 0 auto;
+    z-index: 99995;
+    background: #172033;
+    color: #fff;
+    border-left: 5px solid #C9A84C;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+}
+
+/* ===== Class positions + student progress ===== */
+.pos-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+.pos-tab {
+    border: 1.5px solid #cfe1ff;
+    background: #fff;
+    color: #2d6cdf;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+}
+.pos-tab.active { background: #2d6cdf; color: #fff; border-color: #2d6cdf; }
+.pos-refresh { margin-left: auto; border-color: #e2e8f0; color: #475569; }
+.pos-actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0; }
+.pos-selects { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.pos-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 10px; margin: 6px 0 12px; }
+.pos-chip { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 10px 12px; text-align: center; }
+.pos-chip-value { font-size: 20px; font-weight: 800; color: #172033; }
+.pos-chip-label { font-size: 11px; font-weight: 700; color: #6b7a8f; text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+.pos-trend-up .pos-chip-value { color: #2d9c5c; }
+.pos-trend-down .pos-chip-value { color: #dc3545; }
+.pos-table { width: 100%; border-collapse: collapse; min-width: 520px; }
+.pos-table th { background: #172033; color: #fff; text-align: left; font-size: 12px; padding: 9px 10px; white-space: nowrap; }
+.pos-table td { padding: 9px 10px; border-bottom: 1px solid #e8edf3; font-size: 13.5px; background: #fff; }
+.pos-table tr:nth-child(even) td { background: #f6f8fb; }
+.pos-rank { font-weight: 800; white-space: nowrap; }
+.pos-top-1 td { background: #fff6d6 !important; }
+.pos-top-2 td { background: #eef1f6 !important; }
+.pos-top-3 td { background: #fbeee2 !important; }
+.pos-footer-row td { background: #e2e8f4 !important; font-weight: 800; }
+.pos-missing { color: #a0aab8; }
+.pos-remark { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 800; }
+.pos-remark.pass { background: #e1f5ea; color: #1d7a45; }
+.pos-remark.fail { background: #fde7e9; color: #b4232f; }
+.prog-matches { display: grid; gap: 8px; margin-top: 8px; }
+.prog-match {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+    width: 100%; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; cursor: pointer; font-size: 14px; color: #172033;
+}
+.prog-match span { font-size: 12px; color: #6b7a8f; }
+.prog-match.active { border-color: #2d6cdf; background: #eef3fd; }
+.prog-chart { width: 100%; height: auto; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; }
+.prog-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
+.prog-dot.pass { background: #2d9c5c; }
+.prog-dot.fail { background: #dc3545; }
+.prog-bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.prog-bar-label { flex: 0 0 34%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.prog-bar-track { flex: 1; height: 10px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+.prog-bar-fill { height: 100%; background: #2d6cdf; border-radius: 999px; }
+.prog-bar-value { flex: 0 0 46px; text-align: right; font-weight: 700; }

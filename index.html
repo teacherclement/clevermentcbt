@@ -427,6 +427,9 @@
                     <button title="Analytics & Attendance" class="dash-nav-item" data-target="analyticsSection" onclick="showTeacherSection('analyticsSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg><span>Analytics &amp; Attendance</span></button>
                     <button title="Results" class="dash-nav-item" data-target="adminSection" onclick="showTeacherSection('adminSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Results</span></button>
                     <button title="CSV History" class="dash-nav-item" data-target="csvHistorySection" onclick="showTeacherSection('csvHistorySection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg><span>CSV History</span></button>
+                    <button title="Class Positions" class="dash-nav-item" data-target="positionsSection" onclick="showTeacherSection('positionsSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.7V17c0 .6-.5 1-1.1 1.2C7.800 18.700 7 20.200 7 22"/><path d="M14 14.7V17c0 .6.5 1 1.100 1.200C16.200 18.700 17 20.200 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg><span>Class Positions</span></button>
+                    <button title="Student Progress" class="dash-nav-item" data-target="progressSection" onclick="showTeacherSection('progressSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.500 15.500 8.500 10.500 2 17"/><polyline points="16 7 22 7 22 13"/></svg><span>Student Progress</span></button>
+                    <button title="Backup & Export" class="dash-nav-item" data-target="backupSection" onclick="showTeacherSection('backupSection', this); showLastBackupTime();"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Backup &amp; Export</span></button>
                 </nav>
             </aside>
             <div class="sidebar-backdrop" onclick="toggleDashSidebar('teacherDashboard')"></div>
@@ -693,6 +696,93 @@
             <div id="teacherAnalyticsContainer" class="scrollable-panel">
                 <p class="helper-text">Pick an assessment above to see its question breakdown.</p>
             </div>
+        </div>
+
+        <div class="dash-panel" id="positionsSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-top:0;">Class Positions</h3>
+            <div class="pos-tabs">
+                <button type="button" id="posTabSubject" class="pos-tab active" onclick="posSwitchTab('subject')">Subject position</button>
+                <button type="button" id="posTabClass" class="pos-tab" onclick="posSwitchTab('class')">Class broadsheet</button>
+                <button type="button" class="pos-tab pos-refresh" onclick="initPositionsPanel(true)">Refresh</button>
+            </div>
+            <p id="posLoadStatus" class="helper-text"></p>
+
+            <div id="posSubjectPane">
+                <label class="live-msg-label" for="posAssessmentSelect">Choose an assessment</label>
+                <select id="posAssessmentSelect" class="form-input" onchange="renderSubjectPositions()"></select>
+                <div class="pos-actions">
+                    <button type="button" class="primary-btn" onclick="posDownloadSubjectPdf()">Download PDF</button>
+                    <button type="button" class="secondary-btn" onclick="posExportSubjectCsv()">Export CSV</button>
+                </div>
+                <div id="posSubjectResult"></div>
+            </div>
+
+            <div id="posClassPane" style="display:none;">
+                <div class="pos-selects">
+                    <div><label class="live-msg-label" for="posClassSelect">Class</label>
+                        <select id="posClassSelect" class="form-input" onchange="renderBroadsheet()"></select></div>
+                    <div><label class="live-msg-label" for="posMethodSelect">If a subject has several assessments, use the</label>
+                        <select id="posMethodSelect" class="form-input" onchange="renderBroadsheet()">
+                            <option value="average">Average score</option>
+                            <option value="latest">Latest assessment</option>
+                            <option value="highest">Highest score</option>
+                        </select></div>
+                </div>
+                <div class="pos-actions">
+                    <button type="button" class="primary-btn" onclick="posDownloadBroadsheetPdf()">Download PDF</button>
+                    <button type="button" class="secondary-btn" onclick="posExportBroadsheetCsv()">Export CSV</button>
+                </div>
+                <div id="posClassResult"></div>
+            </div>
+        </div>
+
+        <div class="dash-panel" id="progressSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-top:0;">Student Progress</h3>
+            <p class="helper-text">Search for a student to see all their results over time.</p>
+            <input type="text" id="progSearch" class="form-input" placeholder="Search by name or admission number" oninput="progSearchChanged()" autocomplete="off">
+            <p id="progLoadStatus" class="helper-text"></p>
+            <div id="progMatches"></div>
+
+            <div id="progDetail" style="display:none; margin-top:16px;">
+                <h4 id="progStudentName" style="margin:0;"></h4>
+                <p id="progStudentMeta" class="helper-text" style="margin:2px 0 12px;"></p>
+                <div class="pos-selects">
+                    <div><label class="live-msg-label" for="progSubject">Subject</label>
+                        <select id="progSubject" class="form-input" onchange="renderStudentProgress()"><option value="all">All subjects</option></select></div>
+                    <div><label class="live-msg-label" for="progPeriod">Period</label>
+                        <select id="progPeriod" class="form-input" onchange="renderStudentProgress()">
+                            <option value="all">All time</option>
+                            <option value="30">Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="custom">Choose dates...</option>
+                        </select></div>
+                </div>
+                <div id="progCustomRange" class="pos-selects" style="display:none; margin-top:8px;">
+                    <div><label class="live-msg-label" for="progFrom">From</label><input type="date" id="progFrom" class="form-input" onchange="renderStudentProgress()"></div>
+                    <div><label class="live-msg-label" for="progTo">To</label><input type="date" id="progTo" class="form-input" onchange="renderStudentProgress()"></div>
+                </div>
+                <div id="progCards" class="pos-chips" style="margin-top:14px;"></div>
+                <div id="progChart" style="margin-top:6px;"></div>
+                <div id="progSubjectBars"></div>
+                <div style="margin:14px 0 6px;"><button type="button" class="primary-btn" onclick="progDownloadPdf()">Download progress report (PDF)</button></div>
+                <div id="progTable"></div>
+            </div>
+        </div>
+
+        <div class="dash-panel" id="backupSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-top:0;">Backup &amp; Export</h3>
+            <p class="helper-text">Keep a safe copy of your work. The full backup is one ZIP file containing:</p>
+            <ul class="helper-text" style="margin:0 0 14px 18px; padding:0;">
+                <li><strong>results.csv</strong> - every student result</li>
+                <li><strong>assessments.csv</strong> - your assessments and their settings</li>
+                <li><strong>questions/</strong> - one ready-to-reuse CSV for each assessment (upload it in Publish Assessment to publish again)</li>
+            </ul>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button id="backupZipBtn" class="primary-btn" onclick="teacherDownloadBackupZip()">Download full backup (ZIP)</button>
+                <button id="backupResultsBtn" class="secondary-btn" onclick="teacherDownloadAllResultsCsv()">Results only (CSV)</button>
+            </div>
+            <p id="backupStatus" class="helper-text" style="margin:12px 0 0; font-weight:600;"></p>
+            <p id="backupLastTime" class="helper-text" style="margin:4px 0 0;"></p>
         </div>
 
         <div class="dash-panel" id="csvHistorySection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
@@ -977,6 +1067,7 @@
         <p id="resultActionMessage" style="margin:0 0 18px 0; color:#6b7a8f; font-size:14px;">Choose an action for this result.</p>
         <div style="display:flex; flex-direction:column; gap:10px;">
             <button id="resultActionDownload" class="primary-btn" style="width:100%;">Download Certificate</button>
+            <button id="resultActionRetake" class="secondary-btn" style="width:100%; background:#2d6cdf; color:white;">Allow Retake</button>
             <button id="resultActionDelete" class="secondary-btn" style="width:100%; background:#dc3545; color:white;">Delete Result</button>
             <button id="resultActionCancel" class="secondary-btn" style="width:100%;">Cancel</button>
         </div>
@@ -1121,6 +1212,9 @@
         </div>
     </div>
 </div>
+
+    <!-- ===== Connecting banner (shown while the app retries a slow connection) ===== -->
+    <div id="connectBanner" class="connect-banner" style="display:none;" role="status" aria-live="polite"></div>
 
     <!-- ===== Live messages: student banner stack ===== -->
     <div id="liveMessageStack" class="live-msg-stack" aria-live="polite"></div>
