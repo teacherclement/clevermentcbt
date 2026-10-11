@@ -7492,6 +7492,14 @@ function cleverBotLooksLikeCsv(code) {
 
 // Makes the CSV safe to import: guarantees the header row (the importer always
 // skips line 1), a capital answer letter, and 7 columns. Drops chatter lines.
+function cbQuoteCell(v) {
+    v = String(v === undefined || v === null ? '' : v).trim();
+    if (v.length >= 2 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') v = v.slice(1, -1);
+    // The importer cannot read a quote inside a quoted cell, so any stray one becomes an apostrophe.
+    v = v.replace(/""/g, "'").replace(/"/g, "'").replace(/\s+/g, ' ').trim();
+    return '"' + v + '"';
+}
+
 function cleverBotNormalizeCsv(code) {
     var HEADER = 'Question,Option A,Option B,Option C,Option D,Correct Answer,';
     var lines = String(code || '').replace(/\r\n?/g, '\n').split('\n')
@@ -7505,9 +7513,10 @@ function cleverBotNormalizeCsv(code) {
         var c = cbSplitCsvLine(l);
         if (c.length < 6) return;
         var ans = c[5].trim().replace(/^"|"$/g, '').trim();
-        if (/^[a-d]$/i.test(ans)) c[5] = ans.toUpperCase();
-        if (c.length === 6) c.push('');
-        rows.push(c.join(','));
+        if (/^[a-d]$/i.test(ans)) ans = ans.toUpperCase();
+        // Question + four options always wrapped in double quotes; answer is a bare capital letter.
+        var image = c.length > 6 ? c[6].trim().replace(/^"|"$/g, '').trim() : '';
+        rows.push([cbQuoteCell(c[0]), cbQuoteCell(c[1]), cbQuoteCell(c[2]), cbQuoteCell(c[3]), cbQuoteCell(c[4]), ans, image].join(','));
     });
     return [HEADER].concat(rows).join('\n');
 }
