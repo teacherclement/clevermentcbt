@@ -427,7 +427,7 @@
                     <button title="Analytics & Attendance" class="dash-nav-item" data-target="analyticsSection" onclick="showTeacherSection('analyticsSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg><span>Analytics &amp; Attendance</span></button>
                     <button title="Results" class="dash-nav-item" data-target="adminSection" onclick="showTeacherSection('adminSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Results</span></button>
                     <button title="CSV History" class="dash-nav-item" data-target="csvHistorySection" onclick="showTeacherSection('csvHistorySection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg><span>CSV History</span></button>
-                <button title="Student Progress History" class="dash-nav-item" data-target="studentProgressSection" onclick="showTeacherSection('studentProgressSection', this)"><span aria-hidden="true">📈</span><span>Student Progress</span></button>
+                    <button title="Backup & Export" class="dash-nav-item" data-target="backupSection" onclick="showTeacherSection('backupSection', this); showLastBackupTime();"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Backup &amp; Export</span></button>
                 </nav>
             </aside>
             <div class="sidebar-backdrop" onclick="toggleDashSidebar('teacherDashboard')"></div>
@@ -530,16 +530,6 @@
                     <option value="University 300">University 300 Level</option>
                     <option value="University 400">University 400 Level</option>
                     <option value="Other">Other</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="teacherTermSelect">Academic Term</label>
-                <select id="teacherTermSelect" class="form-input">
-                    <option value="First Term">First Term</option>
-                    <option value="Second Term">Second Term</option>
-                    <option value="Third Term">Third Term</option>
-                    <option value="Annual">Annual</option>
-                    <option value="Other">Other / Not specified</option>
                 </select>
             </div>
             <div class="custom-class-wrapper-teacher" style="display:none; margin-top:8px;">
@@ -701,27 +691,25 @@
                 <option value="">-- Select an assessment --</option>
             </select>
             <button onclick="teacherDownloadAllCertificates()" id="teacherBulkCertBtn" class="secondary-btn full-width" style="margin-bottom:12px; background:#2d6cdf; color:white;">Download All Certificates (ZIP)</button>
-            <div style="background:#fff; border:1px solid #d9e3ef; border-radius:10px; padding:14px; margin-bottom:14px;">
-                <h4 style="margin:0 0 8px;">Correct an Answer &amp; Re-grade</h4>
-                <p class="helper-text" style="margin-bottom:10px;">After editing an answer key, re-grade all submissions for the selected assessment, or give every student credit for one question.</p>
-                <label for="teacherRescoreQuestion" style="display:block; margin-bottom:5px;">Question to give everyone credit for</label>
-                <select id="teacherRescoreQuestion" class="form-input" style="margin-bottom:10px;"><option value="">Choose a question</option></select>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    <button onclick="teacherRescoreSelectedAssessment('regrade')" class="primary-btn">Re-grade All Results</button>
-                    <button onclick="teacherRescoreSelectedAssessment('credit-question')" class="secondary-btn">Give Everyone Credit</button>
-                </div>
-                <p id="teacherRescoreStatus" class="helper-text" style="margin-top:8px;"></p>
-            </div>
             <div id="teacherAnalyticsContainer" class="scrollable-panel">
                 <p class="helper-text">Pick an assessment above to see its question breakdown.</p>
             </div>
         </div>
 
-        <div class="dash-panel" id="studentProgressSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
-            <h3 style="margin-bottom:8px;">Student Progress History</h3>
-            <p class="helper-text" style="margin-bottom:12px;">Search a student by name or admission number to review scores across assessments.</p>
-            <input id="teacherStudentHistorySearch" class="form-input" placeholder="Search student name or admission number" oninput="renderTeacherStudentHistory()" style="margin-bottom:12px;">
-            <div id="teacherStudentHistoryContainer" class="scrollable-panel"><p class="helper-text">Enter a student name or admission number to view progress.</p></div>
+        <div class="dash-panel" id="backupSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-top:0;">Backup &amp; Export</h3>
+            <p class="helper-text">Keep a safe copy of your work. The full backup is one ZIP file containing:</p>
+            <ul class="helper-text" style="margin:0 0 14px 18px; padding:0;">
+                <li><strong>results.csv</strong> - every student result</li>
+                <li><strong>assessments.csv</strong> - your assessments and their settings</li>
+                <li><strong>questions/</strong> - one ready-to-reuse CSV for each assessment (upload it in Publish Assessment to publish again)</li>
+            </ul>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button id="backupZipBtn" class="primary-btn" onclick="teacherDownloadBackupZip()">Download full backup (ZIP)</button>
+                <button id="backupResultsBtn" class="secondary-btn" onclick="teacherDownloadAllResultsCsv()">Results only (CSV)</button>
+            </div>
+            <p id="backupStatus" class="helper-text" style="margin:12px 0 0; font-weight:600;"></p>
+            <p id="backupLastTime" class="helper-text" style="margin:4px 0 0;"></p>
         </div>
 
         <div class="dash-panel" id="csvHistorySection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
@@ -748,9 +736,6 @@
                         <option value="name">Name A-Z</option>
                     </select>
                     <button id="teacherExportBtn" onclick="teacherExportResults()" class="primary-btn">Export CSV</button>
-                    <button onclick="teacherDownloadBackupZip()" class="secondary-btn">Download Backup ZIP</button>
-                    <select id="teacherClassSheetSelect" class="form-input" style="width:auto; min-width:180px;"><option value="">Choose assessment for sheet</option></select>
-                    <button onclick="teacherPrintClassResultSheet()" class="secondary-btn">Print Class Result Sheet</button>
                     <button id="teacherClearBtn" onclick="teacherClearResults()" class="secondary-btn" style="background:#dc3545; color:white;">Clear All</button>
                 </div>
             </div>
@@ -775,7 +760,7 @@
                     <thead>
                         <tr>
                             <th class="select-cell"><input type="checkbox" id="teacherSelectAll" onchange="teacherToggleSelectAll(this.checked)" aria-label="Select all results"></th>
-                            <th>Position</th>
+                            <th>#</th>
                             <th>Class</th>
                             <th>Student</th>
                             <th>Admission No.</th>
@@ -1009,7 +994,7 @@
         <p id="resultActionMessage" style="margin:0 0 18px 0; color:#6b7a8f; font-size:14px;">Choose an action for this result.</p>
         <div style="display:flex; flex-direction:column; gap:10px;">
             <button id="resultActionDownload" class="primary-btn" style="width:100%;">Download Certificate</button>
-            <button id="resultActionRetake" class="secondary-btn" style="width:100%; background:#198754; color:white;">Allow Retake (Replace Old Result)</button>
+            <button id="resultActionRetake" class="secondary-btn" style="width:100%; background:#2d6cdf; color:white;">Allow Retake</button>
             <button id="resultActionDelete" class="secondary-btn" style="width:100%; background:#dc3545; color:white;">Delete Result</button>
             <button id="resultActionCancel" class="secondary-btn" style="width:100%;">Cancel</button>
         </div>
