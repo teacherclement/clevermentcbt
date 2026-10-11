@@ -1844,6 +1844,7 @@ async function savePublishedAssessmentToDatabase(assessment) {
                 teacherSignature: assessment.teacherSignature,
                 subject: assessment.subject,
                 className: assessment.className,
+                term: assessment.term || 'Not specified',
                 questions: assessment.questions,
                 timeLimit: assessment.timeLimit,
                 shuffle: assessment.shuffle,
@@ -2105,6 +2106,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         teacherSignature: teacherSignature || '',
         subject: subject,
         className: className,
+        term: (document.getElementById('teacherTermSelect') && document.getElementById('teacherTermSelect').value !== 'Other') ? document.getElementById('teacherTermSelect').value : 'Not specified',
         questions: JSON.parse(JSON.stringify(teacherQuestions)),
         timeLimit: timeLimit,
         shuffle: shuffle,
@@ -2143,6 +2145,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         teacherSignature: teacherSignature || '',
         subject: subject,
         className: className,
+        term: (document.getElementById('teacherTermSelect') && document.getElementById('teacherTermSelect').value !== 'Other') ? document.getElementById('teacherTermSelect').value : 'Not specified',
         questions: JSON.parse(JSON.stringify(teacherQuestions)),
         timeLimit: timeLimit,
         shuffle: shuffle,
@@ -2221,7 +2224,17 @@ async function renderTeacherPublishedList() {
     var filtered = await getTeacherAssessmentsFromBackend();
     teacherAssessmentsCache = filtered;
 
+    var sheetSelect = document.getElementById('teacherClassSheetSelect');
+    if (sheetSelect) {
+        var previousSheetCode = sheetSelect.value;
+        sheetSelect.innerHTML = '<option value="">Choose assessment for sheet</option>';
+        filtered.forEach(function(a) { var opt = document.createElement('option'); opt.value = a.code; opt.textContent = a.subject + ' — ' + a.className + ' (' + (a.term || 'Not specified') + ')'; sheetSelect.appendChild(opt); });
+        if (previousSheetCode && filtered.some(function(a){return a.code === previousSheetCode;})) sheetSelect.value = previousSheetCode;
+    }
     populateTeacherAnalyticsSelect(filtered);
+    var rescoreSelect = document.getElementById('teacherAnalyticsSelect');
+    if (rescoreSelect && !rescoreSelect.dataset.rescoreBound) { rescoreSelect.addEventListener('change', populateRescoreQuestionOptions); rescoreSelect.dataset.rescoreBound='1'; }
+    populateRescoreQuestionOptions();
 
     if (filtered.length === 0) {
         container.innerHTML = '<p class="helper-text">No assessments published yet.</p>';
@@ -2239,7 +2252,7 @@ async function renderTeacherPublishedList() {
             '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
             '<span style="background:#eef6ff; padding:4px 12px; border-radius:6px; font-weight:600; font-size:13px; color:#2d6cdf;">Code: ' + a.code + '</span>' +
             '<button onclick="copyAssessmentCode(\'' + a.code + '\')" class="secondary-btn" style="font-size:12px; padding:4px 12px;">Copy Code</button>' +
-            '<button onclick="shareAssessmentOnWhatsApp(' + a.id + ')" class="secondary-btn whatsapp-share-btn" aria-label="Share assessment code on WhatsApp"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/></svg> Share</button>' +
+            '<button onclick="shareAssessmentWhatsApp(\'' + a.code + '\', \'' + a.subject.replace(/'/g, '') + '\')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#e8f8ef; color:#147a3d;">Share WhatsApp</button>' +
             '<button onclick="openAssessmentEditor(' + a.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#2d6cdf; color:white;">Edit Assessment</button>' +
             '<button onclick="deletePublishedAssessment(' + a.id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#dc3545; color:white;">Delete</button>' +
             '</div></div>';
@@ -2328,6 +2341,8 @@ function renderAssessmentEditorSettings(a) {
                 '<div><label for="aeClass">Class</label>' +
                     '<select id="aeClass" class="form-input" onchange="aeToggleOther(this, \'aeClassOther\')">' + aeOptionsFromSource('teacherClassSelect', a.className) + '</select>' +
                     '<input id="aeClassOther" class="form-input" style="display:none; margin-top:6px;" placeholder="Type the class name"></div>' +
+                '<div><label for="aeTerm">Academic term</label>' +
+                    '<select id="aeTerm" class="form-input">' + ['First Term','Second Term','Third Term','Annual','Not specified'].map(function(t){return '<option value="'+t+'"'+((a.term||'Not specified')===t?' selected':'')+'>'+t+'</option>';}).join('') + '</select></div>' +
                 '<div><label for="aeCertName">Teacher\'s name on certificate</label>' +
                     '<input id="aeCertName" class="form-input" value="' + escapeAssessmentEditorHtml(a.teacherName || '') + '"></div>' +
                 '<div><label for="aeTime">Time limit</label>' +
@@ -2367,6 +2382,7 @@ function collectAssessmentEditorSettings() {
         settings: {
             subject: subject.value,
             className: cls.value,
+            term: (document.getElementById('aeTerm') && document.getElementById('aeTerm').value) || 'Not specified',
             teacherName: (document.getElementById('aeCertName').value || '').trim(),
             timeLimit: (parseInt(document.getElementById('aeTime').value, 10) || 0) * 60,
             passMark: pm,
@@ -2480,7 +2496,7 @@ function renderAssessmentEditor() {
         if (saveBtn) saveBtn.textContent = 'Save Question Draft';
     } else {
         title.textContent = 'Edit Assessment — ' + a.subject + ' (' + a.code + ')';
-        if (subtitle) subtitle.textContent = 'Update the settings and questions, then save. The assessment code does not change. If you change a correct answer, you will be asked whether to re-grade the results already submitted.';
+        if (subtitle) subtitle.textContent = 'Update the settings and questions, then save. The assessment code does not change. Results already submitted are not recalculated.';
         if (saveBtn) saveBtn.textContent = 'Save Changes';
     }
 
@@ -2499,7 +2515,6 @@ function renderAssessmentEditor() {
         html += '<div class="assessment-editor-card" data-question-index="' + i + '">' +
             '<div class="assessment-editor-card-head">' +
                 '<strong>Question ' + (i + 1) + '</strong>' +
-                (assessmentEditorDraftMode ? '' : '<button type="button" class="assessment-editor-credit" onclick="creditAllForQuestion(' + i + ')">Credit all students</button>') +
                 '<button type="button" class="assessment-editor-delete" onclick="deleteAssessmentEditorQuestion(' + i + ')">Delete</button>' +
             '</div>' +
             '<label>Question</label>' +
@@ -2717,22 +2732,6 @@ async function saveAssessmentEditorChanges() {
     }
     var editedSettings = collected.settings;
 
-    // If any correct answer was changed, offer to re-grade the results already submitted.
-    var doRegrade = false;
-    var originalAssessment = null;
-    for (var oa = 0; oa < teacherAssessmentsCache.length; oa++) {
-        if (String(teacherAssessmentsCache[oa].id) === String(currentAssessmentBeingEdited.id)) { originalAssessment = teacherAssessmentsCache[oa]; break; }
-    }
-    if (originalAssessment) {
-        var changedNums = keyChangedQuestionNumbers(originalAssessment.questions || [], questions);
-        var existingResultCount = teacherResultsCache.filter(function(r) { return r.assessmentCode === originalAssessment.code; }).length;
-        if (changedNums.length > 0 && existingResultCount > 0) {
-            doRegrade = confirm('You changed the correct answer for question' + (changedNums.length === 1 ? ' ' : 's ') + changedNums.join(', ') + '.\n\n' +
-                existingResultCount + ' student result(s) already exist for this assessment.\n\n' +
-                'OK = save AND re-grade those results with the new answer(s).\nCancel = save only (old scores stay as they are).');
-        }
-    }
-
     var teacherToken = localStorage.getItem('cleverment_teacher_token');
     var saveBtn = document.getElementById('assessmentEditorSaveBtn');
     if (saveBtn) {
@@ -2747,7 +2746,7 @@ async function saveAssessmentEditorChanges() {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + teacherToken
             },
-            body: JSON.stringify(Object.assign({ questions: questions, regrade: doRegrade }, editedSettings))
+            body: JSON.stringify(Object.assign({ questions: questions }, editedSettings))
         });
 
         var data = await res.json();
@@ -2791,14 +2790,7 @@ async function saveAssessmentEditorChanges() {
 
         closeAssessmentEditor();
         await renderTeacherPublishedList();
-        var regradeNote = ' Existing submitted results were not changed.';
-        if (data.regrade && !data.regrade.error) {
-            regradeNote = ' Re-graded ' + data.regrade.updated + ' result(s)' + (data.regrade.scoreChanged ? ' (' + data.regrade.scoreChanged + ' score(s) changed).' : ' (no scores changed).');
-            reloadTeacherResultsCache();
-        } else if (data.regrade && data.regrade.error) {
-            regradeNote = ' The questions were saved, but re-grading failed: ' + data.regrade.error;
-        }
-        alert('Assessment updated successfully. The assessment code remains ' + updated.code + '.' + regradeNote);
+        alert('Assessment updated successfully. The assessment code remains ' + updated.code + '. Existing submitted results were not changed.');
     } catch (e) {
         alert('Could not save changes. Please check your connection and try again.');
     } finally {
@@ -4711,7 +4703,6 @@ function normalizeResultRow(r) {
         tabSwitches: r.tab_switches || 0,
         proctorViolations: r.proctor_violations || 0,
         fastAnswerWarnings: r.fast_answer_warnings || 0,
-        retakeAllowed: !!r.retake_allowed,
         date: r.created_at ? new Date(r.created_at).toLocaleString() : ''
     };
 }
@@ -4738,6 +4729,7 @@ function normalizeAssessmentRow(a) {
         teacherSignature: a.teacher_signature || '',
         subject: a.subject,
         className: a.class_name,
+        term: a.term || 'Not specified',
         questions: a.questions,
         timeLimit: a.time_limit,
         shuffle: a.shuffle,
@@ -5622,6 +5614,107 @@ async function attachPassMarks(results, isAdmin) {
     return results;
 }
 
+// ============================================================
+// CLASS POSITIONS, PRINTABLE SHEET, STUDENT HISTORY, BACKUP & SHARING
+// ============================================================
+function shareAssessmentWhatsApp(code, subject) {
+    var assessmentUrl = window.location.origin + window.location.pathname;
+    var message = 'Hello! You have been invited to take the ' + (subject || 'assessment') + ' on CleverMent.\nAssessment code: ' + code + '\nOpen CleverMent here: ' + assessmentUrl;
+    var url = 'https://wa.me/?text=' + encodeURIComponent(message);
+    window.open(url, '_blank', 'noopener');
+}
+
+function getAssessmentPosition(item, rows) {
+    var ahead = 0;
+    rows = rows || teacherResultsCache || [];
+    for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        if (String(r.assessmentCode) === String(item.assessmentCode) && String(r.className) === String(item.className) && String(r.subject) === String(item.subject) && Number(r.score) > Number(item.score)) ahead++;
+    }
+    return ahead + 1;
+}
+
+function getOverallClassPositions(className) {
+    var students = {};
+    (teacherResultsCache || []).forEach(function(r) {
+        if (String(r.className) !== String(className)) return;
+        var key = String(r.admissionNumber || r.studentName || '').trim().toLowerCase();
+        if (!key) return;
+        if (!students[key]) students[key] = { key:key, name:r.studentName, admissionNumber:r.admissionNumber || '', scores:[] };
+        students[key].scores.push(Number(r.score) || 0);
+    });
+    var arr = Object.keys(students).map(function(k) {
+        var s=students[k]; s.average=s.scores.length ? s.scores.reduce(function(a,b){return a+b;},0)/s.scores.length : 0; return s;
+    }).sort(function(a,b){ return b.average-a.average; });
+    var rank=0, previous=null;
+    arr.forEach(function(s,i){ if (previous === null || s.average < previous) rank=i+1; s.position=rank; previous=s.average; });
+    var map={}; arr.forEach(function(s){map[s.key]=s.position;}); return map;
+}
+
+async function teacherPrintClassResultSheet() {
+    var sel=document.getElementById('teacherClassSheetSelect');
+    var code=sel && sel.value ? sel.value : (document.getElementById('teacherAnalyticsSelect') ? document.getElementById('teacherAnalyticsSelect').value : '');
+    var assessment=(teacherAssessmentsCache||[]).find(function(a){return String(a.id)===String(code)||String(a.code)===String(code);});
+    if (!assessment) { alert('Please choose an assessment from the result-sheet dropdown.'); return; }
+    var rows=(teacherResultsCache||[]).filter(function(r){return String(r.assessmentCode)===String(assessment.code);}).sort(function(a,b){return b.score-a.score;});
+    if (!rows.length) { alert('There are no results for this assessment yet.'); return; }
+    var overall=getOverallClassPositions(assessment.className);
+    var total=rows.reduce(function(n,r){return n+Number(r.score||0);},0);
+    var scores=rows.map(function(r){return Number(r.score||0);});
+    var avg=Math.round(total/rows.length), high=Math.max.apply(null,scores), low=Math.min.apply(null,scores);
+    var body=rows.map(function(r){var key=String(r.admissionNumber||r.studentName||'').trim().toLowerCase();return '<tr><td>'+getAssessmentPosition(r,rows)+'</td><td>'+escapeHtml(r.studentName)+'</td><td>'+escapeHtml(r.admissionNumber)+'</td><td>'+r.score+'%</td><td>'+r.correctAnswers+'/'+r.totalQuestions+'</td><td>'+(overall[key]||'—')+'</td></tr>';}).join('');
+    var w=window.open('','_blank'); if(!w){alert('Please allow pop-ups to print the result sheet.');return;}
+    w.document.write('<!doctype html><html><head><title>CleverMent Class Result Sheet</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#172033}h1,h2,p{text-align:center;margin:6px}table{width:100%;border-collapse:collapse;margin-top:22px}th,td{border:1px solid #777;padding:8px;text-align:left}th{background:#eef2f7}.stats{display:flex;justify-content:space-around;margin-top:18px;font-weight:bold}@media print{button{display:none}}</style></head><body><h1>CleverMent</h1><h2>Class Result Sheet</h2><p>'+escapeHtml(assessment.className)+' — '+escapeHtml(assessment.subject)+'</p><p>Assessment Code: '+escapeHtml(assessment.code)+'</p><div class="stats"><span>Students: '+rows.length+'</span><span>Average: '+avg+'%</span><span>Highest: '+high+'%</span><span>Lowest: '+low+'%</span></div><table><thead><tr><th>Subject Position</th><th>Student Name</th><th>Admission No.</th><th>Score</th><th>Correct/Total</th><th>Overall Class Position*</th></tr></thead><tbody>'+body+'</tbody></table><p style="font-size:11px;margin-top:16px">*Overall class position is based on each student’s average across available assessments in this class. Subject position is within this assessment; tied scores share the same position.</p><button onclick="window.print()">Print / Save as PDF</button></body></html>');
+    w.document.close(); setTimeout(function(){try{w.focus();w.print();}catch(e){}},300);
+}
+
+function renderTeacherStudentHistory() {
+    var box=document.getElementById('teacherStudentHistoryContainer'); if(!box)return;
+    var input=document.getElementById('teacherStudentHistorySearch'); var query=String(input&&input.value||'').trim().toLowerCase();
+    if(!query){box.innerHTML='<p class="helper-text">Enter a student name or admission number to view progress.</p>';return;}
+    var rows=(teacherResultsCache||[]).filter(function(r){return String(r.studentName||'').toLowerCase().indexOf(query)!==-1||String(r.admissionNumber||'').toLowerCase().indexOf(query)!==-1;});
+    if(!rows.length){box.innerHTML='<p class="helper-text">No matching student records found.</p>';return;}
+    rows.sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
+    var termByCode={}; (teacherAssessmentsCache||[]).forEach(function(a){termByCode[String(a.code)]=a.term||'Not specified';});
+    var grouped={}; rows.forEach(function(r){var k=String(r.admissionNumber||r.studentName).toLowerCase();if(!grouped[k])grouped[k]=[];grouped[k].push(r);});
+    box.innerHTML=Object.keys(grouped).map(function(k){var list=grouped[k];var avg=Math.round(list.reduce(function(n,r){return n+Number(r.score||0);},0)/list.length);return '<div style="background:white;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:12px"><strong>'+escapeHtml(list[0].studentName)+'</strong> <span style="color:#64748b">('+escapeHtml(list[0].admissionNumber||'No admission number')+')</span><p style="margin:6px 0 10px;color:#2d6cdf;font-weight:700">Assessments: '+list.length+' · Average score: '+avg+'%</p><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Term</th><th>Class</th><th>Subject</th><th>Assessment Code</th><th>Score</th></tr></thead><tbody>'+list.map(function(r){return '<tr><td>'+escapeHtml(r.date)+'</td><td>'+escapeHtml(termByCode[String(r.assessmentCode)]||'Not specified')+'</td><td>'+escapeHtml(r.className)+'</td><td>'+escapeHtml(r.subject)+'</td><td>'+escapeHtml(r.assessmentCode)+'</td><td>'+r.score+'%</td></tr>';}).join('')+'</tbody></table></div></div>';}).join('');
+}
+
+async function teacherDownloadBackupZip() {
+    if (typeof JSZip === 'undefined') { alert('ZIP support is not available. Please refresh and try again.'); return; }
+    var results=teacherResultsCache||[];
+    var assessments=await getTeacherAssessmentsFromBackend();
+    if (!results.length && !assessments.length) { alert('There are no results or assessments to back up.'); return; }
+    var zip=new JSZip();
+    var headers=['Class','Student','Admission No.','Subject','Score','Correct','Total','Time Taken','Assessment Code','Tab Switches','Cam/Noise Flags','Fast Answer Warnings','Date'];
+    var csv=headers.map(csvCell).join(',')+'\n';
+    results.forEach(function(r){csv += [r.className,r.studentName,r.admissionNumber,r.subject,r.score,r.correctAnswers,r.totalQuestions,r.timeTaken,r.assessmentCode,r.tabSwitches,r.proctorViolations,r.fastAnswerWarnings,r.date].map(csvCell).join(',')+'\n';});
+    zip.file('results.csv',csv);
+    var qfolder=zip.folder('assessment_questions');
+    assessments.forEach(function(a,idx){var qcsv='Question,Option A,Option B,Option C,Option D,Correct Answer,Image URL\n';(a.questions||[]).forEach(function(q){var opts=q.options||[];qcsv += [q.question,opts[0]||'',opts[1]||'',opts[2]||'',opts[3]||'',q.correctAnswer||'',q.image||''].map(csvCell).join(',')+'\n';});var safe=(a.subject||'Assessment').replace(/[^a-z0-9_-]+/gi,'_');qfolder.file((idx+1)+'_'+safe+'_'+a.code+'.csv',qcsv);});
+    zip.file('README.txt','CleverMent backup\nIncludes results.csv and a ready-to-reuse CSV question file for each published assessment. Keep this ZIP in a safe location.\n');
+    var blob=await zip.generateAsync({type:'blob'}); var url=URL.createObjectURL(blob); var a=document.createElement('a');a.href=url;a.download='CleverMent_Backup_'+new Date().toISOString().slice(0,10)+'.zip';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1500);
+}
+
+async function teacherRescoreSelectedAssessment(mode) {
+    var sel=document.getElementById('teacherAnalyticsSelect'); var status=document.getElementById('teacherRescoreStatus');
+    var assessment=(teacherAssessmentsCache||[]).find(function(a){return String(a.id)===String(sel&&sel.value)||String(a.code)===String(sel&&sel.value);});
+    if(!assessment){alert('Please select an assessment first.');return;}
+    var body={mode:mode};
+    if(mode==='credit-question'){var q=document.getElementById('teacherRescoreQuestion');if(!q||q.value===''){alert('Select the question to give everyone credit for.');return;}body.questionIndex=Number(q.value);}
+    var msg=mode==='regrade'?'Re-grade every submitted result using the assessment’s current answer key?':'Give every student credit for the selected question?';
+    if(!confirm(msg+' This will update saved scores.'))return;
+    if(status)status.textContent='Re-grading results…';
+    try{var token=localStorage.getItem('cleverment_teacher_token');var res=await fetch(BACKEND_URL+'/api/teacher/assessments/'+encodeURIComponent(assessment.id)+'/rescore',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(body)});var data=await res.json();if(!res.ok)throw new Error(data.error||'Could not re-grade results.');if(status)status.textContent='Updated '+data.updated+' result(s).';await renderTeacherDashboard();alert('Re-grading complete. Updated '+data.updated+' result(s).');}catch(e){if(status)status.textContent=e.message;alert(e.message||'Could not re-grade results.');}
+}
+
+function populateRescoreQuestionOptions() {
+    var sel=document.getElementById('teacherAnalyticsSelect'); var qsel=document.getElementById('teacherRescoreQuestion'); if(!qsel)return;
+    var assessment=(teacherAssessmentsCache||[]).find(function(a){return String(a.id)===String(sel&&sel.value)||String(a.code)===String(sel&&sel.value);});
+    qsel.innerHTML='<option value="">Choose a question</option>';
+    (assessment&&assessment.questions||[]).forEach(function(q,i){var o=document.createElement('option');o.value=String(i);o.textContent=(i+1)+'. '+String(q.question||'Question').slice(0,110);qsel.appendChild(o);});
+}
+
 async function renderTeacherDashboard() {
     loadTeacherProfile();
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
@@ -5758,280 +5851,10 @@ function applyTeacherFilters() {
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
         var isSel = !!teacherSelectedResultIds[String(item.id)];
-        html += '<tr class="' + (isSel ? 'result-row-selected' : '') + '"><td class="select-cell"><input type="checkbox" class="result-select-box"' + (isSel ? ' checked' : '') + ' onchange="teacherToggleResultSelected(' + item.id + ', this)" aria-label="Select result"></td><td>' + (j+1) + '</td><td>' + item.className + '</td><td>' + escapeHtml(item.studentName) + resultRetakeBadgeHtml(item) + (item.fastAnswerWarnings > 0 ? '<br><span style=\"display:inline-block; margin-top:3px; padding:1px 7px; border-radius:10px; background:#fff3cd; color:#8a6d00; font-size:11px; font-weight:700;\" title=\"Student answered too quickly to have read the questions\">&#9888; Fast answering x' + item.fastAnswerWarnings + '</span>' : '') + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'teacher\',' + item.id + ')">⋮ Take Action</button></td></tr>';
+        html += '<tr class="' + (isSel ? 'result-row-selected' : '') + '"><td class="select-cell"><input type="checkbox" class="result-select-box"' + (isSel ? ' checked' : '') + ' onchange="teacherToggleResultSelected(' + item.id + ', this)" aria-label="Select result"></td><td>' + getAssessmentPosition(item, teacherResultsCache) + '</td><td>' + item.className + '</td><td>' + item.studentName + (item.fastAnswerWarnings > 0 ? '<br><span style=\"display:inline-block; margin-top:3px; padding:1px 7px; border-radius:10px; background:#fff3cd; color:#8a6d00; font-size:11px; font-weight:700;\" title=\"Student answered too quickly to have read the questions\">&#9888; Fast answering x' + item.fastAnswerWarnings + '</span>' : '') + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + item.timeTaken + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'teacher\',' + item.id + ')">⋮ Take Action</button></td></tr>';
     }
     tbody.innerHTML = html;
     refreshTeacherSelectionUI();
-}
-
-
-// ============================================================
-// ALLOW RETAKE
-// ============================================================
-
-function resultRetakeBadgeHtml(item) {
-    if (!item.retakeAllowed) return '';
-    return '<br><span style="display:inline-block; margin-top:3px; padding:1px 7px; border-radius:10px; background:#e3f1ff; color:#1d5fbf; font-size:11px; font-weight:700;" title="This student may submit this assessment again. The new result will replace this one.">&#8635; Retake allowed</span>';
-}
-
-// Reloads the teacher's results from the database and redraws the table (keeps the current filters).
-async function reloadTeacherResultsCache() {
-    var email = currentTeacher ? currentTeacher.email : 'unknown';
-    var all = await getAllResultsFromDatabase();
-    var mine = all.filter(function(r) { return r.teacherEmail === email; });
-    mine = await attachPassMarks(mine, false);
-    teacherResultsCache = mine;
-    rebuildTeacherFilterOptions();
-    applyTeacherFilters();
-}
-
-async function allowRetakeForSelectedResult() {
-    if (!pendingResultAction || !pendingResultAction.result) return;
-    var role = pendingResultAction.role;
-    var result = pendingResultAction.result;
-    closeResultActions();
-
-    var allow = !result.retakeAllowed;
-    var question = allow
-        ? 'Allow ' + result.studentName + ' to take "' + result.subject + '" again?\n\nTheir current result (' + result.score + '%) stays on the table until they submit again; then the new result replaces it.'
-        : 'Cancel the retake permission for ' + result.studentName + '? Their current result will count again.';
-    if (!confirm(question)) return;
-
-    var token = role === 'admin' ? localStorage.getItem('cleverment_admin_token') : localStorage.getItem('cleverment_teacher_token');
-    var endpoint = BACKEND_URL + '/api/' + (role === 'admin' ? 'admin' : 'teacher') + '/results/' + encodeURIComponent(result.id) + '/allow-retake';
-    try {
-        var res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify({ allow: allow })
-        });
-        var data = await res.json();
-        if (!res.ok) {
-            alert('Error: ' + (data.error || 'Could not change the retake permission.'));
-            return;
-        }
-        result.retakeAllowed = allow;
-        if (role === 'admin') renderAdminResults(); else applyTeacherFilters();
-        if (allow) {
-            alert('Done. ' + result.studentName + ' can now enter the assessment code again and retake it.');
-        }
-    } catch (e) {
-        alert('Could not reach the server. Please check your connection and try again.');
-    }
-}
-
-// ============================================================
-// RE-GRADE / CREDIT HELPERS (editor)
-// ============================================================
-
-function cbNormText(t) { return String(t || '').replace(/\s+/g, ' ').trim(); }
-
-// Numbers (1-based, in the edited list) of questions whose correct answer letter was changed.
-function keyChangedQuestionNumbers(oldQs, newQs) {
-    var used = {};
-    var out = [];
-    (newQs || []).forEach(function(nq, j) {
-        var oi = -1;
-        for (var i = 0; i < oldQs.length; i++) {
-            if (!used[i] && cbNormText(oldQs[i].question) === cbNormText(nq.question)) { oi = i; break; }
-        }
-        if (oi === -1 && oldQs[j] && !used[j]) {
-            var stillThere = newQs.some(function(x) { return cbNormText(x.question) === cbNormText(oldQs[j].question); });
-            if (!stillThere) oi = j;
-        }
-        if (oi === -1) return;
-        used[oi] = true;
-        if (String(oldQs[oi].correctAnswer || '').toUpperCase() !== String(nq.correctAnswer || '').toUpperCase()) out.push(j + 1);
-    });
-    return out;
-}
-
-async function creditAllForQuestion(index) {
-    if (!currentAssessmentBeingEdited || assessmentEditorDraftMode) return;
-    syncAssessmentEditorFromDOM();
-    var q = (currentAssessmentBeingEdited.questions || [])[index];
-    if (!q) return;
-    var saved = null;
-    for (var i = 0; i < teacherAssessmentsCache.length; i++) {
-        if (String(teacherAssessmentsCache[i].id) === String(currentAssessmentBeingEdited.id)) { saved = teacherAssessmentsCache[i]; break; }
-    }
-    var inSaved = saved && (saved.questions || []).some(function(x) { return cbNormText(x.question) === cbNormText(q.question); });
-    if (!inSaved) {
-        alert('Please save your changes first (tap Save Changes), then give credit for this question.');
-        return;
-    }
-    if (!confirm('Give EVERY student who took this assessment full credit for Question ' + (index + 1) + '?\n\nTheir scores are updated right away. Use this when a question was wrong or unclear.')) return;
-
-    var token = localStorage.getItem('cleverment_teacher_token');
-    try {
-        var res = await fetch(BACKEND_URL + '/api/teacher/assessments/' + encodeURIComponent(currentAssessmentBeingEdited.id) + '/credit-question', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify({ question: q.question })
-        });
-        var data = await res.json();
-        if (!res.ok) { alert('Could not give credit: ' + (data.error || 'Unknown error.')); return; }
-        var r = data.regrade || {};
-        alert('Done. ' + (r.updated || 0) + ' result(s) were updated' + (r.scoreChanged ? ' (' + r.scoreChanged + ' score(s) went up).' : '.'));
-        reloadTeacherResultsCache();
-    } catch (e) {
-        alert('Could not reach the server. Please check your connection and try again.');
-    }
-}
-
-// ============================================================
-// SHARE CODE ON WHATSAPP
-// ============================================================
-
-function shareAssessmentOnWhatsApp(assessmentId) {
-    var a = null;
-    for (var i = 0; i < teacherAssessmentsCache.length; i++) {
-        if (String(teacherAssessmentsCache[i].id) === String(assessmentId)) { a = teacherAssessmentsCache[i]; break; }
-    }
-    if (!a) { alert('Could not find that assessment. Please refresh and try again.'); return; }
-
-    function when(iso) {
-        try { return new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); } catch (e) { return ''; }
-    }
-    var link = window.location.origin + window.location.pathname + '?code=' + encodeURIComponent(a.code);
-    var lines = [];
-    lines.push('\uD83D\uDCDD *' + a.subject + '* assessment - ' + a.className);
-    lines.push('Assessment code: *' + a.code + '*');
-    lines.push('Open this link (the code is filled in for you):');
-    lines.push(link);
-    if (a.timeLimit) lines.push('\u23F1 Time: ' + Math.round(a.timeLimit / 60) + ' minutes');
-    if (a.availableFrom) lines.push('\uD83D\uDCC5 Opens: ' + when(a.availableFrom));
-    if (a.availableUntil) lines.push('\uD83D\uDCC5 Closes: ' + when(a.availableUntil));
-    lines.push('Good luck!');
-
-    var url = 'https://wa.me/?text=' + encodeURIComponent(lines.join('\n'));
-    var win = window.open(url, '_blank');
-    if (!win) window.location.href = url;
-}
-
-// ============================================================
-// BACKUP & EXPORT
-// ============================================================
-
-function cbDownloadBlob(blob, name) {
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
-}
-
-function backupSafeName(t) {
-    return String(t || '').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Untitled';
-}
-
-function backupResultsCsv(results) {
-    var head = ['Assessment Code', 'Class', 'Student', 'Admission No.', 'Subject', 'Score %', 'Correct', 'Total', 'Time Taken', 'Tab Switches', 'Cam/Noise Flags', 'Fast Answer Warnings', 'Date'];
-    var out = [head.map(csvCell).join(',')];
-    results.forEach(function(r) {
-        out.push([r.assessmentCode, r.className, r.studentName, r.admissionNumber, r.subject, r.score, r.correctAnswers, r.totalQuestions, r.timeTaken, r.tabSwitches || 0, r.proctorViolations || 0, r.fastAnswerWarnings || 0, r.date].map(csvCell).join(','));
-    });
-    return out.join('\n');
-}
-
-// Questions in the CleverMent upload format (every question and option in double quotes), ready to publish again.
-function backupQuestionsCsv(questions) {
-    var rows = ['Question,Option A,Option B,Option C,Option D,Correct Answer,Image URL'];
-    (questions || []).forEach(function(q) {
-        var o = Array.isArray(q.options) ? q.options : [];
-        rows.push([cbQuoteCell(q.question), cbQuoteCell(o[0]), cbQuoteCell(o[1]), cbQuoteCell(o[2]), cbQuoteCell(o[3]), String(q.correctAnswer || '').toUpperCase(), q.image ? csvCell(q.image) : ''].join(','));
-    });
-    return rows.join('\n');
-}
-
-async function loadBackupData() {
-    var email = currentTeacher ? currentTeacher.email : 'unknown';
-    var assessments = await getTeacherAssessmentsFromBackend();
-    teacherAssessmentsCache = assessments;
-    var all = await getAllResultsFromDatabase();
-    var results = all.filter(function(r) { return r.teacherEmail === email; });
-    return { email: email, assessments: assessments, results: results };
-}
-
-function setBackupStatus(text, isError) {
-    var el = document.getElementById('backupStatus');
-    if (!el) return;
-    el.style.color = isError ? '#dc3545' : '#6b7a8f';
-    el.textContent = text;
-}
-
-function showLastBackupTime() {
-    var el = document.getElementById('backupLastTime');
-    if (!el) return;
-    var email = currentTeacher ? currentTeacher.email : 'unknown';
-    var last = localStorage.getItem('cleverment_last_backup_' + email);
-    el.textContent = last ? 'Last backup downloaded: ' + new Date(last).toLocaleString() : 'You have not downloaded a backup on this device yet.';
-}
-
-async function teacherDownloadAllResultsCsv() {
-    setBackupStatus('Preparing your results...', false);
-    try {
-        var data = await loadBackupData();
-        if (data.results.length === 0) { setBackupStatus('You have no results to export yet.', true); return; }
-        cbDownloadBlob(new Blob([backupResultsCsv(data.results)], { type: 'text/csv' }), 'CleverMent-all-results-' + new Date().toISOString().slice(0, 10) + '.csv');
-        setBackupStatus('Downloaded ' + data.results.length + ' result(s).', false);
-    } catch (e) {
-        setBackupStatus('Could not prepare the file: ' + e.message, true);
-    }
-}
-
-async function teacherDownloadBackupZip() {
-    if (typeof JSZip === 'undefined') {
-        setBackupStatus('The ZIP tool did not load. Please check your internet connection and refresh the page.', true);
-        return;
-    }
-    var btn = document.getElementById('backupZipBtn');
-    if (btn) btn.disabled = true;
-    setBackupStatus('Collecting your assessments and results...', false);
-    try {
-        var data = await loadBackupData();
-        var zip = new JSZip();
-        var today = new Date().toISOString().slice(0, 10);
-
-        zip.file('results.csv', backupResultsCsv(data.results));
-
-        var head = ['Code', 'Subject', 'Class', 'Questions', 'Time (minutes)', 'Pass mark %', 'Shuffle', 'Camera monitoring', 'Noise monitoring', 'Show results to student', 'Certificate name', 'Available from', 'Available until'];
-        var summary = [head.map(csvCell).join(',')];
-        var used = {};
-        data.assessments.forEach(function(a) {
-            summary.push([a.code, a.subject, a.className, (a.questions || []).length, a.timeLimit ? Math.round(a.timeLimit / 60) : 0, a.passMark, a.shuffle ? 'Yes' : 'No', a.cameraMonitoring ? 'Yes' : 'No', a.noiseMonitoring ? 'Yes' : 'No', a.showResults === false ? 'No' : 'Yes', a.teacherName || '', a.availableFrom || '', a.availableUntil || ''].map(csvCell).join(','));
-            var base = backupSafeName(a.subject + '-' + a.className + '-' + a.code);
-            var name = 'questions/' + base + '.csv';
-            var n = 2;
-            while (used[name]) { name = 'questions/' + base + '-' + n + '.csv'; n++; }
-            used[name] = true;
-            zip.file(name, backupQuestionsCsv(a.questions));
-        });
-        zip.file('assessments.csv', summary.join('\n'));
-
-        zip.file('README.txt',
-            'CleverMent backup - ' + today + '\n' +
-            'Teacher: ' + data.email + '\n\n' +
-            'results.csv      every student result (' + data.results.length + ')\n' +
-            'assessments.csv  your assessments and their settings (' + data.assessments.length + ')\n' +
-            'questions/       one CSV per assessment, in the CleverMent upload format.\n' +
-            '                 To use one again: Publish Assessment > upload the CSV file.\n\n' +
-            'Student certificates are not stored in the backup; they can be downloaded again from the results table.\n');
-
-        setBackupStatus('Building the ZIP...', false);
-        var blob = await zip.generateAsync({ type: 'blob' });
-        cbDownloadBlob(blob, 'CleverMent-backup-' + today + '.zip');
-        localStorage.setItem('cleverment_last_backup_' + data.email, new Date().toISOString());
-        showLastBackupTime();
-        setBackupStatus('Backup downloaded: ' + data.assessments.length + ' assessment(s) and ' + data.results.length + ' result(s).', false);
-    } catch (e) {
-        setBackupStatus('Could not create the backup: ' + e.message, true);
-    } finally {
-        if (btn) btn.disabled = false;
-    }
 }
 
 var pendingResultAction = null;
@@ -6056,8 +5879,7 @@ function openResultActions(role, resultId) {
     if (message) {
         message.textContent = result.studentName + ' — ' + result.subject + ' (' + result.score + '%)';
     }
-    var retakeBtn = document.getElementById('resultActionRetake');
-    if (retakeBtn) retakeBtn.textContent = result.retakeAllowed ? 'Cancel Retake Permission' : 'Allow Retake';
+    var retakeBtn = document.getElementById('resultActionRetake'); if (retakeBtn) retakeBtn.style.display = role === 'teacher' ? 'block' : 'none';
     if (overlay) overlay.style.display = 'flex';
 }
 
@@ -6120,6 +5942,23 @@ async function downloadResultCertificate() {
     }
 }
 
+async function allowStudentRetake() {
+    if (!pendingResultAction || !pendingResultAction.result) return;
+    var role=pendingResultAction.role, result=pendingResultAction.result;
+    if(role!=='teacher'){alert('Retakes can be managed from the teacher workspace.');return;}
+    closeResultActions();
+    if(!confirm('Allow '+result.studentName+' to retake this assessment? Their existing result will be removed and replaced when they submit again.'))return;
+    var token=localStorage.getItem('cleverment_teacher_token');
+    try{
+        var res=await fetch(BACKEND_URL+'/api/teacher/results/'+encodeURIComponent(result.id),{method:'DELETE',headers:{'Authorization':'Bearer '+token}});
+        var data=await res.json();if(!res.ok)throw new Error(data.error||'Could not enable retake.');
+        teacherResultsCache=teacherResultsCache.filter(function(r){return String(r.id)!==String(result.id);});
+        try{localStorage.setItem('cleverment_all_results',JSON.stringify(getAllResultsLocal().filter(function(r){return String(r.id)!==String(result.id);})));}catch(e){}
+        await renderTeacherDashboard();
+        alert('Retake enabled. The previous result was removed; the student can now submit a new attempt with the same admission number.');
+    }catch(e){alert(e.message||'Could not enable retake.');}
+}
+
 async function deleteSelectedResult() {
     if (!pendingResultAction || !pendingResultAction.result) return;
     var role = pendingResultAction.role;
@@ -6165,12 +6004,12 @@ async function deleteSelectedResult() {
 function setupResultActionModal() {
     var downloadBtn = document.getElementById('resultActionDownload');
     var deleteBtn = document.getElementById('resultActionDelete');
+    var retakeBtn = document.getElementById('resultActionRetake');
     var cancelBtn = document.getElementById('resultActionCancel');
     var overlay = document.getElementById('resultActionOverlay');
     if (downloadBtn) downloadBtn.onclick = downloadResultCertificate;
     if (deleteBtn) deleteBtn.onclick = deleteSelectedResult;
-    var retakeBtnEl = document.getElementById('resultActionRetake');
-    if (retakeBtnEl) retakeBtnEl.onclick = allowRetakeForSelectedResult;
+    if (retakeBtn) retakeBtn.onclick = allowStudentRetake;
     if (cancelBtn) cancelBtn.onclick = closeResultActions;
     if (overlay) {
         overlay.addEventListener('click', function(e) {
@@ -6478,12 +6317,6 @@ async function adminLogin() {
         setDashboardHeaderVisible(false);
         renderAdminDashboard();
         updateURL('admin-dashboard');
-        if (data.security && data.security.failedAttempts > 0) {
-            var when = data.security.lastFailedAt ? new Date(data.security.lastFailedAt).toLocaleString() : '';
-            setTimeout(function() {
-                alert('Security notice: ' + data.security.failedAttempts + ' wrong admin password attempt(s) were made since your last login' + (when ? ' (the latest at ' + when + ')' : '') + '.\n\nIf that was not you, change the ADMIN_PASSWORD in your Render settings to a long, new password.');
-            }, 300);
-        }
     } catch (e) {
         alert('Could not reach the server. Please check your connection and try again (the server may take up to a minute to wake up if it has been idle).');
     } finally {
@@ -6925,7 +6758,7 @@ function applyAdminFilters() {
         var scoreClass = item.score >= 70 ? 'score-high' : (item.score >= 50 ? 'score-mid' : 'score-low');
         var tabSwitchCell = item.tabSwitches > 0 ? '<span style="color:#e67e22; font-weight:600;">' + item.tabSwitches + '</span>' : '0';
         var proctorCell = item.proctorViolations > 0 ? '<span style="color:#dc3545; font-weight:600;">' + item.proctorViolations + '</span>' : '0';
-        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + escapeHtml(item.studentName) + resultRetakeBadgeHtml(item) + (item.fastAnswerWarnings > 0 ? '<br><span style=\"display:inline-block; margin-top:3px; padding:1px 7px; border-radius:10px; background:#fff3cd; color:#8a6d00; font-size:11px; font-weight:700;\" title=\"Student answered too quickly to have read the questions\">&#9888; Fast answering x' + item.fastAnswerWarnings + '</span>' : '') + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'admin\',' + item.id + ')">⋮ Take Action</button></td></tr>';
+        html += '<tr><td>' + (j+1) + '</td><td>' + item.teacherEmail + '</td><td>' + item.className + '</td><td>' + item.studentName + (item.fastAnswerWarnings > 0 ? '<br><span style=\"display:inline-block; margin-top:3px; padding:1px 7px; border-radius:10px; background:#fff3cd; color:#8a6d00; font-size:11px; font-weight:700;\" title=\"Student answered too quickly to have read the questions\">&#9888; Fast answering x' + item.fastAnswerWarnings + '</span>' : '') + '</td><td>' + (item.admissionNumber || '') + '</td><td>' + item.subject + '</td><td class="' + scoreClass + '">' + item.score + '%</td><td>' + item.correctAnswers + '/' + item.totalQuestions + '</td><td>' + tabSwitchCell + '</td><td>' + proctorCell + '</td><td>' + item.date + '</td><td class="result-action-cell"><button class="result-action-btn" onclick="openResultActions(\'admin\',' + item.id + ')">⋮ Take Action</button></td></tr>';
     }
     tbody.innerHTML = html;
 }
@@ -7197,10 +7030,12 @@ function showTeacherSection(panelId, btn) {
     showDashSection('teacherDashboard', panelId, btn);
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
         loadTeacherAnalytics();
+        populateRescoreQuestionOptions();
     }
     if (panelId === 'accessLogsSection') {
         loadTeacherAccessLogs();
     }
+    if (panelId === 'studentProgressSection') renderTeacherStudentHistory();
     if (panelId === 'liveSection') {
         startTeacherLivePolling();
     } else {

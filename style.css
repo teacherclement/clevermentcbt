@@ -2120,27 +2120,3 @@ tr.result-row-selected td { background: #eef3fd; }
 .live-msg-dialog h3 { margin: 0 0 4px; color: #172033; }
 .live-msg-label { display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 4px; }
 .live-msg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
-
-
-/* ===== Update 1 additions ===== */
-.assessment-editor-credit {
-    margin-left: auto;
-    margin-right: 8px;
-    border: 1.5px solid #cfe1ff;
-    background: #eef3fd;
-    color: #2d6cdf;
-    border-radius: 8px;
-    padding: 4px 10px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-}
-.whatsapp-share-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-    padding: 4px 12px;
-    background: #25D366 !important;
-    color: #fff !important;
-}
