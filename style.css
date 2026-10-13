@@ -256,19 +256,18 @@ button:disabled {
     font-size: 15px;
     font-variant-numeric: tabular-nums;
 }
-
-#timerDisplay.warning,
-#studentTimerDisplay.warning {
-    color: #dc3545;
-    animation: pulse 1s ease-in-out infinite;
+#studentTimerDisplay {
+    width:58px; height:58px; flex:0 0 58px; box-sizing:border-box;
+    display:inline-flex; align-items:center; justify-content:center;
+    border:3px solid #28a745; border-radius:50%; background:#f0fff4;
+    color:#218838; padding:0; line-height:1; font-size:14px;
+    transition:border-color .25s ease, background-color .25s ease, color .25s ease;
 }
-
-#timerDisplay.expired,
-#studentTimerDisplay.expired {
-    color: #dc3545;
-    animation: pulse 0.5s ease-in-out infinite;
-    font-weight: 700;
-}
+#studentTimerDisplay.timer-yellow { border-color:#e0a800; background:#fff9db; color:#946c00; }
+#studentTimerDisplay.timer-red,
+#studentTimerDisplay.expired { border-color:#dc3545; background:#fff0f1; color:#b21f2d; animation:pulse .8s ease-in-out infinite; }
+#timerDisplay.warning { color:#dc3545; animation:pulse 1s ease-in-out infinite; }
+#studentTimerDisplay.warning { color:#946c00; }
 
 @keyframes pulse {
     0%, 100% { opacity: 1; }
@@ -367,6 +366,15 @@ button:disabled {
     gap: 10px;
 }
 
+#studentQuizSection .student-quiz-heading { display:flex; align-items:center; gap:12px; min-width:0; }
+#studentQuizSection .student-quiz-heading-text { min-width:0; }
+#studentQuizSection .student-quiz-avatar {
+    width:48px; height:48px; flex:0 0 48px; border-radius:50%; overflow:hidden;
+    display:flex; align-items:center; justify-content:center; background:#eaf1fb;
+    color:#244f91; border:2px solid #d6e2f3; font-size:16px; font-weight:700;
+}
+#studentQuizSection .student-quiz-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+.roster-edit-row .roster-photo-preview { width:36px; height:36px; border-radius:50%; object-fit:cover; border:1px solid #d5dce5; background:#f1f5f9; flex:0 0 36px; }
 #studentQuizSection .quiz-header h2 {
     color: #1a1a2e;
     font-size: 20px;

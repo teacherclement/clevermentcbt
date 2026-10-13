@@ -2833,7 +2833,7 @@ async function getRosterForClass(teacherEmail, className) {
         // Normalize: older rosters (before admission numbers existed) were
         // saved as plain strings. Treat those as needing re-upload rather
         // than guessing an admission number for them.
-        return entries.filter(function(e) { return e && typeof e === 'object' && e.admissionNumber; });
+        return entries.filter(function(e) { return e && typeof e === 'object' && e.admissionNumber; }).map(function(e) { return { name: e.name || '', admissionNumber: String(e.admissionNumber || ''), photo: e.photo || '' }; });
     } catch (e) {
         return null;
     }
@@ -2851,7 +2851,7 @@ async function loadRosterForEditing(className) {
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
     var roster = await getRosterForClass(teacherEmail, className);
     currentRosterEditEntries = roster ? roster.map(function(e) {
-        return { name: e.name || '', admissionNumber: e.admissionNumber || '' };
+        return { name: e.name || '', admissionNumber: e.admissionNumber || '', photo: e.photo || '' };
     }) : [];
 
     document.getElementById('rosterEditWrapper').style.display = 'block';
@@ -2864,7 +2864,7 @@ function syncRosterEditEntriesFromDOM() {
     for (var i = 0; i < rows.length; i++) {
         var nameInput = rows[i].querySelector('.roster-edit-name');
         var admInput = rows[i].querySelector('.roster-edit-admission');
-        entries.push({ name: nameInput.value, admissionNumber: admInput.value });
+        entries.push({ name: nameInput.value, admissionNumber: admInput.value, photo: rows[i].getAttribute('data-photo') || '' });
     }
     currentRosterEditEntries = entries;
 }
@@ -2879,9 +2879,11 @@ function renderRosterEditList() {
     var html = '';
     for (var i = 0; i < currentRosterEditEntries.length; i++) {
         var entry = currentRosterEditEntries[i];
-        html += '<div class="roster-edit-row" style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">' +
+        html += '<div class="roster-edit-row" data-photo="' + escapeHtmlAttr(entry.photo || '') + '" style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">' +
+            '<img class="roster-photo-preview" alt="Student photo" src="' + escapeHtmlAttr(entry.photo || '') + '" style="' + (entry.photo ? '' : 'display:none;') + '">' +
             '<input type="text" class="roster-edit-name form-input" style="flex:2; min-width:140px;" placeholder="Student Name" value="' + escapeHtmlAttr(entry.name) + '">' +
             '<input type="text" class="roster-edit-admission form-input" style="flex:1; min-width:120px;" placeholder="Admission Number" value="' + escapeHtmlAttr(entry.admissionNumber) + '">' +
+            '<label class="secondary-btn" style="padding:8px 10px; cursor:pointer; white-space:nowrap;">Photo <input type="file" accept="image/*" style="display:none;" onchange="handleRosterRowPhoto(this)"></label>' +
             '<button onclick="deleteRosterEditRow(' + i + ')" class="secondary-btn" style="background:#dc3545; color:white; padding:8px 12px;">✕</button>' +
             '</div>';
     }
@@ -2892,9 +2894,86 @@ function escapeHtmlAttr(str) {
     return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function compressStudentPhoto(file) {
+    return new Promise(function(resolve, reject) {
+        if (!file || !file.type || file.type.indexOf('image/') !== 0) { reject(new Error('Choose a valid image file.')); return; }
+        var reader = new FileReader();
+        reader.onerror = function() { reject(new Error('Could not read image.')); };
+        reader.onload = function() {
+            var img = new Image();
+            img.onerror = function() { reject(new Error('Could not open image.')); };
+            img.onload = function() {
+                var max = 320, scale = Math.min(1, max / Math.max(img.width, img.height));
+                var canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.round(img.width * scale));
+                canvas.height = Math.max(1, Math.round(img.height * scale));
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.72));
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+async function handleRosterRowPhoto(input) {
+    var row = input && input.closest('.roster-edit-row'), file = input && input.files && input.files[0];
+    if (!row || !file) return;
+    try {
+        var photo = await compressStudentPhoto(file);
+        row.setAttribute('data-photo', photo);
+        var preview = row.querySelector('.roster-photo-preview');
+        preview.src = photo; preview.style.display = 'block';
+    } catch (e) { alert(e.message || 'Could not process this photo.'); }
+    input.value = '';
+}
+async function handleRosterBulkPhotoUpload() {
+    var input = document.getElementById('rosterBulkPhotoInput');
+    var status = document.getElementById('rosterBulkPhotoStatus');
+    var files = input && input.files ? Array.from(input.files) : [];
+    if (!currentRosterEditClass) { alert('Select a class and load its roster before uploading photos.'); return; }
+    if (!files.length) { alert('Choose one or more student photo files first.'); return; }
+    syncRosterEditEntriesFromDOM();
+    var matched = 0, skipped = 0;
+    status.style.display = 'block';
+    for (var i = 0; i < files.length; i++) {
+        var stem = files[i].name.replace(/\.[^.]+$/, '').trim().toLowerCase();
+        var entry = currentRosterEditEntries.find(function(e) { return String(e.admissionNumber || '').trim().toLowerCase() === stem; });
+        if (!entry) { skipped++; continue; }
+        try { entry.photo = await compressStudentPhoto(files[i]); matched++; } catch (e) { skipped++; }
+        status.textContent = 'Processed ' + (i + 1) + ' of ' + files.length + ' photos...';
+    }
+    renderRosterEditList();
+    status.textContent = 'Matched ' + matched + ' photo(s); skipped ' + skipped + '. Click “Save Changes” to save them.';
+    input.value = '';
+}
+function initialsForStudent(name) {
+    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+}
+async function setCurrentStudentPhoto() {
+    var avatar = document.getElementById('studentQuizAvatar');
+    if (!avatar) return;
+    avatar.textContent = initialsForStudent(studentName);
+    window.currentStudentPhoto = '';
+    try {
+        var adm = String(studentAdmissionNumber || '').trim().toLowerCase();
+        var roster = currentClassRosterForAutocomplete || [];
+        var match = roster.find(function(e) { return String(e.admissionNumber || '').trim().toLowerCase() === adm; });
+        if (!match) {
+            roster = await getRosterForClass(currentAssessment.teacherEmail, currentAssessment.className);
+            match = (roster || []).find(function(e) { return String(e.admissionNumber || '').trim().toLowerCase() === adm; });
+        }
+        if (match && match.photo) {
+            var img = document.createElement('img'); img.alt = 'Student photo'; img.src = match.photo;
+            avatar.textContent = ''; avatar.appendChild(img); window.currentStudentPhoto = match.photo;
+        }
+    } catch (e) { /* initials remain as a safe fallback */ }
+}
+
 function addRosterEditRow() {
     syncRosterEditEntriesFromDOM();
-    currentRosterEditEntries.push({ name: '', admissionNumber: '' });
+    currentRosterEditEntries.push({ name: '', admissionNumber: '', photo: '' });
     renderRosterEditList();
     var rows = document.querySelectorAll('#rosterEditList .roster-edit-row');
     var lastRow = rows[rows.length - 1];
@@ -2923,7 +3002,7 @@ async function saveRosterEdits() {
             alert('Every student needs both a Name and an Admission Number. Please fill in the incomplete row, or remove it.');
             return;
         }
-        cleaned.push({ name: name, admissionNumber: admissionNumber });
+        cleaned.push({ name: name, admissionNumber: admissionNumber, photo: currentRosterEditEntries[i].photo || '' });
     }
 
     var statusEl = document.getElementById('rosterEditStatus');
@@ -3285,6 +3364,7 @@ async function teacherDownloadAllCertificates() {
         return;
     }
 
+    var certificateRoster = await getRosterForClass(currentTeacher ? currentTeacher.email : '', assessment.className);
     var JSZipLib = window.JSZip;
     if (!JSZipLib) {
         alert('The zip library failed to load. Please check your internet connection and try again.');
@@ -3295,7 +3375,7 @@ async function teacherDownloadAllCertificates() {
     try {
         var { data, error } = await supabase
             .from('cleverment_results')
-            .select('student_name, score')
+            .select('student_name, admission_number, score')
             .eq('assessment_code', code);
         if (error) {
             alert('Supabase Error: ' + error.message);
@@ -3326,6 +3406,11 @@ async function teacherDownloadAllCertificates() {
         var r = results[i];
         var certData = {
             studentName: r.student_name || 'Student',
+            studentPhoto: (certificateRoster || []).find(function(e) {
+                return e.photo && String(e.admissionNumber || '').trim().toLowerCase() === String(r.admission_number || '').trim().toLowerCase();
+            })?.photo || (certificateRoster || []).find(function(e) {
+                return e.photo && String(e.name || '').trim().toLowerCase() === String(r.student_name || '').trim().toLowerCase();
+            })?.photo || '',
             subject: assessment.subject,
             score: r.score,
             teacherName: assessment.teacherName,
@@ -3777,6 +3862,8 @@ async function restoreQuizState() {
 
     document.getElementById('studentQuizTitle').textContent = studentSubject;
     document.getElementById('studentQuizDisplay').textContent = 'Student: ' + studentName + ' | Class: ' + studentClass;
+    window.currentStudentPhoto = '';
+    setCurrentStudentPhoto();
 
     var display = document.getElementById('studentTimerDisplay');
     if (studentTimeLimit > 0) {
@@ -3787,6 +3874,7 @@ async function restoreQuizState() {
         display.textContent = '∞';
     }
     display.classList.remove('warning', 'expired');
+    updateStudentTimerColor(display);
 
     studentCreateQuestionBoxes();
     studentPreloadImages();
@@ -4288,12 +4376,15 @@ function proceedToStartQuiz() {
 
     document.getElementById('studentQuizTitle').textContent = studentSubject;
     document.getElementById('studentQuizDisplay').textContent = 'Student: ' + studentName + ' | Class: ' + studentClass;
+    window.currentStudentPhoto = '';
+    setCurrentStudentPhoto();
 
     var display = document.getElementById('studentTimerDisplay');
     if (studentTimeLimit > 0) {
         var mins = Math.floor(studentTimeLimit / 60);
         var secs = studentTimeLimit % 60;
         display.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        updateStudentTimerColor(display);
     } else {
         display.textContent = '∞';
     }
@@ -4628,6 +4719,15 @@ function dismissFastAnswerWarning() {
 // STUDENT TIMER
 // ============================================================
 
+function updateStudentTimerColor(display) {
+    if (!display) return;
+    display.classList.remove('timer-yellow', 'timer-red');
+    if (studentTimeLimit > 0) {
+        var ratio = studentTimeRemaining / studentTimeLimit;
+        if (ratio <= 0.15) display.classList.add('timer-red');
+        else if (ratio <= 0.30) display.classList.add('timer-yellow');
+    }
+}
 function studentStartTimer() {
     if (studentTimerInterval) clearInterval(studentTimerInterval);
     if (studentTimeLimit === 0) {
@@ -4650,6 +4750,7 @@ function studentStartTimer() {
         var display = document.getElementById('studentTimerDisplay');
         if (display) {
             display.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        updateStudentTimerColor(display);
             if (remaining <= studentTimeLimit * 0.2 && remaining > 0) {
                 display.classList.add('warning');
             } else {
@@ -5161,7 +5262,15 @@ function buildCertificateElement(data) {
     var nameEl = document.createElement('div');
     nameEl.textContent = data.studentName || 'Student Name';
     nameEl.style.cssText = 'font-size:29pt; font-weight:bold; color:#1a1a2e; padding:0 18mm 2.5mm; min-width:120mm; border-bottom:1.2mm solid #C9A84C; font-family:Georgia,serif; margin:0;';
-    content.appendChild(nameEl);
+    if (data.studentPhoto) {
+        var recipientRow = document.createElement('div');
+        recipientRow.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:7mm; max-width:205mm; margin:0 auto;';
+        nameEl.style.cssText += ';font-size:25pt; min-width:0; max-width:155mm; overflow-wrap:anywhere;';
+        var photo = document.createElement('img');
+        photo.src = data.studentPhoto; photo.alt = 'Student photograph';
+        photo.style.cssText = 'width:25mm; height:30mm; object-fit:cover; border:1mm solid #C9A84C; padding:1mm; background:#fff; flex:0 0 auto;';
+        recipientRow.appendChild(photo); recipientRow.appendChild(nameEl); content.appendChild(recipientRow);
+    } else { content.appendChild(nameEl); }
 
     var p2 = document.createElement('div');
     p2.textContent = 'has successfully completed the assessment in';
@@ -5268,6 +5377,7 @@ function downloadCertificatePDF() {
 
     var cleanCert = buildCertificateElement({
         studentName: studentName,
+        studentPhoto: window.currentStudentPhoto || '',
         subject: studentSubject,
         score: studentScore,
         teacherName: window.assessmentTeacherName,
@@ -5408,7 +5518,15 @@ function downloadCertificateImage() {
     var nameEl = document.createElement('div');
     nameEl.textContent = studentName || 'Student Name';
     nameEl.style.cssText = 'font-size:29pt; font-weight:bold; color:#1a1a2e; padding:0 18mm 2.5mm; min-width:120mm; border-bottom:1.2mm solid #C9A84C; font-family:Georgia,serif; margin:0;';
-    content.appendChild(nameEl);
+    if (window.currentStudentPhoto) {
+        var recipientRow = document.createElement('div');
+        recipientRow.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:7mm; max-width:205mm; margin:0 auto;';
+        nameEl.style.cssText += ';font-size:25pt; min-width:0; max-width:155mm; overflow-wrap:anywhere;';
+        var photo = document.createElement('img');
+        photo.src = window.currentStudentPhoto; photo.alt = 'Student photograph';
+        photo.style.cssText = 'width:25mm; height:30mm; object-fit:cover; border:1mm solid #C9A84C; padding:1mm; background:#fff; flex:0 0 auto;';
+        recipientRow.appendChild(photo); recipientRow.appendChild(nameEl); content.appendChild(recipientRow);
+    } else { content.appendChild(nameEl); }
     
     var p2 = document.createElement('div');
     p2.textContent = 'has successfully completed the assessment in';
