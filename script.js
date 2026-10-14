@@ -8627,6 +8627,66 @@ function studentTrackQuestionSwitch(q) {
 }
 
 
+
+// ============================================================
+// REFRESH BUTTONS on every teacher and admin page
+// (Access Attempts pages already have their own.)
+// ============================================================
+
+var CM_REFRESH_ACTIONS = {
+    // teacher
+    teacherOverviewPanel: function() { return renderTeacherDashboard(); },
+    liveSection: function() { return loadTeacherLive(); },
+    uploadSection: function() { populateTeacherQuestionBankSelect(); return loadTeacherProfile(true); },
+    publishedSection: function() { return renderTeacherPublishedList(); },
+    rosterSection: function() { if (currentRosterEditClass) return loadRosterForEditing(currentRosterEditClass); },
+    analyticsSection: async function() { await reloadTeacherResultsCache(); return loadTeacherAnalytics(); },
+    positionsSection: function() { return initPositionsPanel(true); },
+    progressSection: function() { return initProgressPanel(true); },
+    backupSection: function() { showLastBackupTime(); },
+    csvHistorySection: function() { return renderCSVHistory(); },
+    adminSection: function() { return reloadTeacherResultsCache(); },
+    // admin
+    adminOverviewPanel: async function() { cmAdminCache.t = 0; await renderAdminDashboard(); },
+    adminFeeSection: function() { return renderAdminReactivationFee(); },
+    adminFaqSection: async function() { if (typeof loadFaqs === 'function') await loadFaqs(); return renderAdminFaqList(); },
+    adminLiveSection: function() { return loadAdminLive(); },
+    adminSelectTeacherSection: function() { return loadAdminTeacherWorkspaceOptions(); },
+    adminTeachersSection: async function() { cmAdminCache.t = 0; await renderAdminTeacherList(); await cmAdminPanelOpened('adminTeachersSection'); },
+    adminAssessmentsSection: async function() { cmAdminCache.t = 0; await renderAdminAssessmentList(); await cmAdminPanelOpened('adminAssessmentsSection'); },
+    adminActivitySection: async function() { cmAdminCache.t = 0; await renderAdminActivityLog(); await cmAdminPanelOpened('adminActivitySection'); },
+    adminResultsSection: async function() { cmAdminCache.t = 0; await renderAdminResults(); await cmAdminPanelOpened('adminResultsSection'); }
+};
+
+function cmInjectRefreshButtons() {
+    Object.keys(CM_REFRESH_ACTIONS).forEach(function(panelId) {
+        var panel = document.getElementById(panelId);
+        if (!panel || panel.getAttribute('data-refresh-added')) return;
+        panel.setAttribute('data-refresh-added', '1');
+        var bar = document.createElement('div');
+        bar.className = 'cm-refresh-bar';
+        bar.innerHTML = '<span class="cm-refresh-status"></span><button type="button" class="cm-refresh-btn" aria-label="Refresh this page">' +
+            '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg><span>Refresh</span></button>';
+        var btn = bar.querySelector('.cm-refresh-btn');
+        var status = bar.querySelector('.cm-refresh-status');
+        btn.addEventListener('click', async function() {
+            btn.disabled = true;
+            btn.querySelector('span').textContent = 'Refreshing...';
+            status.textContent = '';
+            try {
+                await CM_REFRESH_ACTIONS[panelId]();
+                status.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            } catch (e) {
+                status.textContent = 'Could not refresh. Please try again.';
+            }
+            btn.disabled = false;
+            btn.querySelector('span').textContent = 'Refresh';
+        });
+        panel.insertBefore(bar, panel.firstChild);
+    });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cmInjectRefreshButtons); else cmInjectRefreshButtons();
+
 function showTeacherSection(panelId, btn) {
     showDashSection('teacherDashboard', panelId, btn);
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {

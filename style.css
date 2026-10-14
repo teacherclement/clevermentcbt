@@ -2334,3 +2334,14 @@ tr.result-row-selected td { background: #eef3fd; }
 .cm-canvas-wrap { position: relative; height: 270px; }
 .qt-dialog { max-width: 640px; }
 @media (max-width: 600px) { .cm-canvas-wrap { height: 240px; } }
+
+
+/* ===== Refresh buttons ===== */
+.cm-refresh-bar { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin: 0 0 10px; }
+.cm-refresh-status { font-size: 12px; color: #6b7a8f; }
+.cm-refresh-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1.5px solid #cfe1ff; background: #eef3fd; color: #2d6cdf;
+    font-weight: 700; font-size: 13px; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+}
+.cm-refresh-btn:disabled { opacity: .6; cursor: wait; }
