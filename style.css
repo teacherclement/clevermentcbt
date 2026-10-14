@@ -2322,3 +2322,15 @@ tr.result-row-selected td { background: #eef3fd; }
     cursor: pointer;
     padding: 0;
 }
+
+
+/* ===== Charts ===== */
+.cm-host { margin: 12px 0; }
+.cm-chart { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 12px; }
+.cm-chart-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 10px; }
+.cm-chart-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: #475569; flex: 1 1 170px; }
+.cm-chart-controls .form-input { margin: 0; }
+.cm-toggle { flex: 0 0 auto; padding: 9px 14px; font-size: 13px; }
+.cm-canvas-wrap { position: relative; height: 270px; }
+.qt-dialog { max-width: 640px; }
+@media (max-width: 600px) { .cm-canvas-wrap { height: 240px; } }

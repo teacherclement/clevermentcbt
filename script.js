@@ -2220,6 +2220,7 @@ async function renderTeacherPublishedList() {
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
     var filtered = await getTeacherAssessmentsFromBackend();
     teacherAssessmentsCache = filtered;
+    cmRefreshPublishedCharts();
 
     populateTeacherAnalyticsSelect(filtered);
 
@@ -3354,6 +3355,7 @@ async function loadTeacherAnalytics() {
     var select = document.getElementById('teacherAnalyticsSelect');
     var container = document.getElementById('teacherAnalyticsContainer');
     if (!select || !container) return;
+    cmRenderChartPanel('cmHostAnalytics', []);
 
     var code = select.value;
     if (!code) {
@@ -3401,7 +3403,8 @@ async function loadTeacherAnalytics() {
             '<span style="font-size:13px; font-weight:600; color:' + barColor + '; white-space:nowrap;">' + q.wrong + '/' + q.total + ' wrong (' + q.wrongPct + '%)</span>' +
             '</div></div>';
     }
-    container.innerHTML = html;
+    container.innerHTML = html + cmAvgTimeHtml(code, assessment);
+    cmRenderChartPanel('cmHostAnalytics', cmAnalyticsSources(code, analytics));
     renderMathIn(container);
 }
 
@@ -3850,6 +3853,9 @@ function saveQuizState() {
         studentTabSwitchCount: studentTabSwitchCount,
         studentProctorStrikes: studentProctorStrikes,
         studentFastAnswerWarnings: studentFastAnswerWarnings,
+        studentQuestionMs: studentQuestionMs,
+        studentActiveOrigIndex: studentActiveOrigIndex,
+        studentQuestionClockStart: studentQuestionClockStart,
         assessmentTeacherName: window.assessmentTeacherName || '',
         assessmentTeacherSignature: window.assessmentTeacherSignature || ''
     };
@@ -3957,6 +3963,9 @@ async function restoreQuizState() {
     studentTabSwitchCount = state.studentTabSwitchCount || 0;
     studentProctorStrikes = state.studentProctorStrikes || 0;
     studentFastAnswerWarnings = state.studentFastAnswerWarnings || 0;
+    studentQuestionMs = state.studentQuestionMs || {};
+    studentActiveOrigIndex = (typeof state.studentActiveOrigIndex === 'number') ? state.studentActiveOrigIndex : -1;
+    studentQuestionClockStart = state.studentQuestionClockStart || 0;
     var restoredPhoto = '';
     try { restoredPhoto = localStorage.getItem('cleverment_student_photo') || ''; } catch (e) {}
     studentPhoto = (typeof eligibility !== 'undefined' && eligibility && eligibility.photo) ? eligibility.photo : restoredPhoto;
@@ -4483,6 +4492,9 @@ function proceedToStartQuiz() {
     studentProctorStrikes = 0;
     studentFastAnswerWarnings = 0;
     studentRecentPickGaps = [];
+    studentQuestionMs = {};
+    studentActiveOrigIndex = -1;
+    studentQuestionClockStart = 0;
     studentEndReason = 'normal';
 
     document.getElementById('studentInfoForm').style.display = 'none';
@@ -4566,6 +4578,7 @@ function studentUpdateQuestionBoxes() {
 function studentDisplayQuestion() {
     var q = studentQuestions[studentCurrentIndex];
     studentQuestionShownAt = Date.now();
+    studentTrackQuestionSwitch(q);
     document.getElementById('studentQuestionText').textContent = (studentCurrentIndex + 1) + '. ' + q.question;
     document.getElementById('studentProgress').textContent = 'Q' + (studentCurrentIndex + 1) + ' of ' + studentQuestions.length;
 
@@ -4706,13 +4719,14 @@ function studentCheckDeadlineNow() {
 }
 
 function buildStudentAnswersPayload() {
+    studentAccrueQuestionTime();
     var letters = ['A', 'B', 'C', 'D'];
     var payload = [];
     for (var i = 0; i < studentQuestions.length; i++) {
         var q = studentQuestions[i];
         var letterIdx = letters.indexOf(studentAnswers[i]);
         var selectedText = letterIdx !== -1 ? (q.options[letterIdx] || null) : null;
-        payload.push({ originalIndex: q.originalIndex, selectedOptionText: selectedText });
+        payload.push({ originalIndex: q.originalIndex, selectedOptionText: selectedText, ms: Math.round(studentQuestionMs[q.originalIndex] || 0) });
     }
     return payload;
 }
@@ -5045,6 +5059,8 @@ function normalizeResultRow(r) {
         fastAnswerWarnings: r.fast_answer_warnings || 0,
         retakeAllowed: !!r.retake_allowed,
         createdAt: r.created_at || '',
+        qTimes: Array.isArray(r.answers) ? r.answers.map(function(a) { return (a && typeof a.timeSeconds === 'number') ? a.timeSeconds : null; }) : [],
+        qCorrect: Array.isArray(r.answers) ? r.answers.map(function(a) { return a && a.isCorrect ? 1 : 0; }) : [],
         date: r.created_at ? new Date(r.created_at).toLocaleString() : ''
     };
 }
@@ -5166,13 +5182,14 @@ async function studentSubmitQuiz() {
     if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Submitting...'; }
 
     var letters = ['A', 'B', 'C', 'D'];
+    studentAccrueQuestionTime();
     var answersPayload = [];
     for (var i = 0; i < studentQuestions.length; i++) {
         var q = studentQuestions[i];
         var userLetter = studentAnswers[i];
         var letterIdx = letters.indexOf(userLetter);
         var selectedText = letterIdx !== -1 ? (q.options[letterIdx] || null) : null;
-        answersPayload.push({ originalIndex: q.originalIndex, selectedOptionText: selectedText });
+        answersPayload.push({ originalIndex: q.originalIndex, selectedOptionText: selectedText, ms: Math.round(studentQuestionMs[q.originalIndex] || 0) });
     }
 
     studentTimeTaken = studentGetTimeTaken();
@@ -5941,6 +5958,7 @@ function applyTeacherFilters() {
     if (statAvg) statAvg.textContent = total > 0 ? Math.round(totalScore / total) + '%' : '0%';
     if (statPass) statPass.textContent = total > 0 ? Math.round((passed / total) * 100) + '%' : '0%';
     if (statClasses) statClasses.textContent = Object.keys(classesSet).length;
+    cmRefreshTeacherCharts(filtered);
 
     var tbody = document.getElementById('teacherResultsTableBody');
     if (!tbody) return;
@@ -6372,6 +6390,8 @@ function setupResultActionModal() {
     if (deleteBtn) deleteBtn.onclick = deleteSelectedResult;
     var retakeBtnEl = document.getElementById('resultActionRetake');
     if (retakeBtnEl) retakeBtnEl.onclick = allowRetakeForSelectedResult;
+    var timesBtnEl = document.getElementById('resultActionTimes');
+    if (timesBtnEl) timesBtnEl.onclick = showQuestionTimesForSelected;
     if (cancelBtn) cancelBtn.onclick = closeResultActions;
     if (overlay) {
         overlay.addEventListener('click', function(e) {
@@ -6705,6 +6725,7 @@ function adminLogout() {
 }
 
 async function renderAdminDashboard() {
+    setTimeout(function() { cmAdminPanelOpened('adminOverviewPanel'); }, 300);
     renderAdminReactivationFee();
     renderAdminTeacherList();
     loadAdminTeacherWorkspaceOptions();
@@ -7769,11 +7790,13 @@ function renderSubjectPositions() {
     var results = teacherResultsCache.filter(function(r) { return r.assessmentCode === code; });
     if (!assessment || results.length === 0) {
         posState.subject = null;
+        cmRenderPosSubject(null);
         box.innerHTML = '<p class="helper-text">No students have submitted this assessment yet.</p>';
         return;
     }
     var data = buildSubjectPositions(results);
     posState.subject = { assessment: assessment, data: data };
+    cmRenderPosSubject(data);
 
     var html = '<div class="pos-chips">' +
         posStatChip('Students', data.stats.students) +
@@ -7797,9 +7820,10 @@ function renderBroadsheet() {
     var box = document.getElementById('posClassResult');
     if (!classSel || !box) return;
     var cls = classSel.value;
-    if (!cls) { posState.broad = null; box.innerHTML = '<p class="helper-text">No results yet.</p>'; return; }
+    if (!cls) { posState.broad = null; cmRenderPosClass(null); box.innerHTML = '<p class="helper-text">No results yet.</p>'; return; }
     var data = buildBroadsheet(teacherResultsCache, cls, methodSel ? methodSel.value : 'average');
     posState.broad = { className: cls, method: methodSel ? methodSel.value : 'average', data: data };
+    cmRenderPosClass(data);
     if (data.rows.length === 0) { box.innerHTML = '<p class="helper-text">No results for this class yet.</p>'; return; }
 
     var html = '<div class="pos-chips">' +
@@ -8051,11 +8075,13 @@ function renderStudentProgress() {
     var subjBox = document.getElementById('progSubjectBars');
     if (hist.list.length === 0) {
         chartBox.innerHTML = '<p class="helper-text">No results for this student in the chosen period or subject.</p>';
+        cmRenderChartPanel('cmHostProgress', []);
         tableBox.innerHTML = '';
         subjBox.innerHTML = '';
         return;
     }
-    chartBox.innerHTML = progChartSvg(hist.list) + '<p class="helper-text" style="margin:4px 0 0;"><span class="prog-dot pass"></span> pass &nbsp; <span class="prog-dot fail"></span> below pass mark</p>';
+    chartBox.innerHTML = '';
+    cmRenderProgressChart(hist);
 
     subjBox.innerHTML = '<h4 style="margin:14px 0 8px;">Average by subject</h4>' + hist.subjectAverages.map(function(sa) {
         return '<div class="prog-bar-row"><div class="prog-bar-label">' + posEsc(sa.label) + '</div><div class="prog-bar-track"><div class="prog-bar-fill" style="width:' + Math.max(2, Math.min(100, sa.average)) + '%"></div></div><div class="prog-bar-value">' + sa.average + '%</div></div>';
@@ -8108,6 +8134,499 @@ function progDownloadPdf() {
 }
 
 
+// ============================================================
+// CHARTS (one tool used by every dashboard)
+// Each dashboard supplies a list of "sources" (what can be charted); the person picks the chart TYPE
+// ("Select graph to view") and, where there is more than one source, WHAT to chart. Default: histogram.
+// ============================================================
+
+var CM_CHART_TYPES = [
+    { id: 'histogram', label: 'Histogram' },
+    { id: 'bar', label: 'Bar graph' },
+    { id: 'hbar', label: 'Horizontal bar graph' },
+    { id: 'line', label: 'Line graph' },
+    { id: 'area', label: 'Area graph' },
+    { id: 'pie', label: 'Pie chart' },
+    { id: 'doughnut', label: 'Doughnut chart' },
+    { id: 'radar', label: 'Radar chart' },
+    { id: 'polar', label: 'Polar area chart' },
+    { id: 'scatter', label: 'Scatter plot' }
+];
+var CM_PALETTE = ['#2d6cdf', '#2d9c5c', '#f0a500', '#dc3545', '#7b4dc0', '#13a8b4', '#e0637a', '#8a9a5b', '#c9a84c', '#4c6a92'];
+var cmChartState = {};
+
+function cmPalette(n) {
+    var out = [];
+    for (var i = 0; i < n; i++) out.push(CM_PALETTE[i % CM_PALETTE.length]);
+    return out;
+}
+
+function cmRound1(x) { return Math.round(x * 10) / 10; }
+
+// ---- data builders: each returns { labels, values, unit, max? } ----
+function cmBins(values) {
+    var counts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    values.forEach(function(v) {
+        var b = Math.min(9, Math.max(0, Math.floor((Number(v) || 0) / 10)));
+        counts[b]++;
+    });
+    return { labels: ['0-9', '10-19', '20-29', '30-39', '40-49', '50-59', '60-69', '70-79', '80-89', '90-100'], values: counts, unit: 'students' };
+}
+
+function cmLimit(entries, limit) {
+    if (entries.length <= limit) return entries;
+    return entries.slice(0, limit);
+}
+
+function cmCountBy(items, keyFn, limit) {
+    var map = {};
+    items.forEach(function(it) { var k = String(keyFn(it) || 'Unknown'); map[k] = (map[k] || 0) + 1; });
+    var entries = Object.keys(map).map(function(k) { return [k, map[k]]; }).sort(function(a, b) { return b[1] - a[1]; });
+    entries = cmLimit(entries, limit || 15);
+    return { labels: entries.map(function(e) { return e[0]; }), values: entries.map(function(e) { return e[1]; }), unit: 'count' };
+}
+
+function cmAvgBy(items, keyFn, valFn, limit, unit) {
+    var map = {};
+    items.forEach(function(it) {
+        var k = String(keyFn(it) || 'Unknown');
+        var m = map[k] || (map[k] = { sum: 0, n: 0 });
+        m.sum += Number(valFn(it)) || 0; m.n++;
+    });
+    var entries = Object.keys(map).map(function(k) { return [k, cmRound1(map[k].sum / map[k].n)]; }).sort(function(a, b) { return b[1] - a[1]; });
+    entries = cmLimit(entries, limit || 15);
+    var out = { labels: entries.map(function(e) { return e[0]; }), values: entries.map(function(e) { return e[1]; }), unit: unit || '%' };
+    if (out.unit === '%') out.max = 100;
+    return out;
+}
+
+function cmDayLabel(d) { return d.toLocaleDateString([], { day: 'numeric', month: 'short' }); }
+
+function cmByDay(items, dateFn) {
+    var map = {};
+    items.forEach(function(it) {
+        var t = Date.parse(dateFn(it) || '');
+        if (isNaN(t)) return;
+        var d = new Date(t); d.setHours(0, 0, 0, 0);
+        var k = d.getTime();
+        map[k] = (map[k] || 0) + 1;
+    });
+    var keys = Object.keys(map).map(Number).sort(function(a, b) { return a - b; }).slice(-30);
+    return { labels: keys.map(function(k) { return cmDayLabel(new Date(k)); }), values: keys.map(function(k) { return map[k]; }), unit: 'count' };
+}
+
+function cmPassed(r) { return Number(r.score) >= ((r.passMark !== null && r.passMark !== undefined) ? Number(r.passMark) : 50); }
+
+// What can be charted from a list of results.
+function cmResultSources(results, opts) {
+    opts = opts || {};
+    var list = [
+        { id: 'dist', label: 'Score distribution', data: function() { return cmBins(results.map(function(r) { return r.score; })); } },
+        { id: 'subject', label: 'Average score by subject', data: function() { return cmAvgBy(results, function(r) { return r.subject; }, function(r) { return r.score; }); } },
+        { id: 'class', label: 'Average score by class', data: function() { return cmAvgBy(results, function(r) { return r.className; }, function(r) { return r.score; }); } },
+        { id: 'passfail', label: 'Pass vs fail', data: function() { var p = results.filter(cmPassed).length; return { labels: ['Passed', 'Failed'], values: [p, results.length - p], unit: 'students' }; } },
+        { id: 'time', label: 'Submissions over time', data: function() { return cmByDay(results, function(r) { return r.createdAt; }); } },
+        { id: 'assess', label: 'Results per assessment', data: function() { return cmCountBy(results, function(r) { return r.assessmentCode; }); } }
+    ];
+    if (opts.students) {
+        list.push({ id: 'student', label: 'Score per student', data: function() {
+            var rows = results.slice(0, 40);
+            return { labels: rows.map(function(r) { return r.studentName; }), values: rows.map(function(r) { return Number(r.score) || 0; }), unit: '%', max: 100 };
+        } });
+    }
+    if (opts.admin) {
+        list.push({ id: 'teacherCount', label: 'Results per teacher', data: function() { return cmCountBy(results, function(r) { return r.teacherEmail; }); } });
+        list.push({ id: 'teacherAvg', label: 'Average score per teacher', data: function() { return cmAvgBy(results, function(r) { return r.teacherEmail; }, function(r) { return r.score; }); } });
+    }
+    return list;
+}
+
+function cmAccessLabel(s) { return typeof accessLogStatusLabel === 'function' ? accessLogStatusLabel(s) : (s || 'Unknown'); }
+
+function cmAccessSources(logs) {
+    return [
+        { id: 'status', label: 'Attempts by outcome', data: function() { return cmCountBy(logs, function(l) { return cmAccessLabel(l.status); }); } },
+        { id: 'day', label: 'Attempts per day', data: function() { return cmByDay(logs, function(l) { return l.timestamp; }); } },
+        { id: 'code', label: 'Attempts per assessment', data: function() { return cmCountBy(logs, function(l) { return l.code; }); } },
+        { id: 'class', label: 'Attempts per class', data: function() { return cmCountBy(logs, function(l) { return l.className; }); } }
+    ];
+}
+
+// ---- drawing ----
+function cmAxes(d, horizontal) {
+    var valueAxis = { beginAtZero: true, title: { display: !!d.unit, text: d.unit || '' } };
+    if (d.max) valueAxis.suggestedMax = d.max;
+    var labelAxis = { ticks: { maxRotation: 60, autoSkip: true } };
+    return horizontal ? { x: valueAxis, y: labelAxis } : { x: labelAxis, y: valueAxis };
+}
+
+function cmChartConfig(type, d) {
+    var labels = d.labels, values = d.values, colors = cmPalette(values.length);
+    var round = ['pie', 'doughnut', 'polar'].indexOf(type) !== -1;
+    var options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: round || type === 'radar' ? round : false } } };
+    var ds = { label: d.unit || 'value', data: values };
+    if (type === 'histogram') {
+        ds.backgroundColor = '#2d6cdf'; ds.borderColor = '#ffffff'; ds.borderWidth = 1; ds.barPercentage = 1; ds.categoryPercentage = 1;
+        options.scales = cmAxes(d, false);
+        return { type: 'bar', data: { labels: labels, datasets: [ds] }, options: options };
+    }
+    if (type === 'bar' || type === 'hbar') {
+        ds.backgroundColor = colors; ds.borderRadius = 4;
+        if (type === 'hbar') options.indexAxis = 'y';
+        options.scales = cmAxes(d, type === 'hbar');
+        return { type: 'bar', data: { labels: labels, datasets: [ds] }, options: options };
+    }
+    if (type === 'line' || type === 'area') {
+        ds.borderColor = '#2d6cdf'; ds.backgroundColor = 'rgba(45,108,223,0.2)'; ds.tension = 0.3; ds.pointRadius = 4; ds.fill = type === 'area';
+        options.scales = cmAxes(d, false);
+        return { type: 'line', data: { labels: labels, datasets: [ds] }, options: options };
+    }
+    if (type === 'pie' || type === 'doughnut') {
+        ds.backgroundColor = colors; ds.borderColor = '#ffffff'; ds.borderWidth = 2;
+        return { type: type, data: { labels: labels, datasets: [ds] }, options: options };
+    }
+    if (type === 'polar') {
+        ds.backgroundColor = colors.map(function(c) { return c + 'cc'; });
+        return { type: 'polarArea', data: { labels: labels, datasets: [ds] }, options: options };
+    }
+    if (type === 'radar') {
+        ds.borderColor = '#2d6cdf'; ds.backgroundColor = 'rgba(45,108,223,0.25)'; ds.pointBackgroundColor = '#2d6cdf';
+        options.scales = { r: { beginAtZero: true, suggestedMax: d.max || undefined } };
+        return { type: 'radar', data: { labels: labels, datasets: [ds] }, options: options };
+    }
+    // scatter
+    ds.data = values.map(function(v, i) { return { x: i + 1, y: v }; });
+    ds.backgroundColor = '#2d6cdf'; ds.pointRadius = 5;
+    options.scales = {
+        x: { ticks: { stepSize: 1, callback: function(v) { return labels[v - 1] || ''; } } },
+        y: { beginAtZero: true, title: { display: !!d.unit, text: d.unit || '' }, suggestedMax: d.max || undefined }
+    };
+    return { type: 'scatter', data: { datasets: [ds] }, options: options };
+}
+
+function cmDrawChart(hostId) {
+    var st = cmChartState[hostId];
+    var host = document.getElementById(hostId);
+    if (!st || !host) return;
+    var wrap = host.querySelector('.cm-canvas-wrap');
+    var canvas = host.querySelector('canvas');
+    var empty = host.querySelector('.cm-empty');
+    if (st.chart) { try { st.chart.destroy(); } catch (e) {} st.chart = null; }
+    var src = st.sources.filter(function(s) { return s.id === st.source; })[0] || st.sources[0];
+    var d = null;
+    try { d = src.data(); } catch (e) { d = null; }
+    var hasData = d && d.values && d.values.length > 0 && d.values.some(function(v) { return Number(v) > 0; });
+    if (!hasData) {
+        wrap.style.display = 'none';
+        empty.style.display = 'block';
+        empty.textContent = 'Nothing to chart yet for this view.';
+        return;
+    }
+    if (typeof Chart === 'undefined') {
+        wrap.style.display = 'none';
+        empty.style.display = 'block';
+        empty.textContent = 'Charts could not load. Please check your internet connection and refresh the page.';
+        return;
+    }
+    empty.style.display = 'none';
+    wrap.style.display = st.hidden ? 'none' : 'block';
+    st.chart = new Chart(canvas, cmChartConfig(st.type, d));
+}
+
+// Builds (or updates) the chart panel inside host element `hostId`. Pass an empty list to clear it.
+function cmRenderChartPanel(hostId, sources) {
+    var host = document.getElementById(hostId);
+    if (!host) return;
+    var st = cmChartState[hostId] || (cmChartState[hostId] = { type: 'histogram', source: null, hidden: false, chart: null });
+    st.sources = (sources || []).filter(Boolean);
+    if (st.sources.length === 0) {
+        if (st.chart) { try { st.chart.destroy(); } catch (e) {} st.chart = null; }
+        host.innerHTML = '';
+        return;
+    }
+    if (!st.sources.some(function(s) { return s.id === st.source; })) st.source = st.sources[0].id;
+
+    if (!host.querySelector('.cm-chart')) {
+        host.innerHTML =
+            '<div class="cm-chart">' +
+                '<div class="cm-chart-controls">' +
+                    '<label>Select graph to view<select class="form-input cm-type">' +
+                        CM_CHART_TYPES.map(function(t) { return '<option value="' + t.id + '">' + t.label + '</option>'; }).join('') +
+                    '</select></label>' +
+                    '<label class="cm-source-label">Show<select class="form-input cm-source"></select></label>' +
+                    '<button type="button" class="secondary-btn cm-toggle">Hide chart</button>' +
+                '</div>' +
+                '<div class="cm-canvas-wrap"><canvas></canvas></div>' +
+                '<p class="cm-empty helper-text" style="display:none;"></p>' +
+            '</div>';
+        host.querySelector('.cm-type').addEventListener('change', function() { st.type = this.value; cmDrawChart(hostId); });
+        host.querySelector('.cm-source').addEventListener('change', function() { st.source = this.value; cmDrawChart(hostId); });
+        host.querySelector('.cm-toggle').addEventListener('click', function() {
+            st.hidden = !st.hidden;
+            this.textContent = st.hidden ? 'Show chart' : 'Hide chart';
+            host.querySelector('.cm-canvas-wrap').style.display = st.hidden ? 'none' : 'block';
+            if (!st.hidden) cmDrawChart(hostId);
+        });
+    }
+    host.querySelector('.cm-type').value = st.type;
+    var srcSel = host.querySelector('.cm-source');
+    srcSel.innerHTML = st.sources.map(function(s) { return '<option value="' + s.id + '">' + escapeHtml(s.label) + '</option>'; }).join('');
+    srcSel.value = st.source;
+    host.querySelector('.cm-source-label').style.display = st.sources.length > 1 ? '' : 'none';
+    cmDrawChart(hostId);
+}
+
+// ---------- teacher dashboards ----------
+function cmRefreshTeacherCharts(filtered) {
+    cmRenderChartPanel('cmHostTeacherOverview', cmResultSources(filtered));
+    cmRenderChartPanel('cmHostTeacherResults', cmResultSources(filtered, { students: true }));
+}
+
+function cmRefreshPublishedCharts() {
+    var list = teacherAssessmentsCache || [];
+    if (list.length === 0) { cmRenderChartPanel('cmHostPublished', []); return; }
+    var results = teacherResultsCache || [];
+    cmRenderChartPanel('cmHostPublished', [
+        { id: 'results', label: 'Results per assessment', data: function() { return cmCountBy(results.filter(function(r) { return list.some(function(a) { return a.code === r.assessmentCode; }); }), function(r) { return r.assessmentCode; }); } },
+        { id: 'avg', label: 'Average score per assessment', data: function() { return cmAvgBy(results, function(r) { return r.assessmentCode; }, function(r) { return r.score; }); } },
+        { id: 'questions', label: 'Questions per assessment', data: function() { return { labels: list.slice(0, 15).map(function(a) { return a.code; }), values: list.slice(0, 15).map(function(a) { return (a.questions || []).length; }), unit: 'questions' }; } },
+        { id: 'time', label: 'Time limit per assessment (minutes)', data: function() { return { labels: list.slice(0, 15).map(function(a) { return a.code; }), values: list.slice(0, 15).map(function(a) { return Math.round((a.timeLimit || 0) / 60); }), unit: 'minutes' }; } }
+    ]);
+}
+
+function cmRenderProgressChart(hist) {
+    var list = hist.list;
+    cmRenderChartPanel('cmHostProgress', [
+        { id: 'time', label: 'Scores over time', data: function() { return { labels: list.map(function(p) { return progShortDate(p.t) + ' ' + p.subject; }), values: list.map(function(p) { return p.score; }), unit: '%', max: 100 }; } },
+        { id: 'subject', label: 'Average by subject', data: function() { return { labels: hist.subjectAverages.map(function(s) { return s.label; }), values: hist.subjectAverages.map(function(s) { return s.average; }), unit: '%', max: 100 }; } },
+        { id: 'passfail', label: 'Pass vs fail', data: function() { var p = list.filter(function(x) { return x.passed; }).length; return { labels: ['Passed', 'Failed'], values: [p, list.length - p], unit: 'assessments' }; } },
+        { id: 'dist', label: 'Score distribution', data: function() { var b = cmBins(list.map(function(x) { return x.score; })); b.unit = 'assessments'; return b; } }
+    ]);
+}
+
+function cmRenderPosSubject(data) {
+    if (!data) { cmRenderChartPanel('cmHostPosSubject', []); return; }
+    cmRenderChartPanel('cmHostPosSubject', [
+        { id: 'student', label: 'Score per student', data: function() { var r = data.rows.slice(0, 40); return { labels: r.map(function(x) { return x.name; }), values: r.map(function(x) { return x.score; }), unit: '%', max: 100 }; } },
+        { id: 'dist', label: 'Score distribution', data: function() { return cmBins(data.rows.map(function(x) { return x.score; })); } },
+        { id: 'passfail', label: 'Pass vs fail', data: function() { return { labels: ['Passed', 'Failed'], values: [data.stats.passed, data.stats.students - data.stats.passed], unit: 'students' }; } }
+    ]);
+}
+
+function cmRenderPosClass(data) {
+    if (!data || data.rows.length === 0) { cmRenderChartPanel('cmHostPosClass', []); return; }
+    cmRenderChartPanel('cmHostPosClass', [
+        { id: 'student', label: 'Average per student', data: function() { var r = data.rows.slice(0, 40); return { labels: r.map(function(x) { return x.name; }), values: r.map(function(x) { return x.average; }), unit: '%', max: 100 }; } },
+        { id: 'subject', label: 'Class average per subject', data: function() { return { labels: data.subjects.map(function(s) { return s.label; }), values: data.subjects.map(function(s) { return data.subjectAverages[s.key] || 0; }), unit: '%', max: 100 }; } },
+        { id: 'dist', label: 'Average distribution', data: function() { return cmBins(data.rows.map(function(x) { return x.average; })); } },
+        { id: 'passfail', label: 'Pass vs fail (by average)', data: function() { var p = data.rows.filter(function(x) { return x.average >= 50; }).length; return { labels: ['Average 50% or more', 'Below 50%'], values: [p, data.rows.length - p], unit: 'students' }; } }
+    ]);
+}
+
+// ---------- per-question time ----------
+function cmFmtSec(s) {
+    s = Math.max(0, Math.round(Number(s) || 0));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+// Average seconds per question across all results of one assessment that have timing data.
+function cmAvgQuestionTimes(code) {
+    var rs = (teacherResultsCache || []).filter(function(r) { return r.assessmentCode === code && Array.isArray(r.qTimes) && r.qTimes.some(function(t) { return typeof t === 'number'; }); });
+    var n = 0;
+    rs.forEach(function(r) { n = Math.max(n, r.qTimes.length); });
+    var avgs = [];
+    for (var i = 0; i < n; i++) {
+        var sum = 0, c = 0;
+        rs.forEach(function(r) { if (typeof r.qTimes[i] === 'number') { sum += r.qTimes[i]; c++; } });
+        avgs.push(c ? cmRound1(sum / c) : 0);
+    }
+    return { avgs: avgs, attempts: rs.length };
+}
+
+function cmAvgTimeHtml(code, assessment) {
+    var t = cmAvgQuestionTimes(code);
+    if (t.attempts === 0) return '';
+    var max = Math.max.apply(null, t.avgs.concat([1]));
+    var html = '<h4 style="margin:18px 0 6px;">Average time per question</h4><p class="helper-text" style="margin:0 0 8px;">Based on ' + t.attempts + ' attempt(s) with timing data.</p>';
+    t.avgs.forEach(function(a, i) {
+        var q = assessment && assessment.questions && assessment.questions[i] ? String(assessment.questions[i].question || '') : '';
+        if (q.length > 80) q = q.slice(0, 80) + '...';
+        html += '<div class="prog-bar-row"><div class="prog-bar-label" style="flex-basis:46%;" title="' + escapeHtml(q) + '">Q' + (i + 1) + (q ? ': ' + escapeHtml(q) : '') + '</div><div class="prog-bar-track"><div class="prog-bar-fill" style="width:' + Math.max(2, a / max * 100) + '%"></div></div><div class="prog-bar-value" style="flex-basis:52px;">' + cmFmtSec(a) + '</div></div>';
+    });
+    return html;
+}
+
+function cmAnalyticsSources(code, analytics) {
+    var t = cmAvgQuestionTimes(code);
+    var results = (teacherResultsCache || []).filter(function(r) { return r.assessmentCode === code; });
+    var list = [];
+    if (analytics && analytics.questions) {
+        list.push({ id: 'missed', label: 'Most missed questions (% wrong)', data: function() { return { labels: analytics.questions.map(function(q, i) { return 'Q' + (i + 1); }), values: analytics.questions.map(function(q) { return q.wrongPct; }), unit: '% wrong', max: 100 }; } });
+    }
+    if (t.attempts > 0) {
+        list.push({ id: 'time', label: 'Average time per question (seconds)', data: function() { return { labels: t.avgs.map(function(a, i) { return 'Q' + (i + 1); }), values: t.avgs, unit: 'seconds' }; } });
+    }
+    list.push({ id: 'dist', label: 'Score distribution', data: function() { return cmBins(results.map(function(r) { return r.score; })); } });
+    return list;
+}
+
+function closeQuestionTimes() {
+    var o = document.getElementById('questionTimesOverlay');
+    if (o) o.style.display = 'none';
+}
+
+function showQuestionTimesForSelected() {
+    if (!pendingResultAction || !pendingResultAction.result) return;
+    var result = pendingResultAction.result;
+    closeResultActions();
+    var overlay = document.getElementById('questionTimesOverlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    document.getElementById('qtTitle').textContent = result.studentName + ' - ' + result.subject;
+    var times = Array.isArray(result.qTimes) ? result.qTimes : [];
+    var has = times.some(function(t) { return typeof t === 'number'; });
+    var summary = document.getElementById('qtSummary');
+    var table = document.getElementById('qtTable');
+    if (!has) {
+        summary.textContent = 'Time per question was not recorded for this result (it was taken before this feature was added).';
+        table.innerHTML = '';
+        cmRenderChartPanel('cmHostQTimes', []);
+        return;
+    }
+    var total = times.reduce(function(a, t) { return a + (typeof t === 'number' ? t : 0); }, 0);
+    summary.textContent = 'Total time taken: ' + result.timeTaken + '. The time on every question below adds up to ' + cmFmtSec(total) + '.';
+    var assessment = (teacherAssessmentsCache || []).filter(function(a) { return a.code === result.assessmentCode; })[0];
+    var correct = Array.isArray(result.qCorrect) ? result.qCorrect : [];
+    var html = '<table class="pos-table"><thead><tr><th>Q</th><th>Question</th><th>Time</th><th>Answer</th></tr></thead><tbody>';
+    times.forEach(function(t, i) {
+        var q = assessment && assessment.questions && assessment.questions[i] ? String(assessment.questions[i].question || '') : '';
+        if (q.length > 70) q = q.slice(0, 70) + '...';
+        html += '<tr><td>' + (i + 1) + '</td><td>' + escapeHtml(q) + '</td><td><strong>' + cmFmtSec(t) + '</strong></td><td>' + (correct[i] ? '<span class="pos-remark pass">Right</span>' : '<span class="pos-remark fail">Wrong</span>') + '</td></tr>';
+    });
+    html += '<tr class="pos-footer-row"><td></td><td>Total</td><td>' + cmFmtSec(total) + '</td><td></td></tr></tbody></table>';
+    table.innerHTML = html;
+    cmRenderChartPanel('cmHostQTimes', [
+        { id: 'time', label: 'Time per question (seconds)', data: function() { return { labels: times.map(function(t, i) { return 'Q' + (i + 1); }), values: times.map(function(t) { return t || 0; }), unit: 'seconds' }; } },
+        { id: 'share', label: 'Share of total time (%)', data: function() { return { labels: times.map(function(t, i) { return 'Q' + (i + 1); }), values: times.map(function(t) { return total ? cmRound1((t || 0) / total * 100) : 0; }), unit: '% of time' }; } },
+        { id: 'rw', label: 'Average time: right vs wrong answers', data: function() {
+            var rs = 0, rc = 0, ws = 0, wc = 0;
+            times.forEach(function(t, i) { if (correct[i]) { rs += t || 0; rc++; } else { ws += t || 0; wc++; } });
+            return { labels: ['Right answers', 'Wrong answers'], values: [rc ? cmRound1(rs / rc) : 0, wc ? cmRound1(ws / wc) : 0], unit: 'seconds per question' };
+        } }
+    ]);
+}
+
+// ---------- admin dashboards ----------
+var cmAdminCache = { t: 0, results: null, teachers: [], assessments: [] };
+
+async function cmLoadAdminData(needResults) {
+    var token = localStorage.getItem('cleverment_admin_token') || '';
+    var headers = { 'Authorization': 'Bearer ' + token };
+    var fresh = Date.now() - cmAdminCache.t < 60000;
+    if (!fresh) {
+        try {
+            var tr = await fetch(BACKEND_URL + '/api/admin/teachers', { headers: headers });
+            if (tr.ok) cmAdminCache.teachers = (await tr.json()).teachers || [];
+        } catch (e) {}
+        try {
+            var ar = await fetch(BACKEND_URL + '/api/admin/assessments', { headers: headers });
+            if (ar.ok) cmAdminCache.assessments = (await ar.json()).assessments || [];
+        } catch (e) {}
+        cmAdminCache.t = Date.now();
+        cmAdminCache.results = null;
+    }
+    if (needResults && !cmAdminCache.results) {
+        var all = (typeof adminResultsCache !== 'undefined' && adminResultsCache && adminResultsCache.length) ? adminResultsCache : await attachPassMarks(await getAllResultsFromDatabase(), true);
+        cmAdminCache.results = all;
+    }
+    return cmAdminCache;
+}
+
+function cmAdminFilteredResults(all) {
+    function val(id) { var el = document.getElementById(id); return el ? el.value : 'all'; }
+    var t = val('adminResultsFilterTeacher'), c = val('adminResultsFilterClass'), s = val('adminResultsFilterSubject');
+    return all.filter(function(r) {
+        return (t === 'all' || r.teacherEmail === t) && (c === 'all' || r.className === c) && (s === 'all' || r.subject === s);
+    });
+}
+
+async function cmAdminPanelOpened(panelId) {
+    try {
+        if (panelId === 'adminOverviewPanel') {
+            var d = await cmLoadAdminData(true);
+            var src = cmResultSources(d.results, { admin: true });
+            src.push({ id: 'assessTeacher', label: 'Assessments per teacher', data: function() { return cmCountBy(d.assessments, function(a) { return a.teacher_email || a.teacherEmail; }); } });
+            cmRenderChartPanel('cmHostAdminOverview', src);
+        } else if (panelId === 'adminResultsSection') {
+            var d2 = await cmLoadAdminData(true);
+            cmRenderChartPanel('cmHostAdminResults', cmResultSources(cmAdminFilteredResults(d2.results), { admin: true, students: true }));
+        } else if (panelId === 'adminTeachersSection') {
+            var d3 = await cmLoadAdminData(true);
+            var names = {};
+            d3.teachers.forEach(function(t) { names[String(t.email || '').toLowerCase()] = t.name || t.email; });
+            function nm(e) { return names[String(e || '').toLowerCase()] || e; }
+            cmRenderChartPanel('cmHostAdminTeachers', [
+                { id: 'results', label: 'Results per teacher', data: function() { return cmCountBy(d3.results, function(r) { return nm(r.teacherEmail); }); } },
+                { id: 'avg', label: 'Average score per teacher', data: function() { return cmAvgBy(d3.results, function(r) { return nm(r.teacherEmail); }, function(r) { return r.score; }); } },
+                { id: 'assess', label: 'Assessments per teacher', data: function() { return cmCountBy(d3.assessments, function(a) { return nm(a.teacher_email || a.teacherEmail); }); } },
+                { id: 'status', label: 'Active vs paused teachers', data: function() { var p = d3.teachers.filter(function(t) { return t.paused; }).length; return { labels: ['Active', 'Paused'], values: [d3.teachers.length - p, p], unit: 'teachers' }; } },
+                { id: 'signups', label: 'Teachers registered over time', data: function() { return cmByDay(d3.teachers, function(t) { return t.created_at; }); } }
+            ]);
+        } else if (panelId === 'adminAssessmentsSection') {
+            var d4 = await cmLoadAdminData(true);
+            cmRenderChartPanel('cmHostAdminAssessments', [
+                { id: 'results', label: 'Results per assessment', data: function() { return cmCountBy(d4.results, function(r) { return r.assessmentCode; }); } },
+                { id: 'avg', label: 'Average score per assessment', data: function() { return cmAvgBy(d4.results, function(r) { return r.assessmentCode; }, function(r) { return r.score; }); } },
+                { id: 'teacher', label: 'Assessments per teacher', data: function() { return cmCountBy(d4.assessments, function(a) { return a.teacher_email || a.teacherEmail; }); } },
+                { id: 'subject', label: 'Assessments per subject', data: function() { return cmCountBy(d4.assessments, function(a) { return a.subject; }); } },
+                { id: 'class', label: 'Assessments per class', data: function() { return cmCountBy(d4.assessments, function(a) { return a.class_name || a.className; }); } },
+                { id: 'questions', label: 'Questions per assessment', data: function() { var l = d4.assessments.slice(0, 15); return { labels: l.map(function(a) { return a.code; }), values: l.map(function(a) { return (a.questions || []).length; }), unit: 'questions' }; } }
+            ]);
+        } else if (panelId === 'adminActivitySection') {
+            var acts = await getTeacherActivity();
+            var dd = await cmLoadAdminData(false);
+            var nmap = {};
+            dd.teachers.forEach(function(t) { nmap[String(t.email || '').toLowerCase()] = t.name || t.email; });
+            cmRenderChartPanel('cmHostAdminActivity', acts && acts.length ? [
+                { id: 'type', label: 'Actions by type', data: function() { return cmCountBy(acts, function(a) { return String(a.action || 'activity').replace(/_/g, ' '); }); } },
+                { id: 'day', label: 'Activity per day', data: function() { return cmByDay(acts, function(a) { return a.created_at; }); } },
+                { id: 'teacher', label: 'Activity per teacher', data: function() { return cmCountBy(acts, function(a) { return nmap[String(a.teacher_email || '').toLowerCase()] || a.teacher_email; }); } }
+            ] : []);
+        }
+    } catch (e) {
+        /* a chart problem must never break the dashboard */
+    }
+}
+
+function cmInitListeners() {
+    var res = document.getElementById('adminResultsSection');
+    if (res) res.addEventListener('change', function() { setTimeout(function() { cmAdminPanelOpened('adminResultsSection'); }, 150); });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cmInitListeners); else cmInitListeners();
+
+// ---------- per-question time tracking (student side) ----------
+// Time on each question is measured in real clock time, including time spent on the page after leaving, so the
+// server can scale the numbers to add up exactly to the total time taken.
+var studentQuestionMs = {};
+var studentActiveOrigIndex = -1;
+var studentQuestionClockStart = 0;
+
+function studentAccrueQuestionTime() {
+    if (studentActiveOrigIndex < 0 || !studentQuestionClockStart) return;
+    var now = Date.now();
+    var d = now - studentQuestionClockStart;
+    if (d > 0) studentQuestionMs[studentActiveOrigIndex] = (studentQuestionMs[studentActiveOrigIndex] || 0) + d;
+    studentQuestionClockStart = now;
+}
+
+function studentTrackQuestionSwitch(q) {
+    if (!q) return;
+    studentAccrueQuestionTime();
+    studentActiveOrigIndex = q.originalIndex;
+    if (!studentQuestionClockStart) studentQuestionClockStart = Date.now();
+}
+
+
 function showTeacherSection(panelId, btn) {
     showDashSection('teacherDashboard', panelId, btn);
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
@@ -8132,6 +8651,7 @@ function showTeacherSection(panelId, btn) {
 function showAdminSection(panelId, btn) {
     showDashSection('adminDashboard', panelId, btn);
     if (panelId === 'adminAccessLogsSection') loadAdminAccessLogs();
+    cmAdminPanelOpened(panelId);
     if (panelId === 'adminLiveSection') startAdminLivePolling();
     else stopAdminLivePolling();
 }
@@ -8194,6 +8714,7 @@ async function loadTeacherAccessLogs() {
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not load access logs.');
         var logs = data.logs || [];
+        cmRenderChartPanel('cmHostTeacherAccess', cmAccessSources(logs));
         if (!logs.length) {
             container.innerHTML = '<p class="helper-text">No student access attempts have been recorded yet.</p>';
             return;
@@ -8644,6 +9165,7 @@ async function loadAdminAccessLogs() {
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not load access logs.');
         var logs = data.logs || [];
+        cmRenderChartPanel('cmHostAdminAccess', cmAccessSources(logs));
         if (!logs.length) { container.innerHTML = '<p class="helper-text">No student access attempts have been recorded yet.</p>'; return; }
         var html = '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table class="teacher-access-log-table"><thead><tr><th>Date & Time</th><th>Teacher</th><th>Assessment</th><th>Student Name</th><th>Admission No.</th><th>Status</th><th>Details</th></tr></thead><tbody>';
         logs.forEach(function(x) {

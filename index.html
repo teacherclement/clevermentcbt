@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -466,7 +467,8 @@
                     <h3>Classes</h3>
                     <p id="teacherStatClasses">0</p>
                 </div>
-            </div>                    <p class="helper-text" style="margin-top:12px;">Your key stats at a glance. Use the menu on the left to publish assessments, manage rosters, and review results.</p>
+            </div>                    <div id="cmHostTeacherOverview" class="cm-host"></div>
+<p class="helper-text" style="margin-top:12px;">Your key stats at a glance. Use the menu on the left to publish assessments, manage rosters, and review results.</p>
                 </div>
                 <div class="dash-panel" id="liveSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
                     <h3 style="margin-bottom:4px;">Live Now</h3>
@@ -482,6 +484,7 @@
                         <button onclick="loadTeacherAccessLogs()" class="secondary-btn" style="font-size:13px; padding:7px 14px;">↻ Refresh</button>
                     </div>
                     <p class="helper-text" style="margin-bottom:12px;">See attempts to access your assessments, including successful access, duplicate attempts, invalid name/admission number, closed assessments, and reported network/server verification errors.</p>
+<div id="cmHostTeacherAccess" class="cm-host"></div>
                     <div id="teacherAccessLogsContainer" class="scrollable-panel">
                         <p class="helper-text">Loading...</p>
                     </div>
@@ -646,6 +649,7 @@
 
         <div class="dash-panel" id="publishedSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">Your Published Assessments</h3>
+<div id="cmHostPublished" class="cm-host"></div>
             <div id="teacherPublishedList" class="scrollable-panel">
                 <p class="helper-text">No assessments published yet.</p>
             </div>
@@ -713,6 +717,7 @@
                 <option value="">-- Select an assessment --</option>
             </select>
             <button onclick="teacherDownloadAllCertificates()" id="teacherBulkCertBtn" class="secondary-btn full-width" style="margin-bottom:12px; background:#2d6cdf; color:white;">Download All Certificates (ZIP)</button>
+<div id="cmHostAnalytics" class="cm-host"></div>
             <div id="teacherAnalyticsContainer" class="scrollable-panel">
                 <p class="helper-text">Pick an assessment above to see its question breakdown.</p>
             </div>
@@ -734,6 +739,7 @@
                     <button type="button" class="primary-btn" onclick="posDownloadSubjectPdf()">Download PDF</button>
                     <button type="button" class="secondary-btn" onclick="posExportSubjectCsv()">Export CSV</button>
                 </div>
+<div id="cmHostPosSubject" class="cm-host"></div>
                 <div id="posSubjectResult"></div>
             </div>
 
@@ -752,6 +758,7 @@
                     <button type="button" class="primary-btn" onclick="posDownloadBroadsheetPdf()">Download PDF</button>
                     <button type="button" class="secondary-btn" onclick="posExportBroadsheetCsv()">Export CSV</button>
                 </div>
+<div id="cmHostPosClass" class="cm-host"></div>
                 <div id="posClassResult"></div>
             </div>
         </div>
@@ -782,6 +789,7 @@
                     <div><label class="live-msg-label" for="progTo">To</label><input type="date" id="progTo" class="form-input" onchange="renderStudentProgress()"></div>
                 </div>
                 <div id="progCards" class="pos-chips" style="margin-top:14px;"></div>
+<div id="cmHostProgress" class="cm-host"></div>
                 <div id="progChart" style="margin-top:6px;"></div>
                 <div id="progSubjectBars"></div>
                 <div style="margin:14px 0 6px;"><button type="button" class="primary-btn" onclick="progDownloadPdf()">Download progress report (PDF)</button></div>
@@ -848,6 +856,7 @@
 
             
 
+<div id="cmHostTeacherResults" class="cm-host"></div>
             <div id="teacherResultsTableContainer" class="scrollable-panel">
                 <table id="teacherResultsTable">
                     <thead>
@@ -943,7 +952,8 @@
                     <h3>Teachers</h3>
                     <p id="adminStatTeachers">0</p>
                 </div>
-            </div>                    <p class="helper-text" style="margin-top:12px;">Platform-wide stats at a glance. Use the menu on the left to manage teachers, assessments, FAQs, and view all results.</p>
+            </div>                    <div id="cmHostAdminOverview" class="cm-host"></div>
+<p class="helper-text" style="margin-top:12px;">Platform-wide stats at a glance. Use the menu on the left to manage teachers, assessments, FAQs, and view all results.</p>
                 </div>
                 <div class="dash-panel" id="adminFeeSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">Account Reactivation Fee</h3>
@@ -979,6 +989,7 @@
                 <button onclick="loadAdminAccessLogs()" class="secondary-btn" style="font-size:13px; padding:7px 14px;">↻ Refresh</button>
             </div>
             <p class="helper-text" style="margin-bottom:12px;">All recorded assessment access attempts, including successful access, duplicate attempts, invalid details, and network/server errors.</p>
+<div id="cmHostAdminAccess" class="cm-host"></div>
             <div id="adminAccessLogsContainer" class="scrollable-panel"><p class="helper-text">Loading...</p></div>
         </div>
 
@@ -995,6 +1006,7 @@
 
         <div class="dash-panel" id="adminTeachersSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">Manage Teachers</h3>
+<div id="cmHostAdminTeachers" class="cm-host"></div>
             <div id="adminTeacherList" class="scrollable-panel">
                 <p class="helper-text">No teachers registered yet.</p>
             </div>
@@ -1007,6 +1019,7 @@
                     <option value="all">All Teachers</option>
                 </select>
             </div>
+<div id="cmHostAdminAssessments" class="cm-host"></div>
             <div id="adminAssessmentList" class="scrollable-panel">
                 <p class="helper-text">No assessments published yet.</p>
             </div>
@@ -1014,6 +1027,7 @@
 
         <div class="dash-panel" id="adminActivitySection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">Teacher Activity Log</h3>
+<div id="cmHostAdminActivity" class="cm-host"></div>
             <div style="max-height:300px; overflow-y:auto;">
                 <div id="adminActivityLog" class="scrollable-panel">
                     <p class="helper-text">No activity recorded yet.</p>
@@ -1041,6 +1055,7 @@
 
             
 
+<div id="cmHostAdminResults" class="cm-host"></div>
             <div id="adminResultsTableContainer" class="scrollable-panel">
                 <table id="adminResultsTable">
                     <thead>
@@ -1087,6 +1102,7 @@
         <p id="resultActionMessage" style="margin:0 0 18px 0; color:#6b7a8f; font-size:14px;">Choose an action for this result.</p>
         <div style="display:flex; flex-direction:column; gap:10px;">
             <button id="resultActionDownload" class="primary-btn" style="width:100%;">Download Certificate</button>
+            <button id="resultActionTimes" class="secondary-btn" style="width:100%; background:#172033; color:white;">Question Times</button>
             <button id="resultActionRetake" class="secondary-btn" style="width:100%; background:#2d6cdf; color:white;">Allow Retake</button>
             <button id="resultActionDelete" class="secondary-btn" style="width:100%; background:#dc3545; color:white;">Delete Result</button>
             <button id="resultActionCancel" class="secondary-btn" style="width:100%;">Cancel</button>
@@ -1232,6 +1248,17 @@
         </div>
     </div>
 </div>
+
+    <!-- ===== Time per question (teacher/admin) ===== -->
+    <div id="questionTimesOverlay" class="live-msg-overlay" style="display:none;" role="dialog" aria-modal="true">
+        <div class="live-msg-dialog qt-dialog">
+            <h3 id="qtTitle">Time per question</h3>
+            <p id="qtSummary" class="helper-text"></p>
+            <div id="cmHostQTimes" class="cm-host"></div>
+            <div id="qtTable" class="scrollable-panel"></div>
+            <div class="live-msg-actions"><button type="button" class="secondary-btn" onclick="closeQuestionTimes()">Close</button></div>
+        </div>
+    </div>
 
     <!-- ===== Connecting banner (shown while the app retries a slow connection) ===== -->
     <div id="connectBanner" class="connect-banner" style="display:none;" role="status" aria-live="polite"></div>
