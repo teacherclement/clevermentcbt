@@ -132,16 +132,25 @@
                 🎙 Noise monitoring active
             </div>
             <div class="quiz-header">
-                <div class="student-quiz-heading">
-                    <div id="studentQuizAvatar" class="student-quiz-avatar" aria-label="Student picture">?</div>
-                    <div class="student-quiz-heading-text">
-                    <h2 id="studentQuizTitle">Assessment</h2>
-                    <p id="studentQuizDisplay" style="font-size:14px; color:#6b7a8f; margin-top:2px;"></p>
+                <div class="quiz-student">
+                    <div id="studentAvatar" class="student-avatar">
+                        <img id="studentAvatarImg" alt="" style="display:none;">
+                        <span id="studentAvatarInitials">?</span>
+                    </div>
+                    <div class="quiz-student-text">
+                        <h2 id="studentQuizTitle">Assessment</h2>
+                        <p id="studentQuizDisplay" style="font-size:14px; color:#6b7a8f; margin-top:2px;"></p>
                     </div>
                 </div>
                 <div class="quiz-stats">
-                    <span id="studentTimerDisplay">00:00</span>
-                    <span style="margin:0 4px;">|</span>
+                    <div id="studentTimerRing" class="quiz-timer ok" role="timer" aria-label="Time remaining">
+                        <svg viewBox="0 0 100 100" aria-hidden="true">
+                            <circle class="qt-track" cx="50" cy="50" r="44"></circle>
+                            <circle id="studentTimerArc" class="qt-arc" cx="50" cy="50" r="44" transform="rotate(-90 50 50)"></circle>
+                        </svg>
+                        <span id="studentTimerDisplay">00:00</span>
+                    </div>
+                    <span id="studentNoTimeLimit" style="display:none;">No time limit</span>
                     <span id="studentProgress">Q1 of 0</span>
                 </div>
             </div>
@@ -165,6 +174,7 @@
                 <p class="hint-text">Click any number to navigate</p>
                 <div id="studentQuestionBoxes"></div>
             </div>
+
         </div>
 
         <!-- ===== RESULTS SECTION WITH 3 BUTTONS ===== -->
@@ -679,16 +689,16 @@
             <button onclick="handleRosterFileUpload()" class="primary-btn full-width">Upload Roster</button>
             <p id="rosterUploadStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
 
-            <div id="rosterBulkPhotos" style="margin-top:16px; padding:14px; background:#fff; border:1px solid #e4eaf1; border-radius:10px;">
-                <h4 style="margin:0 0 6px;">Upload Student Photos in Bulk</h4>
-                <p class="helper-text" style="margin-bottom:8px;">Choose image files named with each student's admission number (for example, STU001.jpg). Load the roster first; then save changes after upload.</p>
-                <input type="file" id="rosterBulkPhotoInput" accept="image/*" multiple class="form-input">
-                <button onclick="handleRosterBulkPhotoUpload()" class="secondary-btn full-width" style="margin-top:8px;">Upload Selected Photos</button>
-                <p id="rosterBulkPhotoStatus" class="helper-text" style="display:none; margin-top:8px;"></p>
-            </div>
             <div id="rosterEditWrapper" style="display:none; margin-top:20px; border-top:1.5px solid #eef2f6; padding-top:16px;">
                 <h4 style="margin-bottom:4px;">3. Edit This Class's Roster</h4>
                 <p class="helper-text" style="margin-bottom:12px;">Fix a typo, add one student, or remove someone - without redoing the whole spreadsheet.</p>
+                <div class="roster-photo-bulk">
+                    <strong>Student pictures</strong>
+                    <p class="helper-text" style="margin:4px 0 8px;">Tap the picture circle beside a student to add or change their photo. To add many at once, choose photo files named with the admission numbers (for example 2024-001.jpg).</p>
+                    <input type="file" id="rosterBulkPhotoInput" accept="image/*" multiple class="form-input" onchange="handleBulkRosterPhotos(this)">
+                    <p id="rosterPhotoBulkStatus" class="helper-text" style="display:none; margin-top:8px; font-weight:600;"></p>
+                </div>
+                <input type="file" id="rosterPhotoPicker" accept="image/*" style="display:none;" onchange="onRosterPhotoPicked(this)">
                 <div id="rosterEditList"></div>
                 <button onclick="addRosterEditRow()" class="secondary-btn full-width" style="margin-top:8px;">+ Add Student</button>
                 <button onclick="saveRosterEdits()" class="primary-btn full-width" style="margin-top:10px;">Save Changes</button>

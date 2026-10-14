@@ -2833,7 +2833,7 @@ async function getRosterForClass(teacherEmail, className) {
         // Normalize: older rosters (before admission numbers existed) were
         // saved as plain strings. Treat those as needing re-upload rather
         // than guessing an admission number for them.
-        return entries.filter(function(e) { return e && typeof e === 'object' && e.admissionNumber; }).map(function(e) { return { name: e.name || '', admissionNumber: String(e.admissionNumber || ''), photo: e.photo || '' }; });
+        return entries.filter(function(e) { return e && typeof e === 'object' && e.admissionNumber; });
     } catch (e) {
         return null;
     }
@@ -2846,15 +2846,27 @@ async function getRosterForClass(teacherEmail, className) {
 var currentRosterEditClass = '';
 var currentRosterEditEntries = [];
 
+var currentRosterEditPhotoKeys = {};   // admission keys that already have a picture saved on the server
+var rosterPhotoTargetIndex = -1;
+
+function rosterKey(a) { return String(a || '').trim().toLowerCase(); }
+function rosterLooseKey(a) { return String(a || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
 async function loadRosterForEditing(className) {
     currentRosterEditClass = className;
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
     var roster = await getRosterForClass(teacherEmail, className);
+    var photos = await getRosterPhotoMap(className, true);
+    currentRosterEditPhotoKeys = {};
+    Object.keys(photos).forEach(function(k) { currentRosterEditPhotoKeys[k] = true; });
     currentRosterEditEntries = roster ? roster.map(function(e) {
-        return { name: e.name || '', admissionNumber: e.admissionNumber || '', photo: e.photo || '' };
+        var p = photos[rosterKey(e.admissionNumber)] || '';
+        return { name: e.name || '', admissionNumber: e.admissionNumber || '', photo: p, photoDirty: false };
     }) : [];
 
     document.getElementById('rosterEditWrapper').style.display = 'block';
+    var bulkStatus = document.getElementById('rosterPhotoBulkStatus');
+    if (bulkStatus) bulkStatus.style.display = 'none';
     renderRosterEditList();
 }
 
@@ -2864,7 +2876,8 @@ function syncRosterEditEntriesFromDOM() {
     for (var i = 0; i < rows.length; i++) {
         var nameInput = rows[i].querySelector('.roster-edit-name');
         var admInput = rows[i].querySelector('.roster-edit-admission');
-        entries.push({ name: nameInput.value, admissionNumber: admInput.value, photo: rows[i].getAttribute('data-photo') || '' });
+        var old = currentRosterEditEntries[i] || {};
+        entries.push({ name: nameInput.value, admissionNumber: admInput.value, photo: old.photo || '', photoDirty: !!old.photoDirty });
     }
     currentRosterEditEntries = entries;
 }
@@ -2876,14 +2889,18 @@ function renderRosterEditList() {
         return;
     }
 
+    var cameraIcon = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
     var html = '';
     for (var i = 0; i < currentRosterEditEntries.length; i++) {
         var entry = currentRosterEditEntries[i];
-        html += '<div class="roster-edit-row" data-photo="' + escapeHtmlAttr(entry.photo || '') + '" style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">' +
-            '<img class="roster-photo-preview" alt="Student photo" src="' + escapeHtmlAttr(entry.photo || '') + '" style="' + (entry.photo ? '' : 'display:none;') + '">' +
-            '<input type="text" class="roster-edit-name form-input" style="flex:2; min-width:140px;" placeholder="Student Name" value="' + escapeHtmlAttr(entry.name) + '">' +
-            '<input type="text" class="roster-edit-admission form-input" style="flex:1; min-width:120px;" placeholder="Admission Number" value="' + escapeHtmlAttr(entry.admissionNumber) + '">' +
-            '<label class="secondary-btn" style="padding:8px 10px; cursor:pointer; white-space:nowrap;">Photo <input type="file" accept="image/*" style="display:none;" onchange="handleRosterRowPhoto(this)"></label>' +
+        html += '<div class="roster-edit-row" style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">' +
+            '<div class="roster-photo-cell">' +
+                '<button type="button" class="roster-photo-btn" onclick="pickRosterPhoto(' + i + ')" aria-label="Add or change picture">' +
+                    (entry.photo ? '<img src="' + entry.photo + '" alt="">' : cameraIcon) + '</button>' +
+                (entry.photo ? '<button type="button" class="roster-photo-remove" onclick="removeRosterPhoto(' + i + ')" aria-label="Remove picture">&times;</button>' : '') +
+            '</div>' +
+            '<input type="text" class="roster-edit-name form-input" style="flex:2; min-width:130px;" placeholder="Student Name" value="' + escapeHtmlAttr(entry.name) + '">' +
+            '<input type="text" class="roster-edit-admission form-input" style="flex:1; min-width:110px;" placeholder="Admission Number" value="' + escapeHtmlAttr(entry.admissionNumber) + '">' +
             '<button onclick="deleteRosterEditRow(' + i + ')" class="secondary-btn" style="background:#dc3545; color:white; padding:8px 12px;">✕</button>' +
             '</div>';
     }
@@ -2894,86 +2911,9 @@ function escapeHtmlAttr(str) {
     return (str || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function compressStudentPhoto(file) {
-    return new Promise(function(resolve, reject) {
-        if (!file || !file.type || file.type.indexOf('image/') !== 0) { reject(new Error('Choose a valid image file.')); return; }
-        var reader = new FileReader();
-        reader.onerror = function() { reject(new Error('Could not read image.')); };
-        reader.onload = function() {
-            var img = new Image();
-            img.onerror = function() { reject(new Error('Could not open image.')); };
-            img.onload = function() {
-                var max = 320, scale = Math.min(1, max / Math.max(img.width, img.height));
-                var canvas = document.createElement('canvas');
-                canvas.width = Math.max(1, Math.round(img.width * scale));
-                canvas.height = Math.max(1, Math.round(img.height * scale));
-                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas.toDataURL('image/jpeg', 0.72));
-            };
-            img.src = reader.result;
-        };
-        reader.readAsDataURL(file);
-    });
-}
-async function handleRosterRowPhoto(input) {
-    var row = input && input.closest('.roster-edit-row'), file = input && input.files && input.files[0];
-    if (!row || !file) return;
-    try {
-        var photo = await compressStudentPhoto(file);
-        row.setAttribute('data-photo', photo);
-        var preview = row.querySelector('.roster-photo-preview');
-        preview.src = photo; preview.style.display = 'block';
-    } catch (e) { alert(e.message || 'Could not process this photo.'); }
-    input.value = '';
-}
-async function handleRosterBulkPhotoUpload() {
-    var input = document.getElementById('rosterBulkPhotoInput');
-    var status = document.getElementById('rosterBulkPhotoStatus');
-    var files = input && input.files ? Array.from(input.files) : [];
-    if (!currentRosterEditClass) { alert('Select a class and load its roster before uploading photos.'); return; }
-    if (!files.length) { alert('Choose one or more student photo files first.'); return; }
-    syncRosterEditEntriesFromDOM();
-    var matched = 0, skipped = 0;
-    status.style.display = 'block';
-    for (var i = 0; i < files.length; i++) {
-        var stem = files[i].name.replace(/\.[^.]+$/, '').trim().toLowerCase();
-        var entry = currentRosterEditEntries.find(function(e) { return String(e.admissionNumber || '').trim().toLowerCase() === stem; });
-        if (!entry) { skipped++; continue; }
-        try { entry.photo = await compressStudentPhoto(files[i]); matched++; } catch (e) { skipped++; }
-        status.textContent = 'Processed ' + (i + 1) + ' of ' + files.length + ' photos...';
-    }
-    renderRosterEditList();
-    status.textContent = 'Matched ' + matched + ' photo(s); skipped ' + skipped + '. Click “Save Changes” to save them.';
-    input.value = '';
-}
-function initialsForStudent(name) {
-    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return '?';
-    return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-}
-async function setCurrentStudentPhoto() {
-    var avatar = document.getElementById('studentQuizAvatar');
-    if (!avatar) return;
-    avatar.textContent = initialsForStudent(studentName);
-    window.currentStudentPhoto = '';
-    try {
-        var adm = String(studentAdmissionNumber || '').trim().toLowerCase();
-        var roster = currentClassRosterForAutocomplete || [];
-        var match = roster.find(function(e) { return String(e.admissionNumber || '').trim().toLowerCase() === adm; });
-        if (!match) {
-            roster = await getRosterForClass(currentAssessment.teacherEmail, currentAssessment.className);
-            match = (roster || []).find(function(e) { return String(e.admissionNumber || '').trim().toLowerCase() === adm; });
-        }
-        if (match && match.photo) {
-            var img = document.createElement('img'); img.alt = 'Student photo'; img.src = match.photo;
-            avatar.textContent = ''; avatar.appendChild(img); window.currentStudentPhoto = match.photo;
-        }
-    } catch (e) { /* initials remain as a safe fallback */ }
-}
-
 function addRosterEditRow() {
     syncRosterEditEntriesFromDOM();
-    currentRosterEditEntries.push({ name: '', admissionNumber: '', photo: '' });
+    currentRosterEditEntries.push({ name: '', admissionNumber: '', photo: '', photoDirty: false });
     renderRosterEditList();
     var rows = document.querySelectorAll('#rosterEditList .roster-edit-row');
     var lastRow = rows[rows.length - 1];
@@ -2984,6 +2924,150 @@ function deleteRosterEditRow(index) {
     syncRosterEditEntriesFromDOM();
     currentRosterEditEntries.splice(index, 1);
     renderRosterEditList();
+}
+
+// Shrinks a photo to a passport-style 240 x 300 JPEG (about 15-25 KB), centred and cropped to fill the frame.
+function rosterPrepareStudentPhoto(file) {
+    return new Promise(function(resolve, reject) {
+        if (!/^image\//i.test(file.type || '') && !/\.(jpe?g|png|webp|heic)$/i.test(file.name || '')) {
+            reject(new Error('That file is not a picture.'));
+            return;
+        }
+        var reader = new FileReader();
+        reader.onerror = function() { reject(new Error('Could not read that picture.')); };
+        reader.onload = function(e) {
+            var img = new Image();
+            img.onerror = function() { reject(new Error('Could not open that picture.')); };
+            img.onload = function() {
+                var W = 240, H = 300;
+                var scale = Math.max(W / img.width, H / img.height);
+                var sw = W / scale, sh = H / scale;
+                var sx = (img.width - sw) / 2;
+                var sy = Math.max(0, (img.height - sh) * 0.25); // faces sit in the upper part of a portrait
+                var canvas = document.createElement('canvas');
+                canvas.width = W;
+                canvas.height = H;
+                var ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, W, H);
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+                var out = canvas.toDataURL('image/jpeg', 0.85);
+                if (out.length > 150000) out = canvas.toDataURL('image/jpeg', 0.7);
+                resolve(out);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function pickRosterPhoto(index) {
+    rosterPhotoTargetIndex = index;
+    var picker = document.getElementById('rosterPhotoPicker');
+    if (picker) { picker.value = ''; picker.click(); }
+}
+
+async function onRosterPhotoPicked(input) {
+    var file = input.files && input.files[0];
+    var idx = rosterPhotoTargetIndex;
+    if (!file || idx < 0) return;
+    try {
+        var photo = await rosterPrepareStudentPhoto(file);
+        syncRosterEditEntriesFromDOM();
+        if (currentRosterEditEntries[idx]) {
+            currentRosterEditEntries[idx].photo = photo;
+            currentRosterEditEntries[idx].photoDirty = true;
+        }
+        renderRosterEditList();
+        var st = document.getElementById('rosterEditStatus');
+        if (st) { st.style.display = 'block'; st.textContent = 'Picture added. Tap Save Changes to keep it.'; }
+    } catch (e) {
+        alert(e.message || 'Could not use that picture.');
+    } finally {
+        input.value = '';
+        rosterPhotoTargetIndex = -1;
+    }
+}
+
+function removeRosterPhoto(index) {
+    syncRosterEditEntriesFromDOM();
+    if (currentRosterEditEntries[index]) {
+        currentRosterEditEntries[index].photo = '';
+        currentRosterEditEntries[index].photoDirty = true;
+    }
+    renderRosterEditList();
+}
+
+// Many pictures at once: each file is matched to a student by its file name, which must be the admission number
+// (2024-001.jpg matches 2024/001 - slashes, dashes and spaces are ignored).
+async function handleBulkRosterPhotos(input) {
+    var files = Array.prototype.slice.call(input.files || [], 0, 100);
+    var status = document.getElementById('rosterPhotoBulkStatus');
+    if (!currentRosterEditClass) { alert('Please select a class first.'); input.value = ''; return; }
+    if (files.length === 0) return;
+    syncRosterEditEntriesFromDOM();
+
+    var byKey = {};
+    currentRosterEditEntries.forEach(function(e, i) {
+        var k = rosterLooseKey(e.admissionNumber);
+        if (k) (byKey[k] = byKey[k] || []).push(i);
+    });
+
+    status.style.display = 'block';
+    var matched = 0, unmatched = [], failed = [];
+    for (var f = 0; f < files.length; f++) {
+        status.textContent = 'Reading pictures... ' + (f + 1) + ' of ' + files.length;
+        var base = files[f].name.replace(/\.[^.]+$/, '');
+        var idxs = byKey[rosterLooseKey(base)];
+        if (!idxs) { unmatched.push(files[f].name); continue; }
+        try {
+            var photo = await rosterPrepareStudentPhoto(files[f]);
+            idxs.forEach(function(i) { currentRosterEditEntries[i].photo = photo; currentRosterEditEntries[i].photoDirty = true; });
+            matched++;
+        } catch (e) {
+            failed.push(files[f].name);
+        }
+    }
+    renderRosterEditList();
+    var text = 'Matched ' + matched + ' of ' + files.length + ' picture' + (files.length === 1 ? '' : 's') + '.';
+    if (unmatched.length) text += ' No student has an admission number matching: ' + unmatched.slice(0, 8).join(', ') + (unmatched.length > 8 ? ' and ' + (unmatched.length - 8) + ' more' : '') + '.';
+    if (failed.length) text += ' Could not read: ' + failed.slice(0, 5).join(', ') + '.';
+    text += matched ? ' Now tap Save Changes below to keep them.' : '';
+    status.textContent = text;
+    input.value = '';
+}
+
+// Sends added / changed / removed pictures to the server in small groups. Returns a short message.
+async function saveRosterPhotoChanges(className) {
+    var finalKeys = {};
+    var upserts = [];
+    currentRosterEditEntries.forEach(function(e) {
+        var key = rosterKey(e.admissionNumber);
+        if (!key || !e.photo) return;
+        finalKeys[key] = true;
+        if (e.photoDirty || !currentRosterEditPhotoKeys[key]) upserts.push({ admissionNumber: e.admissionNumber.trim(), photo: e.photo });
+    });
+    var removals = [];
+    Object.keys(currentRosterEditPhotoKeys).forEach(function(k) {
+        if (!finalKeys[k]) removals.push({ admissionNumber: k, photo: '' });
+    });
+    var all = upserts.concat(removals);
+    if (all.length === 0) return '';
+
+    var token = localStorage.getItem('cleverment_teacher_token');
+    for (var i = 0; i < all.length; i += 40) {
+        var res = await fetch(BACKEND_URL + '/api/teacher/roster-photos', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ className: className, photos: all.slice(i, i + 40) })
+        });
+        var data = await res.json().catch(function() { return {}; });
+        if (!res.ok) throw new Error(data.error || 'Could not save the pictures.');
+    }
+    currentRosterEditPhotoKeys = finalKeys;
+    currentRosterEditEntries.forEach(function(e) { e.photoDirty = false; });
+    delete rosterPhotoCache[className];
+    return upserts.length + ' picture' + (upserts.length === 1 ? '' : 's') + ' saved' + (removals.length ? ', ' + removals.length + ' removed' : '') + '.';
 }
 
 async function saveRosterEdits() {
@@ -3002,7 +3086,7 @@ async function saveRosterEdits() {
             alert('Every student needs both a Name and an Admission Number. Please fill in the incomplete row, or remove it.');
             return;
         }
-        cleaned.push({ name: name, admissionNumber: admissionNumber, photo: currentRosterEditEntries[i].photo || '' });
+        cleaned.push({ name: name, admissionNumber: admissionNumber });
     }
 
     var statusEl = document.getElementById('rosterEditStatus');
@@ -3010,13 +3094,20 @@ async function saveRosterEdits() {
     statusEl.textContent = 'Saving...';
 
     var saved = await saveClassRosterEntries(currentRosterEditClass, cleaned);
-    if (saved) {
-        currentRosterEditEntries = cleaned;
-        renderRosterEditList();
-        statusEl.textContent = 'Saved: ' + cleaned.length + ' student(s) on the roster for ' + currentRosterEditClass + '.';
-    } else {
+    if (!saved) {
         statusEl.textContent = 'Could not save. Please try again.';
+        return;
     }
+    var photoMessage = '';
+    try {
+        photoMessage = await saveRosterPhotoChanges(currentRosterEditClass);
+    } catch (e) {
+        statusEl.textContent = 'The names were saved, but the pictures were not: ' + e.message;
+        renderRosterEditList();
+        return;
+    }
+    renderRosterEditList();
+    statusEl.textContent = 'Saved: ' + cleaned.length + ' student(s) on the roster for ' + currentRosterEditClass + '.' + (photoMessage ? ' ' + photoMessage : '');
 }
 
 function downloadRosterTemplate() {
@@ -3314,6 +3405,35 @@ async function loadTeacherAnalytics() {
     renderMathIn(container);
 }
 
+
+// ---- Student pictures on certificates made by the teacher (results table, analytics ZIP) ----
+var rosterPhotoCache = {};
+
+async function getRosterPhotoMap(className, forceFresh) {
+    var cached = rosterPhotoCache[className];
+    if (!forceFresh && cached && Date.now() - cached.t < 5 * 60 * 1000) return cached.map;
+    var token = localStorage.getItem('cleverment_teacher_token');
+    var map = {};
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/roster-photos?className=' + encodeURIComponent(className), {
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        var data = await res.json();
+        if (res.ok && data.photos) map = data.photos;
+    } catch (e) { /* no pictures available: certificates simply have none */ }
+    rosterPhotoCache[className] = { map: map, t: Date.now() };
+    return map;
+}
+
+async function attachRosterPhoto(certData, className, admissionNumber) {
+    certData.admissionNumber = admissionNumber || '';
+    if (!className || !admissionNumber) return certData;
+    var map = await getRosterPhotoMap(className);
+    var photo = map[String(admissionNumber).trim().toLowerCase()];
+    if (photo) certData.studentPhoto = photo;
+    return certData;
+}
+
 function generateCertificatePDFBlob(data) {
     return new Promise(function(resolve, reject) {
         var tempDiv = document.createElement('div');
@@ -3364,7 +3484,6 @@ async function teacherDownloadAllCertificates() {
         return;
     }
 
-    var certificateRoster = await getRosterForClass(currentTeacher ? currentTeacher.email : '', assessment.className);
     var JSZipLib = window.JSZip;
     if (!JSZipLib) {
         alert('The zip library failed to load. Please check your internet connection and try again.');
@@ -3375,7 +3494,7 @@ async function teacherDownloadAllCertificates() {
     try {
         var { data, error } = await supabase
             .from('cleverment_results')
-            .select('student_name, admission_number, score')
+            .select('student_name, score')
             .eq('assessment_code', code);
         if (error) {
             alert('Supabase Error: ' + error.message);
@@ -3406,11 +3525,6 @@ async function teacherDownloadAllCertificates() {
         var r = results[i];
         var certData = {
             studentName: r.student_name || 'Student',
-            studentPhoto: (certificateRoster || []).find(function(e) {
-                return e.photo && String(e.admissionNumber || '').trim().toLowerCase() === String(r.admission_number || '').trim().toLowerCase();
-            })?.photo || (certificateRoster || []).find(function(e) {
-                return e.photo && String(e.name || '').trim().toLowerCase() === String(r.student_name || '').trim().toLowerCase();
-            })?.photo || '',
             subject: assessment.subject,
             score: r.score,
             teacherName: assessment.teacherName,
@@ -3418,6 +3532,7 @@ async function teacherDownloadAllCertificates() {
             code: assessment.code,
             dateObj: new Date()
         };
+        await attachRosterPhoto(certData, assessment.className, r.admission_number);
         try {
             var blob = await generateCertificatePDFBlob(certData);
             var safeName = (r.student_name || 'Student').replace(/[\\/:*?"<>|]/g, '_').trim() || 'Student';
@@ -3842,6 +3957,9 @@ async function restoreQuizState() {
     studentTabSwitchCount = state.studentTabSwitchCount || 0;
     studentProctorStrikes = state.studentProctorStrikes || 0;
     studentFastAnswerWarnings = state.studentFastAnswerWarnings || 0;
+    var restoredPhoto = '';
+    try { restoredPhoto = localStorage.getItem('cleverment_student_photo') || ''; } catch (e) {}
+    studentPhoto = (typeof eligibility !== 'undefined' && eligibility && eligibility.photo) ? eligibility.photo : restoredPhoto;
     window.assessmentTeacherName = state.assessmentTeacherName || '';
     window.assessmentTeacherSignature = state.assessmentTeacherSignature || '';
 
@@ -3862,8 +3980,7 @@ async function restoreQuizState() {
 
     document.getElementById('studentQuizTitle').textContent = studentSubject;
     document.getElementById('studentQuizDisplay').textContent = 'Student: ' + studentName + ' | Class: ' + studentClass;
-    window.currentStudentPhoto = '';
-    setCurrentStudentPhoto();
+    studentRenderAvatar();
 
     var display = document.getElementById('studentTimerDisplay');
     if (studentTimeLimit > 0) {
@@ -3874,7 +3991,7 @@ async function restoreQuizState() {
         display.textContent = '∞';
     }
     display.classList.remove('warning', 'expired');
-    updateStudentTimerColor(display);
+    studentRefreshTimerRing();
 
     studentCreateQuestionBoxes();
     studentPreloadImages();
@@ -4293,6 +4410,7 @@ async function startStudentQuiz() {
             }
             return;
         }
+        setStudentPhoto(eligibility.photo || '');
     } catch (e) {
         reportStudentAccessNetworkError(currentAssessmentCode, studentName, studentAdmissionNumber, 'start_check');
         alert('Could not verify your assessment status. Please check your connection and try again.');
@@ -4376,16 +4494,16 @@ function proceedToStartQuiz() {
 
     document.getElementById('studentQuizTitle').textContent = studentSubject;
     document.getElementById('studentQuizDisplay').textContent = 'Student: ' + studentName + ' | Class: ' + studentClass;
-    window.currentStudentPhoto = '';
-    setCurrentStudentPhoto();
+    studentRenderAvatar();
 
     var display = document.getElementById('studentTimerDisplay');
     if (studentTimeLimit > 0) {
         var mins = Math.floor(studentTimeLimit / 60);
         var secs = studentTimeLimit % 60;
         display.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-        updateStudentTimerColor(display);
+        studentRefreshTimerRing(studentTimeLimit);
     } else {
+        studentRefreshTimerRing();
         display.textContent = '∞';
     }
     display.classList.remove('warning', 'expired');
@@ -4719,19 +4837,85 @@ function dismissFastAnswerWarning() {
 // STUDENT TIMER
 // ============================================================
 
-function updateStudentTimerColor(display) {
-    if (!display) return;
-    display.classList.remove('timer-yellow', 'timer-red');
-    if (studentTimeLimit > 0) {
-        var ratio = studentTimeRemaining / studentTimeLimit;
-        if (ratio <= 0.15) display.classList.add('timer-red');
-        else if (ratio <= 0.30) display.classList.add('timer-yellow');
+
+// ============================================================
+// CIRCULAR TIMER + STUDENT PICTURE
+// ============================================================
+
+var studentPhoto = '';
+
+function setStudentPhoto(photo) {
+    studentPhoto = photo || '';
+    try {
+        if (studentPhoto) localStorage.setItem('cleverment_student_photo', studentPhoto);
+        else localStorage.removeItem('cleverment_student_photo');
+    } catch (e) { /* storage full or blocked - the picture is a bonus */ }
+}
+
+function studentInitials(name) {
+    var parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    var first = parts[0].charAt(0);
+    var second = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+    return (first + second).toUpperCase();
+}
+
+// Shows the student's picture beside their name, or a circle with their initials when there is no picture.
+function studentRenderAvatar() {
+    var img = document.getElementById('studentAvatarImg');
+    var ini = document.getElementById('studentAvatarInitials');
+    if (!img || !ini) return;
+    if (studentPhoto) {
+        img.src = studentPhoto;
+        img.style.display = 'block';
+        ini.style.display = 'none';
+    } else {
+        img.style.display = 'none';
+        img.removeAttribute('src');
+        ini.textContent = studentInitials(studentName);
+        ini.style.display = 'flex';
     }
 }
+
+// Colours the ring and sets how much of it is left.
+// green: plenty of time | yellow: 30% left | red: last 10% (or the last minute) - and it pulses.
+function studentRefreshTimerRing(remaining) {
+    var ring = document.getElementById('studentTimerRing');
+    var arc = document.getElementById('studentTimerArc');
+    var noLimit = document.getElementById('studentNoTimeLimit');
+    if (!ring || !arc) return;
+    var limit = studentTimeLimit;
+    if (!limit) {
+        ring.style.display = 'none';
+        if (noLimit) noLimit.style.display = 'inline';
+        return;
+    }
+    ring.style.display = '';
+    if (noLimit) noLimit.style.display = 'none';
+    if (typeof remaining !== 'number') {
+        remaining = studentQuizEndsAt ? Math.max(0, Math.ceil((studentQuizEndsAt - Date.now()) / 1000)) : limit;
+    }
+    remaining = Math.max(0, Math.min(limit, remaining));
+    var circumference = 2 * Math.PI * 44;
+    arc.style.strokeDasharray = String(circumference);
+    arc.style.strokeDashoffset = String(circumference * (1 - remaining / limit));
+
+    var redAt = Math.max(limit * 0.10, Math.min(60, limit * 0.2));
+    var state = 'ok';
+    if (remaining <= redAt) state = 'danger';
+    else if (remaining <= limit * 0.30) state = 'caution';
+    ring.classList.remove('ok', 'caution', 'danger', 'pulse');
+    ring.classList.add(state);
+    if (state === 'danger' && remaining > 0) ring.classList.add('pulse');
+    var display = document.getElementById('studentTimerDisplay');
+    if (display) display.classList.toggle('long', display.textContent.length > 5);
+}
+
 function studentStartTimer() {
     if (studentTimerInterval) clearInterval(studentTimerInterval);
     if (studentTimeLimit === 0) {
         document.getElementById('studentTimerDisplay').textContent = '∞';
+        studentRefreshTimerRing();
         return;
     }
 
@@ -4750,13 +4934,10 @@ function studentStartTimer() {
         var display = document.getElementById('studentTimerDisplay');
         if (display) {
             display.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
-        updateStudentTimerColor(display);
-            if (remaining <= studentTimeLimit * 0.2 && remaining > 0) {
-                display.classList.add('warning');
-            } else {
-                display.classList.remove('warning');
-            }
+            // The colour now belongs to the ring; the digits just follow it.
+            display.classList.remove('warning');
         }
+        studentRefreshTimerRing(remaining);
 
         if (remaining <= 0) {
             if (display) {
@@ -4808,6 +4989,7 @@ function studentTimeUp() {
         display.classList.add('expired');
         display.classList.remove('warning');
     }
+    studentRefreshTimerRing(0);
 
     var overlay = document.createElement('div');
     overlay.className = 'time-up-overlay';
@@ -5262,15 +5444,7 @@ function buildCertificateElement(data) {
     var nameEl = document.createElement('div');
     nameEl.textContent = data.studentName || 'Student Name';
     nameEl.style.cssText = 'font-size:29pt; font-weight:bold; color:#1a1a2e; padding:0 18mm 2.5mm; min-width:120mm; border-bottom:1.2mm solid #C9A84C; font-family:Georgia,serif; margin:0;';
-    if (data.studentPhoto) {
-        var recipientRow = document.createElement('div');
-        recipientRow.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:7mm; max-width:205mm; margin:0 auto;';
-        nameEl.style.cssText += ';font-size:25pt; min-width:0; max-width:155mm; overflow-wrap:anywhere;';
-        var photo = document.createElement('img');
-        photo.src = data.studentPhoto; photo.alt = 'Student photograph';
-        photo.style.cssText = 'width:25mm; height:30mm; object-fit:cover; border:1mm solid #C9A84C; padding:1mm; background:#fff; flex:0 0 auto;';
-        recipientRow.appendChild(photo); recipientRow.appendChild(nameEl); content.appendChild(recipientRow);
-    } else { content.appendChild(nameEl); }
+    content.appendChild(nameEl);
 
     var p2 = document.createElement('div');
     p2.textContent = 'has successfully completed the assessment in';
@@ -5347,6 +5521,27 @@ function buildCertificateElement(data) {
 
     cleanCert.appendChild(content);
     cleanCert.appendChild(footer);
+
+    // Student picture: passport-style portrait with a gold frame, top-right inside the inner border
+    // (an empty corner, clear of the logo, the title and the student's name).
+    if (data.studentPhoto) {
+        var photoWrap = document.createElement('div');
+        photoWrap.style.cssText = 'position:absolute; z-index:15; top:22mm; right:27mm; width:36mm; text-align:center;';
+        var frame = document.createElement('div');
+        frame.style.cssText = 'width:30mm; height:38mm; padding:1mm; background:#ffffff; border:1.2mm solid #C9A84C; box-shadow:0 0.8mm 2.2mm rgba(0,0,0,0.22); box-sizing:content-box; margin:0 auto;';
+        var pimg = document.createElement('img');
+        pimg.src = data.studentPhoto;
+        pimg.style.cssText = 'width:100%; height:100%; object-fit:cover; display:block;';
+        frame.appendChild(pimg);
+        photoWrap.appendChild(frame);
+        if (data.admissionNumber) {
+            var cap = document.createElement('div');
+            cap.textContent = 'Adm. No: ' + data.admissionNumber;
+            cap.style.cssText = 'font-size:8pt; color:#555; font-family:Georgia,serif; margin-top:2.2mm; white-space:nowrap;';
+            photoWrap.appendChild(cap);
+        }
+        cleanCert.appendChild(photoWrap);
+    }
     return cleanCert;
 }
 
@@ -5377,12 +5572,13 @@ function downloadCertificatePDF() {
 
     var cleanCert = buildCertificateElement({
         studentName: studentName,
-        studentPhoto: window.currentStudentPhoto || '',
         subject: studentSubject,
         score: studentScore,
         teacherName: window.assessmentTeacherName,
         teacherSignature: window.assessmentTeacherSignature,
         code: currentAssessmentCode,
+        studentPhoto: studentPhoto,
+        admissionNumber: studentAdmissionNumber,
         dateObj: new Date()
     });
     tempDiv.appendChild(cleanCert);
@@ -5419,212 +5615,44 @@ function downloadCertificatePDF() {
 // ============================================================
 
 function downloadCertificateImage() {
-    // Create a temporary container
     var tempDiv = document.createElement('div');
-    tempDiv.style.position = 'fixed';
-    tempDiv.style.left = '-9999px';
-    tempDiv.style.top = '0';
-    tempDiv.style.width = '297mm';
-    tempDiv.style.height = '210mm';
-    tempDiv.style.margin = '0';
-    tempDiv.style.padding = '0';
-    tempDiv.style.background = 'white';
-    tempDiv.style.zIndex = '-1';
-    tempDiv.style.overflow = 'hidden';
-    
-    // Build the certificate from scratch (same as above but for image)
-    var cleanCert = document.createElement('div');
-    cleanCert.style.width = '297mm';
-    cleanCert.style.height = '210mm';
-    cleanCert.style.position = 'relative';
-    cleanCert.style.overflow = 'hidden';
-    cleanCert.style.background = 'radial-gradient(circle at center, #ffffff 0%, #fdfcf9 65%, #f7f3e8 100%)';
-    cleanCert.style.boxSizing = 'border-box';
-    cleanCert.style.margin = '0';
-    cleanCert.style.padding = '0';
-    
-    // ----- BORDERS -----
-    var border1 = document.createElement('div');
-    border1.style.cssText = 'position:absolute; top:7mm; left:7mm; right:7mm; bottom:7mm; border:3.5mm solid #1a1a2e; z-index:1;';
-    cleanCert.appendChild(border1);
-    
-    var border2 = document.createElement('div');
-    border2.style.cssText = 'position:absolute; top:11mm; left:11mm; right:11mm; bottom:11mm; border:1.8mm solid #C9A84C; z-index:2;';
-    cleanCert.appendChild(border2);
-    
-    var border3 = document.createElement('div');
-    border3.style.cssText = 'position:absolute; top:14mm; left:14mm; right:14mm; bottom:14mm; border:0.45mm solid #1a1a2e; z-index:3;';
-    cleanCert.appendChild(border3);
-    
-    // ----- CORNERS -----
-    var corners = [
-        {top:'6mm', left:'6mm', bw:'2mm 0 0 2mm'},
-        {top:'6mm', right:'6mm', bw:'2mm 2mm 0 0'},
-        {bottom:'6mm', left:'6mm', bw:'0 0 2mm 2mm'},
-        {bottom:'6mm', right:'6mm', bw:'0 2mm 2mm 0'}
-    ];
-    for (var i = 0; i < corners.length; i++) {
-        var c = document.createElement('div');
-        c.style.cssText = 'position:absolute; width:26mm; height:26mm; border-color:#C9A84C; border-style:solid; z-index:4;';
-        if (corners[i].top) c.style.top = corners[i].top;
-        if (corners[i].left) c.style.left = corners[i].left;
-        if (corners[i].right) c.style.right = corners[i].right;
-        if (corners[i].bottom) c.style.bottom = corners[i].bottom;
-        c.style.borderWidth = corners[i].bw;
-        cleanCert.appendChild(c);
-    }
-    
-    // ----- WATERMARK -----
-    var wm = document.createElement('div');
-    wm.style.cssText = 'position:absolute; width:145mm; height:145mm; border-radius:50%; border:0.5mm solid rgba(201,168,76,0.07); top:50%; left:50%; transform:translate(-50%, -50%); z-index:0;';
-    cleanCert.appendChild(wm);
-    
-    // ----- CONTENT -----
-    var content = document.createElement('div');
-    content.style.cssText = 'position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;';
-    
-    var logo = document.createElement('img');
-    logo.src = 'logo.png';
-    logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0';
-    content.appendChild(logo);
-    
-    var h1 = document.createElement('div');
-    h1.textContent = 'CERTIFICATE';
-    h1.style.cssText = 'font-size:32pt; font-weight:bold; color:#1a1a2e; letter-spacing:4px; font-family:Georgia,serif;';
-    content.appendChild(h1);
-    
-    var h2 = document.createElement('div');
-    h2.textContent = 'Of Achievement';
-    h2.style.cssText = 'font-size:18pt; color:#C9A84C; letter-spacing:2px; font-weight:bold; font-family:Georgia,serif; margin:1mm 0 3mm;';
-    content.appendChild(h2);
-    
-    var divLine = document.createElement('div');
-    divLine.style.cssText = 'width:65mm; height:1.2mm; background:#C9A84C; margin:0 auto 4mm; position:relative;';
-    var d1 = document.createElement('span');
-    d1.textContent = '◆';
-    d1.style.cssText = 'position:absolute; top:-5px; left:-12px; color:#C9A84C; font-size:9px;';
-    var d2 = document.createElement('span');
-    d2.textContent = '◆';
-    d2.style.cssText = 'position:absolute; top:-5px; right:-12px; color:#C9A84C; font-size:9px;';
-    divLine.appendChild(d1);
-    divLine.appendChild(d2);
-    content.appendChild(divLine);
-    
-    var p1 = document.createElement('div');
-    p1.textContent = 'This is to certify that';
-    p1.style.cssText = 'font-size:14pt; color:#555; font-family:Georgia,serif; margin:0 0 3mm;';
-    content.appendChild(p1);
-    
-    var nameEl = document.createElement('div');
-    nameEl.textContent = studentName || 'Student Name';
-    nameEl.style.cssText = 'font-size:29pt; font-weight:bold; color:#1a1a2e; padding:0 18mm 2.5mm; min-width:120mm; border-bottom:1.2mm solid #C9A84C; font-family:Georgia,serif; margin:0;';
-    if (window.currentStudentPhoto) {
-        var recipientRow = document.createElement('div');
-        recipientRow.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:7mm; max-width:205mm; margin:0 auto;';
-        nameEl.style.cssText += ';font-size:25pt; min-width:0; max-width:155mm; overflow-wrap:anywhere;';
-        var photo = document.createElement('img');
-        photo.src = window.currentStudentPhoto; photo.alt = 'Student photograph';
-        photo.style.cssText = 'width:25mm; height:30mm; object-fit:cover; border:1mm solid #C9A84C; padding:1mm; background:#fff; flex:0 0 auto;';
-        recipientRow.appendChild(photo); recipientRow.appendChild(nameEl); content.appendChild(recipientRow);
-    } else { content.appendChild(nameEl); }
-    
-    var p2 = document.createElement('div');
-    p2.textContent = 'has successfully completed the assessment in';
-    p2.style.cssText = 'font-size:13.5pt; color:#555; font-family:Georgia,serif; margin:4mm 0 2mm;';
-    content.appendChild(p2);
-    
-    var subEl = document.createElement('div');
-    subEl.textContent = studentSubject || 'Subject';
-    subEl.style.cssText = 'font-size:21pt; font-weight:bold; color:#1a1a2e; font-family:Georgia,serif; margin:0 0 3mm;';
-    content.appendChild(subEl);
-    
-    var p3 = document.createElement('div');
-    p3.textContent = 'with an average score of';
-    p3.style.cssText = 'font-size:13.5pt; color:#555; font-family:Georgia,serif; margin:0 0 1mm;';
-    content.appendChild(p3);
-    
-    var scoreEl = document.createElement('div');
-    var grade = getGrade(studentScore || 0);
-    scoreEl.textContent = (studentScore || 0) + '% - ' + grade;
-    scoreEl.style.cssText = 'font-size:19pt; font-weight:bold; color:#1a1a2e; font-family:Georgia,serif; margin:0;';
-    content.appendChild(scoreEl);
-    
-    var bottom = document.createElement('div');
-    bottom.style.cssText = 'width:190mm; display:flex; justify-content:space-between; align-items:flex-end; margin-top:4mm;';
-    
-    var teacherDiv = document.createElement('div');
-    teacherDiv.style.cssText = 'width:70mm; text-align:center;';
-    var tLabel = document.createElement('div');
-    tLabel.textContent = 'Teacher';
-    tLabel.style.cssText = 'font-size:11pt; color:#555; font-family:Georgia,serif; margin-bottom:2mm;';
-    teacherDiv.appendChild(tLabel);
-    var tName = document.createElement('div');
-    tName.textContent = window.assessmentTeacherName || 'Unknown Teacher';
-    tName.style.cssText = 'font-size:13pt; font-weight:bold; padding-bottom:2mm; border-bottom:0.5mm solid #1a1a2e; font-family:Georgia,serif;';
-    teacherDiv.appendChild(tName);
-    bottom.appendChild(teacherDiv);
-    
-    var sigDiv = document.createElement('div');
-    sigDiv.style.cssText = 'width:70mm; text-align:center;';
-    var sLabel = document.createElement('div');
-    sLabel.textContent = 'Signature';
-    sLabel.style.cssText = 'font-size:11pt; color:#555; font-family:Georgia,serif; margin-bottom:2mm;';
-    sigDiv.appendChild(sLabel);
-    var sigImg = document.createElement('img');
-    var sigUrl = window.assessmentTeacherSignature || '';
-    if (sigUrl) {
-        sigImg.src = sigUrl;
-        sigImg.style.cssText = 'height:15mm; max-width:55mm; object-fit:contain; display:block; margin:0 auto 1mm;';
-    } else {
-        sigImg.style.display = 'none';
-    }
-    sigDiv.appendChild(sigImg);
-    var sLine = document.createElement('div');
-    sLine.style.cssText = 'border-bottom:0.5mm solid #1a1a2e; height:2mm;';
-    sigDiv.appendChild(sLine);
-    bottom.appendChild(sigDiv);
-    content.appendChild(bottom);
-    
-    var footer = document.createElement('div');
-    footer.style.cssText = 'position:absolute; z-index:20; bottom:17mm; left:20mm; right:20mm; display:flex; justify-content:space-between; align-items:center; border-top:0.5mm solid #C9A84C; padding-top:3mm; font-size:8.5pt; color:#555; font-family:Georgia,serif;';
-    
-    var dateEl = document.createElement('div');
-    dateEl.innerHTML = 'Issued on: <strong style="color:#1a1a2e;">' + formatDate(new Date()) + '</strong>';
-    footer.appendChild(dateEl);
-    
-    var idEl = document.createElement('div');
-    var certId = 'CERT-' + String(Date.now()).slice(-6);
-    idEl.innerHTML = 'Certificate ID: <strong style="color:#1a1a2e;">' + certId + '</strong>';
-    footer.appendChild(idEl);
-    
-    var codeEl = document.createElement('div');
-    codeEl.innerHTML = 'Code: <strong style="color:#1a1a2e;">' + (currentAssessmentCode || 'CODE-0000') + '</strong>';
-    footer.appendChild(codeEl);
-    
-    cleanCert.appendChild(content);
-    cleanCert.appendChild(footer);
+    tempDiv.style.cssText = 'position:fixed; left:-9999px; top:0; width:297mm; height:210mm; margin:0; padding:0; background:white; z-index:-1; overflow:hidden;';
+
+    var cleanCert = buildCertificateElement({
+        studentName: studentName,
+        subject: studentSubject,
+        score: studentScore,
+        teacherName: window.assessmentTeacherName,
+        teacherSignature: window.assessmentTeacherSignature,
+        code: currentAssessmentCode,
+        studentPhoto: studentPhoto,
+        admissionNumber: studentAdmissionNumber,
+        dateObj: new Date()
+    });
     tempDiv.appendChild(cleanCert);
     document.body.appendChild(tempDiv);
-    
-    // --- Generate Image ---
-    setTimeout(function() {
-        html2canvas(cleanCert, {
+
+    waitForCertificateImages(cleanCert, 4000).then(function() {
+        return html2canvas(cleanCert, {
             scale: 3,
             useCORS: true,
             backgroundColor: '#ffffff',
             width: 297 * 3.779,
             height: 210 * 3.779,
             logging: false
-        }).then(function(canvas) {
-            var link = document.createElement('a');
-            link.download = 'Certificate-' + studentName + '.png';
-            link.href = canvas.toDataURL('image/png');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            document.body.removeChild(tempDiv);
         });
-    }, 500);
+    }).then(function(canvas) {
+        var link = document.createElement('a');
+        link.download = 'Certificate-' + studentName + '.png';
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        document.body.removeChild(tempDiv);
+    }).catch(function(error) {
+        if (tempDiv.parentNode) document.body.removeChild(tempDiv);
+        alert('Could not create the certificate image: ' + (error && error.message ? error.message : error));
+    });
 }
 
 function studentPrintCertificate() {
@@ -5768,6 +5796,9 @@ function studentResetQuiz() {
     }
     document.getElementById('studentTimerDisplay').textContent = '00:00';
     document.getElementById('studentTimerDisplay').classList.remove('warning', 'expired');
+    setStudentPhoto('');
+    var ringReset = document.getElementById('studentTimerRing');
+    if (ringReset) ringReset.classList.remove('caution', 'danger', 'pulse');
     updateURL('student');
 }
 
@@ -6264,7 +6295,7 @@ async function downloadResultCertificate() {
             return;
         }
 
-        var blob = await generateCertificatePDFBlob({
+        var singleCertData = {
             studentName: result.studentName,
             subject: result.subject,
             score: result.score,
@@ -6272,7 +6303,9 @@ async function downloadResultCertificate() {
             teacherSignature: assessment.teacherSignature,
             code: assessment.code,
             dateObj: new Date()
-        });
+        };
+        await attachRosterPhoto(singleCertData, result.className, result.admissionNumber);
+        var blob = await generateCertificatePDFBlob(singleCertData);
 
         var url = URL.createObjectURL(blob);
         var a = document.createElement('a');
@@ -6554,7 +6587,7 @@ async function teacherDownloadSelectedCertificates() {
             var assessment = byCode[r.assessmentCode];
             if (!assessment) { skipped++; continue; }
 
-            var blob = await generateCertificatePDFBlob({
+            var bulkCertData = {
                 studentName: r.studentName,
                 subject: r.subject,
                 score: r.score,
@@ -6562,7 +6595,9 @@ async function teacherDownloadSelectedCertificates() {
                 teacherSignature: assessment.teacherSignature,
                 code: assessment.code,
                 dateObj: new Date()
-            });
+            };
+            await attachRosterPhoto(bulkCertData, r.className, r.admissionNumber);
+            var blob = await generateCertificatePDFBlob(bulkCertData);
 
             var base = 'Certificate-' + String(r.studentName || 'Student').replace(/[\\/:*?"<>|]/g, '_') +
                 (r.admissionNumber ? '-' + String(r.admissionNumber).replace(/[\\/:*?"<>|]/g, '_') : '');
