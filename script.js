@@ -59,7 +59,12 @@ function getPageFromURL() {
 
 function updateURL(page) {
     var newURL = window.location.pathname + '?page=' + page;
-    window.history.pushState({ page: page }, '', newURL);
+    var curState = window.history.state;
+    if (cmNavSuppress || (curState && curState.page === page && !curState.section)) {
+        window.history.replaceState({ page: page }, '', newURL); // same screen again, or navigating by back/forward: no new history entry
+    } else {
+        window.history.pushState({ page: page }, '', newURL);
+    }
     // Remember where the person was, so a logged-in teacher/admin can be
     // returned to their dashboard if the app is re-opened without ?page=.
     try { localStorage.setItem('cleverment_last_page', page); } catch (e) {}
@@ -3873,6 +3878,14 @@ function clearQuizState() {
 }
 
 async function restoreQuizState() {
+    // The student chose "Leave the assessment" with the back button: show the code page this one time.
+    // The saved attempt (and its deadline) is kept, so entering the same code again resumes it.
+    try {
+        if (sessionStorage.getItem('cm_skip_restore_once')) {
+            sessionStorage.removeItem('cm_skip_restore_once');
+            return false;
+        }
+    } catch (e) {}
     var saved = localStorage.getItem('cleverment_quiz_state');
     if (!saved) return false;
 
@@ -4370,6 +4383,7 @@ async function startStudentQuiz() {
     }
 
     studentAdmissionNumber = admissionInput.value.trim();
+    if (await cmResumeSavedAttempt()) return; // a started attempt is never restarted (the timer must not reset)
     if (!studentAdmissionNumber) {
         alert('Please enter your admission number!');
         admissionInput.focus();
@@ -7423,6 +7437,7 @@ function showDashSection(dashboardId, panelId, btn) {
 
     // Close the mobile slide-in menu after picking a section.
     layout.classList.remove('sidebar-open');
+    cmPushSection(dashboardId, panelId);
 }
 
 // ============================================================
@@ -8913,6 +8928,124 @@ function applyEditorFlagBadges() {
         }
     });
 }
+
+
+
+// ============================================================
+// BACK / FORWARD BUTTONS + KEYBOARD SHORTCUTS
+// ============================================================
+var cmNavSuppress = false;
+
+function cmVisible(id) {
+    var el = document.getElementById(id);
+    return !!el && el.style.display === 'block';
+}
+
+// Each dashboard section is a step in the browser history, so the device back button returns to the previous section.
+function cmPushSection(dashboardId, panelId) {
+    if (cmNavSuppress) return;
+    var page = dashboardId === 'adminDashboard' ? 'admin-dashboard' : 'teacher-dashboard';
+    var cur = window.history.state;
+    if (cur && cur.page === page && cur.section === panelId) return;
+    var isFirst = panelId === 'teacherOverviewPanel' || panelId === 'adminOverviewPanel';
+    var url = window.location.pathname + '?page=' + page;
+    if (cur && cur.page === page && !cur.section && isFirst) {
+        window.history.replaceState({ page: page, section: panelId }, '', url);
+    } else {
+        window.history.pushState({ page: page, section: panelId }, '', url);
+    }
+    try { localStorage.setItem('cleverment_last_page', page); } catch (e) {}
+}
+
+function cmLeaveAssessmentNow() {
+    try { syncStudentProgress(true); } catch (e) {}
+    try { sessionStorage.setItem('cm_skip_restore_once', '1'); } catch (e) {}
+    window.location.replace(window.location.pathname + '?page=student');
+}
+
+// If this device holds an unfinished attempt of the SAME assessment by the SAME student, resume it
+// instead of starting again, so leaving and coming back can never reset the timer.
+async function cmResumeSavedAttempt() {
+    try {
+        var raw = localStorage.getItem('cleverment_quiz_state');
+        if (!raw) return false;
+        var st = JSON.parse(raw);
+        if (!st || st.currentAssessmentCode !== currentAssessmentCode) return false;
+        var adm = String(studentAdmissionNumber || '').trim().toLowerCase();
+        var savedAdm = String(st.studentAdmissionNumber || '').trim().toLowerCase();
+        if (!adm || (savedAdm && savedAdm !== adm)) return false;
+        return await restoreQuizState();
+    } catch (e) { return false; }
+}
+
+function cmOnPopState(e) {
+    var state = (e && e.state) || {};
+    var page = state.page || getPageFromURL() || 'landing';
+    var path = window.location.pathname;
+
+    // During an assessment the back button asks first.
+    if (typeof studentQuizIsOnScreen === 'function' && studentQuizIsOnScreen() && !studentIsTimeUp) {
+        window.history.pushState({ page: 'student-assessment' }, '', path + '?page=student-assessment');
+        if (confirm('Leave the assessment?\n\nYour timer keeps running. You can come back with the same link or code and carry on where you stopped.')) {
+            cmLeaveAssessmentNow();
+        }
+        return;
+    }
+
+    cmNavSuppress = true;
+    try {
+        var teacherIn = !!currentTeacher;
+        var adminIn = false;
+        try { adminIn = !!localStorage.getItem('cleverment_admin_token'); } catch (err) {}
+        // Signed-in people go back to the Welcome page, not to a login form.
+        if ((page === 'teacher' && teacherIn) || (page === 'admin' && adminIn)) {
+            page = 'landing';
+            window.history.replaceState({ page: 'landing' }, '', path + '?page=landing');
+        }
+        var resultsOpen = cmVisible('studentResultsSection') || cmVisible('studentCertificateSection');
+        if (resultsOpen && (page === 'student' || page === 'student-assessment' || page === 'results')) {
+            studentResetQuiz(); // finished assessment: back goes to the code page
+            return;
+        }
+        if (page === 'student' && cmVisible('studentAssessmentView')) {
+            backToStudentAccess();
+            return;
+        }
+        if (page === 'student-assessment' && !currentAssessment) page = 'student';
+        showPageFromURL(page);
+        if (state.section && page === 'teacher-dashboard' && typeof showTeacherSection === 'function') showTeacherSection(state.section, null);
+        if (state.section && page === 'admin-dashboard' && typeof showAdminSection === 'function') showAdminSection(state.section, null);
+    } catch (err) {
+        /* navigation must never throw at the person */
+    } finally {
+        cmNavSuppress = false;
+    }
+}
+window.addEventListener('popstate', cmOnPopState);
+
+// Keyboard (computers): A-D or 1-4 choose an option, P or left arrow = previous, N or right arrow = next.
+function cmOnQuizKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if (typeof studentQuizIsOnScreen !== 'function' || !studentQuizIsOnScreen() || studentIsTimeUp || studentFastWarningOpen) return;
+    var t = e.target, tag = t && t.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+    var ids = ['questionFlagOverlay', 'fastAnswerOverlay', 'proctorResumeOverlay'];
+    for (var i = 0; i < ids.length; i++) {
+        var o = document.getElementById(ids[i]);
+        if (o && o.style.display && o.style.display !== 'none') return;
+    }
+    var key = String(e.key || '');
+    var k = key.length === 1 ? key.toLowerCase() : key;
+    var optionKeys = { a: 0, b: 1, c: 2, d: 3, '1': 0, '2': 1, '3': 2, '4': 3 };
+    if (optionKeys.hasOwnProperty(k)) {
+        var q = studentQuestions[studentCurrentIndex];
+        if (q && q.options && q.options[optionKeys[k]] !== undefined) { e.preventDefault(); studentSelectOption(optionKeys[k]); }
+        return;
+    }
+    if (k === 'p' || k === 'ArrowLeft') { e.preventDefault(); studentPrevQuestion(); return; }
+    if (k === 'n' || k === 'ArrowRight') { e.preventDefault(); studentNextQuestion(); }
+}
+document.addEventListener('keydown', cmOnQuizKey);
 
 
 function showTeacherSection(panelId, btn) {

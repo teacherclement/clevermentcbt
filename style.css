@@ -2375,3 +2375,8 @@ tr.result-row-selected td { background: #eef3fd; }
 .flag-count { display: inline-block; min-width: 24px; text-align: center; padding: 2px 8px; border-radius: 999px; background: #fde7e9; color: #b4232f; font-weight: 800; }
 .flag-note { font-size: 12px; color: #6b7a8f; font-style: italic; margin-bottom: 4px; }
 .flag-badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #fde7e9; color: #b4232f; font-size: 12px; font-weight: 800; }
+
+
+/* ===== Keyboard hint (computers only) ===== */
+.kb-hint { display: none; margin: 10px 0 0; font-size: 12px; color: #6b7a8f; text-align: center; }
+@media (hover: hover) and (pointer: fine) { .kb-hint { display: block; } }
