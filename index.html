@@ -38,12 +38,12 @@
     </div>
 
     <!-- Floating help button - visible everywhere except during an active quiz -->
-    <button id="needHelpBtn" onclick="openFaqPage()" style="position:fixed; bottom:16px; left:16px; z-index:500; background:#2d6cdf; color:white; border:none; border-radius:24px; padding:10px 18px; font-weight:700; font-size:14px; box-shadow:0 2px 10px rgba(0,0,0,0.25); cursor:pointer;">❓ Need Help?</button>
+    <button id="needHelpBtn" class="help-float-btn" onclick="openFaqPage()" aria-label="Need help?" title="Need help?"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.100 9a3 3 0 0 1 5.800 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
 
     <!-- Floating WhatsApp support button - hidden only during an active quiz -->
     <a id="whatsappFloatBtn" class="whatsapp-float-btn" href="https://wa.me/2349069959358" target="_blank" rel="noopener" aria-label="Message us on WhatsApp" title="Message us on WhatsApp">
         <svg class="whatsapp-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-        <span>Message us on WhatsApp</span>
+        
     </a>
 
     <!-- ===== FAQ PAGE ===== -->
@@ -163,6 +163,7 @@
                     </div>
                     <img id="studentQuestionImage" src="" alt="Question Image" style="max-width:100%; max-height:300px; border-radius:10px; border:1px solid #eef2f6;">
                 </div>
+                <div class="q-flag-row"><button type="button" id="studentFlagBtn" class="q-flag-btn" onclick="openQuestionFlagDialog()" aria-label="Report a problem with this question"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4"/><path d="M4 4h13l-2.500 4.500L17 13H4z"/></svg><span>Report a problem</span></button></div>
                 <p id="studentQuestionText"></p>
                 <div id="studentOptionsContainer"></div>
                 <div class="nav-buttons">
@@ -717,6 +718,7 @@
                 <option value="">-- Select an assessment --</option>
             </select>
             <button onclick="teacherDownloadAllCertificates()" id="teacherBulkCertBtn" class="secondary-btn full-width" style="margin-bottom:12px; background:#2d6cdf; color:white;">Download All Certificates (ZIP)</button>
+<div id="flaggedQuestionsHost"></div>
 <div id="cmHostAnalytics" class="cm-host"></div>
             <div id="teacherAnalyticsContainer" class="scrollable-panel">
                 <p class="helper-text">Pick an assessment above to see its question breakdown.</p>
@@ -1257,6 +1259,23 @@
             <div id="cmHostQTimes" class="cm-host"></div>
             <div id="qtTable" class="scrollable-panel"></div>
             <div class="live-msg-actions"><button type="button" class="secondary-btn" onclick="closeQuestionTimes()">Close</button></div>
+        </div>
+    </div>
+
+    <!-- ===== Flag a question (student) ===== -->
+    <div id="questionFlagOverlay" class="live-msg-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="flagQuestionLabel">
+        <div class="live-msg-dialog">
+            <h3>Report a problem</h3>
+            <p id="flagQuestionLabel" class="helper-text" style="margin:0 0 10px; font-weight:700;"></p>
+            <div id="flagReasonList"></div>
+            <label class="live-msg-label" for="flagNote" style="margin-top:10px;">Add a short note (optional)</label>
+            <textarea id="flagNote" class="form-input" rows="2" maxlength="150" oninput="document.getElementById('flagCount').textContent = this.value.length + '/150'" placeholder="Tell your teacher what is wrong"></textarea>
+            <div style="text-align:right; font-size:12px; color:#6b7a8f;" id="flagCount">0/150</div>
+            <p id="flagStatus" style="min-height:20px; margin:6px 0 0; font-size:13px; font-weight:600;"></p>
+            <div class="live-msg-actions">
+                <button type="button" class="secondary-btn" onclick="closeQuestionFlagDialog()">Cancel</button>
+                <button type="button" id="flagSendBtn" class="primary-btn" onclick="sendQuestionFlag()">Send report</button>
+            </div>
         </div>
     </div>
 

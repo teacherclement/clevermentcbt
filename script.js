@@ -2397,6 +2397,7 @@ function openAssessmentEditor(assessmentId) {
     currentAssessmentBeingEdited = JSON.parse(JSON.stringify(assessment));
     renderAssessmentEditor();
     renderAssessmentEditorSettings(currentAssessmentBeingEdited);
+    loadEditorFlagCounts();
     var modal = document.getElementById('assessmentEditorModal');
     if (modal) {
         modal.style.display = 'flex';
@@ -3356,6 +3357,7 @@ async function loadTeacherAnalytics() {
     var container = document.getElementById('teacherAnalyticsContainer');
     if (!select || !container) return;
     cmRenderChartPanel('cmHostAnalytics', []);
+    renderFlaggedQuestions(select.value);
 
     var code = select.value;
     if (!code) {
@@ -4495,6 +4497,9 @@ function proceedToStartQuiz() {
     studentQuestionMs = {};
     studentActiveOrigIndex = -1;
     studentQuestionClockStart = 0;
+    studentFlagged = {};
+    studentFlaggedFor = '';
+    try { localStorage.removeItem('cleverment_flags_' + currentAssessmentCode + '_' + String(studentAdmissionNumber || '').toLowerCase()); } catch (e) {}
     studentEndReason = 'normal';
 
     document.getElementById('studentInfoForm').style.display = 'none';
@@ -4579,6 +4584,7 @@ function studentDisplayQuestion() {
     var q = studentQuestions[studentCurrentIndex];
     studentQuestionShownAt = Date.now();
     studentTrackQuestionSwitch(q);
+    studentUpdateFlagButton();
     document.getElementById('studentQuestionText').textContent = (studentCurrentIndex + 1) + '. ' + q.question;
     document.getElementById('studentProgress').textContent = 'Q' + (studentCurrentIndex + 1) + ' of ' + studentQuestions.length;
 
@@ -5839,6 +5845,7 @@ async function attachPassMarks(results, isAdmin) {
 }
 
 async function renderTeacherDashboard() {
+    try { var pingToken = localStorage.getItem('cleverment_teacher_token'); if (pingToken) fetch(BACKEND_URL + '/api/teacher/ping', { method: 'POST', headers: { 'Authorization': 'Bearer ' + pingToken } }).catch(function() {}); } catch (e) {}
     loadTeacherProfile();
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
     var allResults = await getAllResultsFromDatabase();
@@ -6919,6 +6926,7 @@ async function renderAdminTeacherList() {
             html += '<div style="background:white; padding:10px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
                 '<div><strong>' + teachers[i].name + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + teachers[i].email + ')</span>' +
                 (isPaused ? ' <span style="color:#dc3545; font-size:12px; font-weight:600;">[PAUSED]</span>' : '') +
+                '<br><span style="color:#6b7a8f; font-size:12px;">' + cmLoginText(teachers[i]) + '</span>' +
                 '</div>' +
                 '<div style="display:flex; gap:6px;">' +
                 '<button onclick="adminPauseTeacher(' + teachers[i].id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:' + pauseColor + '; color:white;">' + pauseText + '</button>' +
@@ -8686,6 +8694,226 @@ function cmInjectRefreshButtons() {
     });
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cmInjectRefreshButtons); else cmInjectRefreshButtons();
+
+
+// ============================================================
+// ADMIN: TEACHER LAST LOGIN / LAST ACTIVE
+// ============================================================
+function cmAgo(iso) {
+    var t = Date.parse(iso || '');
+    if (isNaN(t)) return '';
+    var sec = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (sec < 90) return 'just now';
+    var min = Math.round(sec / 60); if (min < 60) return min + ' min ago';
+    var hr = Math.round(min / 60); if (hr < 24) return hr + ' hour' + (hr === 1 ? '' : 's') + ' ago';
+    var day = Math.round(hr / 24); if (day < 60) return day + ' day' + (day === 1 ? '' : 's') + ' ago';
+    var mon = Math.round(day / 30); return mon + ' months ago';
+}
+function cmLoginText(t) {
+    function line(label, iso) {
+        if (!iso) return label + ': <b>Never</b>';
+        return label + ': <b>' + new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + '</b> (' + cmAgo(iso) + ')';
+    }
+    return line('Last login', t.last_login_at) + ' &middot; ' + line('Last active', t.last_active_at);
+}
+
+// ============================================================
+// STUDENT: FLAG A QUESTION
+// ============================================================
+var FLAG_CATEGORY_LABELS = {
+    incomplete: 'Incomplete question',
+    no_correct: 'No correct answer among the options',
+    multiple_correct: 'More than one correct answer',
+    typo: 'Wrong wording or typing mistake',
+    missing_media: 'Picture or diagram missing',
+    symbols: 'Maths symbols not showing properly',
+    out_of_syllabus: 'Not taught / out of syllabus',
+    duplicate: 'Duplicate question',
+    other: 'Other'
+};
+var studentFlagged = {};
+var studentFlaggedFor = '';
+
+function studentFlagStorageKey() { return 'cleverment_flags_' + currentAssessmentCode + '_' + String(studentAdmissionNumber || '').toLowerCase(); }
+
+function studentLoadFlagsIfNeeded() {
+    var k = studentFlagStorageKey();
+    if (studentFlaggedFor === k) return;
+    studentFlaggedFor = k;
+    try { studentFlagged = JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { studentFlagged = {}; }
+}
+
+function studentUpdateFlagButton() {
+    var btn = document.getElementById('studentFlagBtn');
+    var q = studentQuestions[studentCurrentIndex];
+    if (!btn || !q) return;
+    studentLoadFlagsIfNeeded();
+    var flagged = !!studentFlagged[q.originalIndex];
+    btn.classList.toggle('flagged', flagged);
+    var label = btn.querySelector('span');
+    if (label) label.textContent = flagged ? 'Reported' : 'Report a problem';
+    btn.setAttribute('aria-label', flagged ? 'You reported this question' : 'Report a problem with this question');
+}
+
+function openQuestionFlagDialog() {
+    var q = studentQuestions[studentCurrentIndex];
+    if (!q) return;
+    studentLoadFlagsIfNeeded();
+    var overlay = document.getElementById('questionFlagOverlay');
+    var list = document.getElementById('flagReasonList');
+    var current = studentFlagged[q.originalIndex] || '';
+    list.innerHTML = Object.keys(FLAG_CATEGORY_LABELS).map(function(id) {
+        return '<label class="flag-reason"><input type="radio" name="flagReason" value="' + id + '"' + (current === id ? ' checked' : '') + '><span>' + FLAG_CATEGORY_LABELS[id] + '</span></label>';
+    }).join('');
+    document.getElementById('flagNote').value = '';
+    document.getElementById('flagCount').textContent = '0/150';
+    document.getElementById('flagStatus').textContent = current ? 'You already reported this question. Choose a different reason to change it.' : '';
+    document.getElementById('flagStatus').style.color = '#6b7a8f';
+    document.getElementById('flagQuestionLabel').textContent = 'Question ' + (studentCurrentIndex + 1);
+    document.getElementById('flagSendBtn').disabled = false;
+    overlay.style.display = 'flex';
+}
+
+function closeQuestionFlagDialog() {
+    var o = document.getElementById('questionFlagOverlay');
+    if (o) o.style.display = 'none';
+}
+
+async function sendQuestionFlag() {
+    var q = studentQuestions[studentCurrentIndex];
+    var picked = document.querySelector('#flagReasonList input[name="flagReason"]:checked');
+    var status = document.getElementById('flagStatus');
+    if (!q) return;
+    if (!picked) { status.style.color = '#dc3545'; status.textContent = 'Please choose a reason.'; return; }
+    var btn = document.getElementById('flagSendBtn');
+    btn.disabled = true;
+    status.style.color = '#6b7a8f';
+    status.textContent = 'Sending...';
+    try {
+        var res = await fetchWithRetry(BACKEND_URL + '/api/quiz/flag', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: currentAssessmentCode,
+                studentName: studentName,
+                admissionNumber: studentAdmissionNumber,
+                questionIndex: q.originalIndex,
+                category: picked.value,
+                note: document.getElementById('flagNote').value
+            })
+        }, { attempts: 2, baseDelay: 1500 });
+        var data = await res.json();
+        if (!res.ok) { status.style.color = '#dc3545'; status.textContent = data.error || 'Could not send your report.'; btn.disabled = false; return; }
+        studentFlagged[q.originalIndex] = picked.value;
+        try { localStorage.setItem(studentFlagStorageKey(), JSON.stringify(studentFlagged)); } catch (e) {}
+        studentUpdateFlagButton();
+        status.style.color = '#2d9c5c';
+        status.textContent = '\u2713 Thank you. Your teacher will see this report.';
+        setTimeout(closeQuestionFlagDialog, 1100);
+    } catch (e) {
+        status.style.color = '#dc3545';
+        status.textContent = 'Could not reach the server. Please try again.';
+        btn.disabled = false;
+    }
+}
+
+// ============================================================
+// TEACHER: FLAGGED QUESTIONS
+// ============================================================
+var editorFlagCounts = {};
+
+async function fetchAssessmentFlags(code) {
+    var token = localStorage.getItem('cleverment_teacher_token');
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/assessments/' + encodeURIComponent(code) + '/flags', { headers: { 'Authorization': 'Bearer ' + token } });
+        var data = await res.json();
+        return res.ok ? (data.flags || []) : [];
+    } catch (e) { return []; }
+}
+
+function groupFlagsByQuestion(flags) {
+    var map = {};
+    flags.forEach(function(f) {
+        var g = map[f.question_index] || (map[f.question_index] = { index: f.question_index, text: f.question_text, count: 0, cats: {}, students: [], resolved: true });
+        g.count++;
+        g.cats[f.category] = (g.cats[f.category] || 0) + 1;
+        g.students.push(f);
+        if (!f.resolved) g.resolved = false;
+    });
+    return Object.keys(map).map(function(k) { return map[k]; }).sort(function(a, b) { return b.count - a.count || a.index - b.index; });
+}
+
+async function renderFlaggedQuestions(code) {
+    var host = document.getElementById('flaggedQuestionsHost');
+    if (!host) return;
+    if (!code) { host.innerHTML = ''; cmRenderChartPanel('cmHostFlags', []); return; }
+    var flags = await fetchAssessmentFlags(code);
+    var groups = groupFlagsByQuestion(flags);
+    if (groups.length === 0) {
+        host.innerHTML = '<div class="flag-box"><h4 style="margin:0 0 4px;">Flagged questions</h4><p class="helper-text" style="margin:0;">No student has flagged a question in this assessment.</p></div>';
+        cmRenderChartPanel('cmHostFlags', []);
+        return;
+    }
+    var html = '<div class="flag-box"><h4 style="margin:0 0 4px;">Flagged questions</h4><p class="helper-text" style="margin:0 0 8px;">' + flags.length + ' report(s) on ' + groups.length + ' question(s).</p>' +
+        '<div class="scrollable-panel"><table class="pos-table"><thead><tr><th>Q</th><th>Question</th><th>Flags</th><th>Reasons</th><th>Flagged by</th><th></th></tr></thead><tbody>';
+    groups.forEach(function(g) {
+        var reasons = Object.keys(g.cats).map(function(k) { return escapeHtml(FLAG_CATEGORY_LABELS[k] || k) + ' (' + g.cats[k] + ')'; }).join('<br>');
+        var who = g.students.map(function(f) {
+            var tip = (FLAG_CATEGORY_LABELS[f.category] || f.category) + (f.note ? ' - ' + f.note : '');
+            return '<span title="' + escapeHtml(tip) + '">' + escapeHtml(f.student_name) + '</span>' + (f.note ? '<div class="flag-note">&ldquo;' + escapeHtml(f.note) + '&rdquo;</div>' : '');
+        }).join('<br>');
+        var q = String(g.text || ''); if (q.length > 90) q = q.slice(0, 90) + '...';
+        html += '<tr style="' + (g.resolved ? 'opacity:.55;' : '') + '"><td>' + (g.index + 1) + '</td><td>' + escapeHtml(q) + '</td><td><span class="flag-count">' + g.count + '</span></td><td>' + reasons + '</td><td>' + who + '</td>' +
+            '<td><button type="button" class="secondary-btn" style="font-size:12px; padding:5px 10px;" onclick="resolveFlaggedQuestion(\'' + escapeHtml(code) + '\',' + g.index + ',' + (g.resolved ? 'false' : 'true') + ')">' + (g.resolved ? 'Reopen' : 'Mark resolved') + '</button></td></tr>';
+    });
+    host.innerHTML = html + '</tbody></table></div><div id="cmHostFlags" class="cm-host"></div></div>';
+    cmRenderChartPanel('cmHostFlags', [
+        { id: 'perq', label: 'Flags per question', data: function() { return { labels: groups.map(function(g) { return 'Q' + (g.index + 1); }), values: groups.map(function(g) { return g.count; }), unit: 'flags' }; } },
+        { id: 'reason', label: 'Flags by reason', data: function() { var m = {}; flags.forEach(function(f) { var l = FLAG_CATEGORY_LABELS[f.category] || f.category; m[l] = (m[l] || 0) + 1; }); return { labels: Object.keys(m), values: Object.keys(m).map(function(k) { return m[k]; }), unit: 'flags' }; } }
+    ]);
+}
+
+async function resolveFlaggedQuestion(code, questionIndex, resolved) {
+    var token = localStorage.getItem('cleverment_teacher_token');
+    try {
+        await fetch(BACKEND_URL + '/api/teacher/assessments/' + encodeURIComponent(code) + '/flags/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ questionIndex: questionIndex, resolved: resolved })
+        });
+    } catch (e) {}
+    renderFlaggedQuestions(code);
+}
+
+// Flag counts beside each question in Edit Assessment.
+async function loadEditorFlagCounts() {
+    if (!currentAssessmentBeingEdited || assessmentEditorDraftMode) return;
+    var flags = await fetchAssessmentFlags(currentAssessmentBeingEdited.code);
+    editorFlagCounts = {};
+    flags.forEach(function(f) { var k = cbNormText(f.question_text); editorFlagCounts[k] = (editorFlagCounts[k] || 0) + 1; });
+    applyEditorFlagBadges();
+}
+
+function applyEditorFlagBadges() {
+    var list = document.getElementById('assessmentEditorList');
+    if (!list || !currentAssessmentBeingEdited) return;
+    var strongs = list.querySelectorAll('strong');
+    Array.prototype.forEach.call(strongs, function(el) {
+        var m = /^Question (\d+)$/.exec(el.textContent.trim());
+        if (!m) return;
+        var q = currentAssessmentBeingEdited.questions[Number(m[1]) - 1];
+        var n = q ? (editorFlagCounts[cbNormText(q.question)] || 0) : 0;
+        var old = el.nextSibling;
+        if (old && old.classList && old.classList.contains('flag-badge')) old.remove();
+        if (n > 0) {
+            var b = document.createElement('span');
+            b.className = 'flag-badge';
+            b.textContent = '\u2691 ' + n + ' flag' + (n === 1 ? '' : 's');
+            el.parentNode.insertBefore(b, el.nextSibling);
+        }
+    });
+}
+
 
 function showTeacherSection(panelId, btn) {
     showDashSection('teacherDashboard', panelId, btn);

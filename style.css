@@ -2345,3 +2345,33 @@ tr.result-row-selected td { background: #eef3fd; }
     font-weight: 700; font-size: 13px; padding: 7px 12px; border-radius: 999px; cursor: pointer;
 }
 .cm-refresh-btn:disabled { opacity: .6; cursor: wait; }
+
+
+/* ===== Floating buttons: icons only ===== */
+#needHelpBtn.help-float-btn {
+    position: fixed !important; bottom: 16px !important; left: 16px !important; z-index: 500;
+    width: 50px !important; height: 50px !important; padding: 0 !important; border-radius: 50% !important;
+    background: #2d6cdf !important; color: #fff !important; border: none !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25); cursor: pointer; overflow: hidden;
+}
+#needHelpBtn.help-float-btn svg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+#whatsappFloatBtn.whatsapp-float-btn {
+    width: 50px !important; height: 50px !important; min-width: 0 !important; padding: 0 !important; gap: 0 !important;
+    border-radius: 50% !important; display: flex; align-items: center; justify-content: center;
+}
+#whatsappFloatBtn.whatsapp-float-btn svg { width: 28px !important; height: 28px !important; margin: 0 !important; }
+#whatsappFloatBtn.whatsapp-float-btn span { display: none !important; }
+
+/* ===== Flag a question ===== */
+.q-flag-row { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.q-flag-btn {
+    display: inline-flex; align-items: center; gap: 6px; border: 1.5px solid #e2e8f0; background: #fff; color: #6b7a8f;
+    font-size: 12px; font-weight: 700; padding: 6px 11px; border-radius: 999px; cursor: pointer;
+}
+.q-flag-btn.flagged { color: #dc3545; border-color: #f3b5ba; background: #fdecec; }
+.flag-reason { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1.5px solid #e2e8f0; border-radius: 10px; margin-bottom: 6px; font-size: 14px; cursor: pointer; }
+.flag-reason input { width: 18px; height: 18px; flex: 0 0 auto; }
+.flag-box { background: #fff; border: 1.5px solid #f3d9a8; border-radius: 12px; padding: 12px; margin: 10px 0 14px; }
+.flag-count { display: inline-block; min-width: 24px; text-align: center; padding: 2px 8px; border-radius: 999px; background: #fde7e9; color: #b4232f; font-weight: 800; }
+.flag-note { font-size: 12px; color: #6b7a8f; font-style: italic; margin-bottom: 4px; }
+.flag-badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: #fde7e9; color: #b4232f; font-size: 12px; font-weight: 800; }
