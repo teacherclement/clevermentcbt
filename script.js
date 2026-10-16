@@ -213,17 +213,41 @@ function saveStateAndNavigate(pageId) {
 // SUPABASE CONNECTION
 // ============================================================
 
-var SUPABASE_URL = 'https://tcodtuqirkzzpxggxqaa.supabase.co';
-var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRjb2R0dXFpcmt6enB4Z2d4cWFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyMDk2MDEsImV4cCI6MjEwMjc4NTYwMX0.CN-kWafaN37VW9YCw6kLdetzBEl_DddPbdh1MeOl02k';
+// The website no longer holds any database key. Every query below goes to our own server (/api/db/query),
+// which checks who is asking before it touches the database. The calls look exactly like before.
+var supabaseClient = (function() {
+    var methods = ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'like', 'ilike', 'in', 'is', 'order', 'limit', 'range', 'single', 'maybeSingle'];
+    function Query(table) { this._table = table; this._ops = []; }
+    methods.forEach(function(m) {
+        Query.prototype[m] = function() { this._ops.push({ m: m, a: Array.prototype.slice.call(arguments) }); return this; };
+    });
+    Query.prototype.then = function(onOk, onErr) { return cmDbRun(this._table, this._ops).then(onOk, onErr); };
+    return { from: function(table) { return new Query(table); } };
+})();
 
-if (typeof supabase !== 'undefined' && supabase.createClient) {
-    var supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} else if (typeof supabaseJs !== 'undefined' && supabaseJs.createClient) {
-    var supabaseClient = supabaseJs.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-} else {
-    var supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
-    if (!supabaseClient) {
-        console.error('Supabase not loaded!');
+async function cmDbRun(table, ops) {
+    var headers = { 'Content-Type': 'application/json' };
+    var adminToken = null, teacherToken = null, actAs = null;
+    try {
+        adminToken = localStorage.getItem('cleverment_admin_token');
+        teacherToken = localStorage.getItem('cleverment_teacher_token');
+        actAs = localStorage.getItem('cleverment_admin_act_as_teacher');
+    } catch (e) {}
+    var page = '';
+    try { page = (typeof getPageFromURL === 'function' && getPageFromURL()) || ''; } catch (e) {}
+    var onAdminPage = /^admin/.test(page);
+    var token = null;
+    if (adminToken && actAs && !onAdminPage) { token = adminToken; headers['X-CleverMent-Act-As-Teacher'] = actAs; }
+    else if (onAdminPage) token = adminToken || teacherToken;
+    else token = teacherToken || adminToken;
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    try {
+        var res = await fetch(BACKEND_URL + '/api/db/query', { method: 'POST', headers: headers, body: JSON.stringify({ table: table, ops: ops }) });
+        var json = await res.json();
+        if (!res.ok) return { data: null, error: { message: json.error || 'Request failed.' } };
+        return { data: json.data === undefined ? null : json.data, error: json.error || null };
+    } catch (e) {
+        return { data: null, error: { message: 'Network error.' } };
     }
 }
 
@@ -6706,11 +6730,15 @@ async function adminLogin() {
         var res = await fetch(BACKEND_URL + '/api/auth/admin/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password })
+            body: JSON.stringify({ password: password, code: (document.getElementById('adminTotpCode') || {}).value || '' })
         });
         var data = await res.json();
 
         if (!res.ok) {
+            if (data.needsCode) {
+                var wrap = document.getElementById('adminTotpWrap');
+                if (wrap) { wrap.style.display = 'block'; var ci = document.getElementById('adminTotpCode'); if (ci) ci.focus(); }
+            }
             alert(data.error || 'Incorrect admin password.');
             return;
         }
@@ -6722,6 +6750,9 @@ async function adminLogin() {
         setDashboardHeaderVisible(false);
         renderAdminDashboard();
         updateURL('admin-dashboard');
+        if (data.weakPassword) {
+            setTimeout(function() { alert('Security tip: your admin password is short. Change ADMIN_PASSWORD in Render to 12 or more characters (a few random words work well). Open Admin > Security for more.'); }, 600);
+        }
         if (data.security && data.security.failedAttempts > 0) {
             var when = data.security.lastFailedAt ? new Date(data.security.lastFailedAt).toLocaleString() : '';
             setTimeout(function() {
@@ -8672,6 +8703,7 @@ var CM_REFRESH_ACTIONS = {
     // admin
     adminOverviewPanel: async function() { cmAdminCache.t = 0; await renderAdminDashboard(); },
     adminFeeSection: function() { return renderAdminReactivationFee(); },
+    adminSecuritySection: function() { return loadAdminSecurity(); },
     adminFaqSection: async function() { if (typeof loadFaqs === 'function') await loadFaqs(); return renderAdminFaqList(); },
     adminLiveSection: function() { return loadAdminLive(); },
     adminSelectTeacherSection: function() { return loadAdminTeacherWorkspaceOptions(); },
@@ -9048,6 +9080,51 @@ function cmOnQuizKey(e) {
 document.addEventListener('keydown', cmOnQuizKey);
 
 
+
+// ============================================================
+// ADMIN: SECURITY PAGE
+// ============================================================
+async function loadAdminSecurity() {
+    var box = document.getElementById('adminSecurityBox');
+    if (!box) return;
+    var token = localStorage.getItem('cleverment_admin_token');
+    box.innerHTML = '<p class="helper-text">Checking...</p>';
+    try {
+        var res = await fetch(BACKEND_URL + '/api/admin/security', { headers: { 'Authorization': 'Bearer ' + token } });
+        var d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not load.');
+        var html = '<div class="flag-box" style="border-color:#cfe1ff;"><h4 style="margin:0 0 6px;">Two-step login</h4>';
+        if (d.totpEnabled) {
+            html += '<p style="margin:0;">&#10003; <b>On.</b> Logging in as admin needs your password and a 6-digit code from your authenticator app.</p>';
+        } else {
+            html += '<p class="helper-text" style="margin:0 0 8px;"><b>Off.</b> To turn it on:</p><ol class="helper-text" style="margin:0 0 8px 18px; padding:0;">' +
+                '<li>Install an authenticator app (Google Authenticator, Microsoft Authenticator or Authy).</li>' +
+                '<li>In the app choose "Enter a setup key" and type this key: <b style="user-select:all; font-size:15px; letter-spacing:1px;">' + escapeHtml(d.setup.secret) + '</b></li>' +
+                '<li>In Render, open your backend service, then Environment, and add a variable named <b>ADMIN_TOTP_SECRET</b> with that same key. Save.</li>' +
+                '<li>From then on, admin login also asks for the 6-digit code.</li></ol>' +
+                '<p class="helper-text" style="margin:0;">Do the Render step soon: this page shows a new key each time until the variable is saved.</p>';
+        }
+        html += '</div><div class="flag-box" style="border-color:#cfe1ff;"><h4 style="margin:0 0 6px;">Admin password</h4><p style="margin:0;">' +
+            (d.weakPassword ? '&#9888; Your password is short. Use 12 or more characters (ADMIN_PASSWORD in Render).' : '&#10003; Length is good.') + '</p></div>';
+        html += '<div class="flag-box" style="border-color:#cfe1ff;"><h4 style="margin:0 0 6px;">Database lock check</h4>';
+        if (!d.exposure.configured) {
+            html += '<p class="helper-text" style="margin:0;">To run this check, add a variable named <b>SUPABASE_ANON_KEY</b> in Render (the public "anon" key from Supabase, Project Settings, API). Then tap Refresh.</p>';
+        } else {
+            html += d.exposure.tables.map(function(t) {
+                var ok = t.status === 'protected';
+                return '<p style="margin:2px 0;">' + (ok ? '&#10003; Protected' : (t.status === 'exposed' ? '&#9888; <b>EXPOSED</b>' : '? Could not check')) + ' &mdash; ' + escapeHtml(t.table.replace('cleverment_', '')) + '</p>';
+            }).join('');
+            if (d.exposure.tables.some(function(t) { return t.status === 'exposed'; })) {
+                html += '<p class="helper-text" style="margin:8px 0 0;color:#b4232f;">Run supabase_lockdown.sql in Supabase (SQL Editor) to lock these down.</p>';
+            }
+        }
+        box.innerHTML = html + '</div>';
+    } catch (e) {
+        box.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load.') + '</p>';
+    }
+}
+
+
 function showTeacherSection(panelId, btn) {
     showDashSection('teacherDashboard', panelId, btn);
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
@@ -9073,6 +9150,7 @@ function showAdminSection(panelId, btn) {
     showDashSection('adminDashboard', panelId, btn);
     if (panelId === 'adminAccessLogsSection') loadAdminAccessLogs();
     cmAdminPanelOpened(panelId);
+    if (panelId === 'adminSecuritySection') loadAdminSecurity();
     if (panelId === 'adminLiveSection') startAdminLivePolling();
     else stopAdminLivePolling();
 }

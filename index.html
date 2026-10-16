@@ -10,7 +10,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -901,6 +900,7 @@
             <label for="adminPassword">Admin Password</label>
             <div style="position:relative;">
                 <input type="password" id="adminPassword" placeholder="Enter admin password" class="form-input">
+                <div id="adminTotpWrap" style="display:none; margin-top:10px;"><input type="text" id="adminTotpCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6-digit code from your authenticator app" class="form-input"></div>
                 <button type="button" onclick="togglePasswordVisibility('adminPassword', 'adminToggleBtn')" id="adminToggleBtn" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:#6b7a8f; padding:4px 8px; font-size:14px;">Show</button>
             </div>
         </div>
@@ -931,6 +931,7 @@
                     <button title="All Results" class="dash-nav-item" data-target="adminResultsSection" onclick="showAdminSection('adminResultsSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>All Results</span></button>
                     <button title="Manage FAQs" class="dash-nav-item" data-target="adminFaqSection" onclick="showAdminSection('adminFaqSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Manage FAQs</span></button>
                     <button title="Reactivation Fee" class="dash-nav-item" data-target="adminFeeSection" onclick="showAdminSection('adminFeeSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span>Reactivation Fee</span></button>
+                    <button title="Security" class="dash-nav-item" data-target="adminSecuritySection" onclick="showAdminSection('adminSecuritySection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Security</span></button>
                     <button title="Activity Log" class="dash-nav-item" data-target="adminActivitySection" onclick="showAdminSection('adminActivitySection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Activity Log</span></button>
                 </nav>
             </aside>
@@ -958,6 +959,11 @@
             </div>                    <div id="cmHostAdminOverview" class="cm-host"></div>
 <p class="helper-text" style="margin-top:12px;">Platform-wide stats at a glance. Use the menu on the left to manage teachers, assessments, FAQs, and view all results.</p>
                 </div>
+        <div class="dash-panel" id="adminSecuritySection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-top:0;">Security</h3>
+            <div id="adminSecurityBox"></div>
+        </div>
+
                 <div class="dash-panel" id="adminFeeSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">Account Reactivation Fee</h3>
             <p class="helper-text" style="margin-bottom:10px;">This is the amount a paused teacher is charged via Flutterwave to reactivate their own account.</p>
