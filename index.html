@@ -162,13 +162,14 @@
                     </div>
                     <img id="studentQuestionImage" src="" alt="Question Image" style="max-width:100%; max-height:300px; border-radius:10px; border:1px solid #eef2f6;">
                 </div>
-                <div class="q-flag-row"><button type="button" id="studentFlagBtn" class="q-flag-btn" onclick="openQuestionFlagDialog()" aria-label="Report a problem with this question"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4"/><path d="M4 4h13l-2.500 4.500L17 13H4z"/></svg><span>Report a problem</span></button></div>
+                <div class="q-flag-row"><button type="button" id="studentReviewBtn" class="q-flag-btn" onclick="studentToggleReview()" aria-label="Mark this question for review"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span>Mark for review</span></button>
+                <button type="button" id="studentFlagBtn" class="q-flag-btn" onclick="openQuestionFlagDialog()" aria-label="Report a problem with this question"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 22V4"/><path d="M4 4h13l-2.500 4.500L17 13H4z"/></svg><span>Report a problem</span></button></div>
                 <p id="studentQuestionText"></p>
                 <div id="studentOptionsContainer"></div>
                 <div class="nav-buttons">
                     <button id="studentPrevBtn" onclick="studentPrevQuestion()" class="secondary-btn">Previous</button>
                     <button id="studentNextBtn" onclick="studentNextQuestion()" class="secondary-btn">Next</button>
-                    <button id="studentSubmitBtn" onclick="studentSubmitQuiz()" class="primary-btn">Submit</button>
+                    <button id="studentSubmitBtn" onclick="studentRequestSubmit()" class="primary-btn">Submit</button>
                 </div>
                 <p class="kb-hint">Keyboard: <b>A-D</b> or <b>1-4</b> choose &middot; <b>P</b> or <b>&larr;</b> previous &middot; <b>N</b> or <b>&rarr;</b> next</p>
             </div>
@@ -581,6 +582,22 @@
                 <label for="teacherAvailableUntil">Available Until (optional)</label>
                 <input type="datetime-local" id="teacherAvailableUntil" class="form-input">
                 <p class="helper-text" style="margin-top:4px;">Leave both blank for an assessment that's open any time the code is used. Times are based on your device's local time zone.</p>
+            </div>
+            <div class="form-group">
+                <label for="teacherQuestionLimit">Questions per student (optional)</label>
+                <input type="number" id="teacherQuestionLimit" min="0" value="0" class="form-input">
+                <p class="helper-text">0 means every student gets all questions. For example, upload 100 questions and enter 40: each student gets a different random 40.</p>
+            </div>
+            <div class="form-group">
+                <label for="teacherNegativeMarking">Negative marking (optional)</label>
+                <select id="teacherNegativeMarking" class="form-input">
+                    <option value="0">None</option>
+                    <option value="0.25">Minus 1/4 mark per wrong answer</option>
+                    <option value="0.33">Minus 1/3 mark per wrong answer</option>
+                    <option value="0.5">Minus 1/2 mark per wrong answer</option>
+                    <option value="1">Minus 1 mark per wrong answer</option>
+                </select>
+                <p class="helper-text">Only answered questions that are wrong lose marks. Blank answers cost nothing.</p>
             </div>
             <div class="form-group" style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
                 <label for="teacherShuffleQuestions" style="margin-bottom:0; cursor:pointer;">Shuffle Questions &amp; Answer Options</label>
@@ -1282,6 +1299,18 @@
             <div class="live-msg-actions">
                 <button type="button" class="secondary-btn" onclick="closeQuestionFlagDialog()">Cancel</button>
                 <button type="button" id="flagSendBtn" class="primary-btn" onclick="sendQuestionFlag()">Send report</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Summary before submitting ===== -->
+    <div id="submitReviewOverlay" class="live-msg-overlay" style="display:none;" role="dialog" aria-modal="true">
+        <div class="live-msg-dialog">
+            <h3>Before you submit</h3>
+            <div id="submitReviewBody"></div>
+            <div class="live-msg-actions">
+                <button type="button" class="secondary-btn" onclick="closeSubmitReview()">Go back</button>
+                <button type="button" class="primary-btn" onclick="closeSubmitReview(); studentSubmitQuiz();">Submit now</button>
             </div>
         </div>
     </div>

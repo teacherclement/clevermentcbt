@@ -1844,7 +1844,8 @@ function parseTeacherCSV(csvText) {
                     cols[4].replace(/^"|"$/g, '')
                 ],
                 correctAnswer: cols[5].replace(/^"|"$/g, '').toUpperCase().trim(),
-                image: cols.length > 6 ? cols[6].replace(/^"|"$/g, '').trim() : ''
+                image: cols.length > 6 ? cols[6].replace(/^"|"$/g, '').trim() : '',
+                explanation: cols.length > 7 ? cols[7].replace(/^"|"$/g, '').trim() : ''
             });
         }
     }
@@ -2141,6 +2142,8 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         noiseMonitoring: noiseMonitoring,
         showResults: showResults,
         passMark: passMark,
+        questionLimit: parseInt((document.getElementById('teacherQuestionLimit') || {}).value, 10) || 0,
+        negativeMarking: Number((document.getElementById('teacherNegativeMarking') || {}).value) || 0,
         availableFrom: availableFrom,
         availableUntil: availableUntil
     };
@@ -2364,6 +2367,10 @@ function renderAssessmentEditorSettings(a) {
                     '<select id="aeTime" class="form-input">' + timeHtml + '</select></div>' +
                 '<div><label for="aePassMark">Pass mark (%)</label>' +
                     '<input id="aePassMark" type="number" min="0" max="100" class="form-input" value="' + (a.passMark !== undefined && a.passMark !== null ? a.passMark : 50) + '"></div>' +
+                '<div><label for="aeQuestionLimit">Questions per student (0 = all)</label>' +
+                    '<input id="aeQuestionLimit" type="number" min="0" class="form-input" value="' + (a.questionLimit || 0) + '"></div>' +
+                '<div><label for="aeNegative">Negative marking</label>' +
+                    '<select id="aeNegative" class="form-input">' + [['0','None'],['0.25','Minus 1/4 mark per wrong answer'],['0.33','Minus 1/3 mark per wrong answer'],['0.5','Minus 1/2 mark per wrong answer'],['1','Minus 1 mark per wrong answer']].map(function(o) { return '<option value="' + o[0] + '"' + (Number(a.negativeMarking || 0) === Number(o[0]) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
             '</div>' +
             '<div class="assessment-settings-toggles">' +
                 toggle('aeCamera', 'Live monitoring: Camera', 'Checks the student stays visible on camera', a.cameraMonitoring) +
@@ -2403,7 +2410,9 @@ function collectAssessmentEditorSettings() {
             cameraMonitoring: document.getElementById('aeCamera').checked,
             noiseMonitoring: document.getElementById('aeNoise').checked,
             shuffle: document.getElementById('aeShuffle').checked,
-            showResults: document.getElementById('aeShowResults').checked
+            showResults: document.getElementById('aeShowResults').checked,
+            questionLimit: parseInt(document.getElementById('aeQuestionLimit').value, 10) || 0,
+            negativeMarking: Number(document.getElementById('aeNegative').value) || 0
         }
     };
 }
@@ -4517,6 +4526,16 @@ function proceedToStartQuiz() {
         }
     }
 
+    // Random pool: each student gets a different random selection of the questions.
+    var poolLimit = parseInt(currentAssessment.questionLimit, 10) || 0;
+    if (poolLimit > 0 && poolLimit < studentQuestions.length) {
+        var pick = studentQuestions.slice();
+        for (var pk = pick.length - 1; pk > 0; pk--) {
+            var pj = Math.floor(Math.random() * (pk + 1));
+            var ptmp = pick[pk]; pick[pk] = pick[pj]; pick[pj] = ptmp;
+        }
+        studentQuestions = pick.slice(0, poolLimit);
+    }
     studentCurrentIndex = 0;
     studentAnswers = new Array(studentQuestions.length).fill(null);
     studentIsTimeUp = false;
@@ -4537,6 +4556,8 @@ function proceedToStartQuiz() {
     studentQuestionClockStart = 0;
     studentFlagged = {};
     studentFlaggedFor = '';
+    studentReviewMarks = {};
+    studentReviewFor = '';
     try { localStorage.removeItem('cleverment_flags_' + currentAssessmentCode + '_' + String(studentAdmissionNumber || '').toLowerCase()); } catch (e) {}
     studentEndReason = 'normal';
 
@@ -4623,6 +4644,7 @@ function studentDisplayQuestion() {
     studentQuestionShownAt = Date.now();
     studentTrackQuestionSwitch(q);
     studentUpdateFlagButton();
+    studentUpdateReviewButton();
     document.getElementById('studentQuestionText').textContent = (studentCurrentIndex + 1) + '. ' + q.question;
     document.getElementById('studentProgress').textContent = 'Q' + (studentCurrentIndex + 1) + ' of ' + studentQuestions.length;
 
@@ -5138,6 +5160,8 @@ function normalizeAssessmentRow(a) {
         noiseMonitoring: a.noise_monitoring || false,
         showResults: a.show_results !== false,
         passMark: (a.pass_mark !== null && a.pass_mark !== undefined) ? a.pass_mark : 50,
+        questionLimit: parseInt(a.question_limit, 10) || 0,
+        negativeMarking: Number(a.negative_marking) || 0,
         availableFrom: a.available_from || null,
         availableUntil: a.available_until || null,
         date: a.created_at ? new Date(a.created_at).toLocaleString() : ''
@@ -5251,6 +5275,7 @@ async function studentSubmitQuiz() {
                 tabSwitches: studentTabSwitchCount,
                 proctorViolations: studentProctorStrikes,
                 fastAnswerWarnings: studentFastAnswerWarnings,
+                shownIndices: studentQuestions.map(function(q) { return q.originalIndex; }),
                 timeTaken: studentTimeTaken
             })
         });
@@ -5292,7 +5317,7 @@ async function studentSubmitQuiz() {
             }
             return;
         }
-        alert('Could not reach the server. Please check your connection and try Submit again - your answers are still here.');
+        cmScheduleOfflineSubmit();
         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit'; }
         if (!studentIsTimeUp && studentEndReason !== 'misconduct') studentStartTimer();
         return;
@@ -5303,6 +5328,7 @@ async function studentSubmitQuiz() {
     stopStudentPresence();
     stopStudentProgressSync();
     studentAutoSubmitRetries = 0;
+    cmClearOfflineSubmit();
     var timeUpOverlayDone = document.getElementById('studentTimeUpOverlay');
     if (timeUpOverlayDone) timeUpOverlayDone.remove();
 
@@ -5361,6 +5387,7 @@ async function studentSubmitQuiz() {
             <p><strong>Q${j + 1}:</strong> ${item.question}</p>
             <p>Your answer: <strong style="color:${item.isCorrect ? '#2d9c5c' : '#dc3545'}">${item.userAnswerText || 'Not answered'}</strong></p>
             ${!item.isCorrect ? '<p>Correct answer: <strong style="color:#2d9c5c">' + item.correctAnswerText + '</strong></p>' : ''}
+            ${item.explanation ? '<p class="explain">&#128161; ' + escapeHtml(item.explanation) + '</p>' : ''}
             <p>${item.isCorrect ? 'Correct' : 'Wrong'}</p>
         `;
         container.appendChild(div);
@@ -9118,10 +9145,157 @@ async function loadAdminSecurity() {
                 html += '<p class="helper-text" style="margin:8px 0 0;color:#b4232f;">Run supabase_lockdown.sql in Supabase (SQL Editor) to lock these down.</p>';
             }
         }
-        box.innerHTML = html + '</div>';
+        box.innerHTML = html + '</div><div class="flag-box" id="adminBackupBox" style="border-color:#cfe1ff;"><h4 style="margin:0 0 6px;">Backups</h4><p class="helper-text">Loading...</p></div>';
+        loadAdminBackups();
     } catch (e) {
         box.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load.') + '</p>';
     }
+}
+
+
+
+// ============================================================
+// DELIVERY A: mark for review, summary before submit, offline-safe submit
+// ============================================================
+var studentReviewMarks = {};
+var studentReviewFor = '';
+function studentReviewKey() { return 'cleverment_review_' + currentAssessmentCode + '_' + String(studentAdmissionNumber || '').toLowerCase(); }
+function studentLoadReviewIfNeeded() {
+    var k = studentReviewKey();
+    if (studentReviewFor === k) return;
+    studentReviewFor = k;
+    try { studentReviewMarks = JSON.parse(localStorage.getItem(k) || '{}') || {}; } catch (e) { studentReviewMarks = {}; }
+}
+function cmApplyReviewMarks() {
+    studentLoadReviewIfNeeded();
+    for (var i = 0; i < studentQuestions.length; i++) {
+        var box = document.getElementById('student-qbox-' + i);
+        if (box) box.classList.toggle('review', !!studentReviewMarks[studentQuestions[i].originalIndex]);
+    }
+}
+function studentUpdateReviewButton() {
+    var btn = document.getElementById('studentReviewBtn');
+    var q = studentQuestions[studentCurrentIndex];
+    if (!btn || !q) return;
+    studentLoadReviewIfNeeded();
+    var on = !!studentReviewMarks[q.originalIndex];
+    btn.classList.toggle('marked', on);
+    var span = btn.querySelector('span');
+    if (span) span.textContent = on ? 'Marked for review' : 'Mark for review';
+    cmApplyReviewMarks();
+}
+function studentToggleReview() {
+    var q = studentQuestions[studentCurrentIndex];
+    if (!q) return;
+    studentLoadReviewIfNeeded();
+    if (studentReviewMarks[q.originalIndex]) delete studentReviewMarks[q.originalIndex]; else studentReviewMarks[q.originalIndex] = true;
+    try { localStorage.setItem(studentReviewKey(), JSON.stringify(studentReviewMarks)); } catch (e) {}
+    studentUpdateReviewButton();
+}
+var __cmOrigBoxes = studentUpdateQuestionBoxes;
+studentUpdateQuestionBoxes = function() { __cmOrigBoxes(); cmApplyReviewMarks(); };
+
+function studentJumpTo(i) {
+    closeSubmitReview();
+    studentCurrentIndex = i;
+    studentDisplayQuestion();
+    studentUpdateQuestionBoxes();
+    try { saveQuizState(); } catch (e) {}
+}
+function closeSubmitReview() {
+    var o = document.getElementById('submitReviewOverlay');
+    if (o) o.style.display = 'none';
+}
+// Submit button: show a quick summary first when something is unanswered or marked for review.
+function studentRequestSubmit() {
+    studentLoadReviewIfNeeded();
+    var unanswered = [], marked = [];
+    studentQuestions.forEach(function(q, i) {
+        if (studentAnswers[i] === null) unanswered.push(i);
+        if (studentReviewMarks[q.originalIndex]) marked.push(i);
+    });
+    if (!unanswered.length && !marked.length) { studentSubmitQuiz(); return; }
+    function chips(list) { return list.map(function(i) { return '<button type="button" class="review-chip" onclick="studentJumpTo(' + i + ')">' + (i + 1) + '</button>'; }).join(''); }
+    var html = '<p style="margin:0 0 10px;"><b>' + (studentQuestions.length - unanswered.length) + '</b> of <b>' + studentQuestions.length + '</b> questions answered.</p>';
+    if (unanswered.length) html += '<p class="helper-text" style="margin:8px 0 4px;">Not answered (tap to go there):</p><div>' + chips(unanswered) + '</div>';
+    if (marked.length) html += '<p class="helper-text" style="margin:10px 0 4px;">Marked for review:</p><div>' + chips(marked) + '</div>';
+    document.getElementById('submitReviewBody').innerHTML = html;
+    document.getElementById('submitReviewOverlay').style.display = 'flex';
+}
+
+// If the network drops while submitting, keep the answers safe, say so, and keep trying.
+var cmOfflineSubmitTimer = null;
+var cmOfflineSubmitTries = 0;
+function cmScheduleOfflineSubmit() {
+    if (cmOfflineSubmitTries >= 60) {
+        cmOfflineSubmitTries = 0;
+        hideConnectBanner();
+        alert('Still no connection. Your answers are saved on this phone. Please connect to the internet and tap Submit again.');
+        return;
+    }
+    cmOfflineSubmitTries++;
+    showConnectBanner('No network. Your answers are saved on this phone and will be sent automatically when the connection returns. Please keep this page open.');
+    if (cmOfflineSubmitTimer) clearTimeout(cmOfflineSubmitTimer);
+    cmOfflineSubmitTimer = setTimeout(function() { cmOfflineSubmitTimer = null; studentSubmitQuiz(); }, 10000);
+}
+function cmClearOfflineSubmit() {
+    if (cmOfflineSubmitTimer) clearTimeout(cmOfflineSubmitTimer);
+    cmOfflineSubmitTimer = null;
+    cmOfflineSubmitTries = 0;
+    hideConnectBanner();
+}
+window.addEventListener('online', function() {
+    if (cmOfflineSubmitTimer) { clearTimeout(cmOfflineSubmitTimer); cmOfflineSubmitTimer = null; studentSubmitQuiz(); }
+});
+
+// ---------- admin: backups card (Security page) ----------
+function cmBackupLabel(name) {
+    var m = name.match(/^backup-(\d{4})-(\d\d)-(\d\d)-(\d\d)-(\d\d)/);
+    if (!m) return name;
+    return new Date(Date.UTC(m[1], m[2] - 1, m[3], m[4], m[5])).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+async function loadAdminBackups() {
+    var box = document.getElementById('adminBackupBox');
+    if (!box) return;
+    var token = localStorage.getItem('cleverment_admin_token');
+    try {
+        var res = await fetch(BACKEND_URL + '/api/admin/backups', { headers: { 'Authorization': 'Bearer ' + token } });
+        var d = await res.json();
+        var list = d.backups || [];
+        var html = '<h4 style="margin:0 0 6px;">Backups</h4><p class="helper-text" style="margin:0 0 8px;">The server saves a private backup every week and keeps the newest 8. Old logs and sessions are cleaned up automatically.</p>' +
+            '<button type="button" class="primary-btn" id="backupNowBtn" onclick="runAdminBackupNow()">Back up now</button><p id="backupNowStatus" class="helper-text" style="margin:8px 0;"></p>';
+        if (!list.length) html += '<p class="helper-text">No backup yet. The first one is made automatically soon after the server starts, or tap Back up now.</p>';
+        list.forEach(function(b) {
+            html += '<div class="prog-bar-row"><div class="prog-bar-label" style="flex-basis:60%;">' + escapeHtml(cmBackupLabel(b.name)) + (b.size ? ' &middot; ' + (b.size > 1048576 ? (b.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b.size / 1024)) + ' KB') : '') + '</div>' +
+                '<button type="button" class="secondary-btn" style="font-size:12px; padding:5px 10px;" data-name="' + escapeHtml(b.name) + '" onclick="downloadAdminBackup(this.getAttribute(\'data-name\'))">Download</button></div>';
+        });
+        box.innerHTML = html;
+    } catch (e) {
+        box.innerHTML = '<h4 style="margin:0 0 6px;">Backups</h4><p class="helper-text" style="color:#dc3545;">Could not load backups.</p>';
+    }
+}
+async function runAdminBackupNow() {
+    var btn = document.getElementById('backupNowBtn'), st = document.getElementById('backupNowStatus');
+    var token = localStorage.getItem('cleverment_admin_token');
+    btn.disabled = true; st.textContent = 'Backing up... this can take a minute.';
+    try {
+        var res = await fetch(BACKEND_URL + '/api/admin/backups/run', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+        var d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Backup failed.');
+        await loadAdminBackups();
+        var st2 = document.getElementById('backupNowStatus'); if (st2) st2.textContent = 'Backup saved.';
+    } catch (e) {
+        st.textContent = e.message; btn.disabled = false;
+    }
+}
+async function downloadAdminBackup(name) {
+    var token = localStorage.getItem('cleverment_admin_token');
+    try {
+        var res = await fetch(BACKEND_URL + '/api/admin/backups/url?name=' + encodeURIComponent(name), { headers: { 'Authorization': 'Bearer ' + token } });
+        var d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not prepare the download.');
+        window.open(d.url, '_blank');
+    } catch (e) { alert(e.message); }
 }
 
 
