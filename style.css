@@ -2389,3 +2389,13 @@ tr.result-row-selected td { background: #eef3fd; }
 [id^="student-qbox-"].review::after { content: ''; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: #f0a500; }
 .review-chip { display: inline-block; min-width: 40px; margin: 3px 4px 3px 0; padding: 7px 10px; border: 1.5px solid #cfe1ff; background: #eef3fd; color: #2d6cdf; border-radius: 10px; font-weight: 800; cursor: pointer; }
 .explain { margin: 6px 0 0; padding: 8px 10px; background: #fff9e6; border-left: 4px solid #C9A84C; border-radius: 6px; font-size: 13.5px; color: #4a3d12; }
+
+
+/* ===== Delivery B ===== */
+.grade-chip { display: inline-block; min-width: 26px; text-align: center; padding: 2px 8px; border-radius: 8px; font-weight: 800; background: #e1f5ea; color: #1d7a45; }
+.grade-chip.g-C, .grade-chip.g-D { background: #fff3cd; color: #8a6d00; }
+.grade-chip.g-E, .grade-chip.g-F { background: #fde7e9; color: #b4232f; }
+.wa-parent-btn { border: none; background: #25D366; color: #fff; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.quality-good { color: #1d7a45; font-weight: 700; }
+.quality-warn { color: #8a6d00; font-weight: 700; }
+.quality-bad { color: #b4232f; font-weight: 800; }

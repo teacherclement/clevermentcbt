@@ -10,6 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -736,6 +737,7 @@
             </select>
             <button onclick="teacherDownloadAllCertificates()" id="teacherBulkCertBtn" class="secondary-btn full-width" style="margin-bottom:12px; background:#2d6cdf; color:white;">Download All Certificates (ZIP)</button>
 <div id="flaggedQuestionsHost"></div>
+<div id="qualityReportHost"></div>
 <div id="cmHostAnalytics" class="cm-host"></div>
             <div id="teacherAnalyticsContainer" class="scrollable-panel">
                 <p class="helper-text">Pick an assessment above to see its question breakdown.</p>
@@ -757,6 +759,7 @@
                 <div class="pos-actions">
                     <button type="button" class="primary-btn" onclick="posDownloadSubjectPdf()">Download PDF</button>
                     <button type="button" class="secondary-btn" onclick="posExportSubjectCsv()">Export CSV</button>
+                    <button type="button" class="secondary-btn" onclick="posExportSubjectXlsx()">Export Excel</button>
                 </div>
 <div id="cmHostPosSubject" class="cm-host"></div>
                 <div id="posSubjectResult"></div>
@@ -776,6 +779,8 @@
                 <div class="pos-actions">
                     <button type="button" class="primary-btn" onclick="posDownloadBroadsheetPdf()">Download PDF</button>
                     <button type="button" class="secondary-btn" onclick="posExportBroadsheetCsv()">Export CSV</button>
+                    <button type="button" class="secondary-btn" onclick="posExportBroadsheetXlsx()">Export Excel</button>
+                    <button type="button" class="primary-btn" style="background:#C9A84C; color:#172033;" onclick="posDownloadReportCards()">Report cards (ZIP)</button>
                 </div>
 <div id="cmHostPosClass" class="cm-host"></div>
                 <div id="posClassResult"></div>
@@ -856,6 +861,7 @@
                         <option value="name">Name A-Z</option>
                     </select>
                     <button id="teacherExportBtn" onclick="teacherExportResults()" class="primary-btn">Export CSV</button>
+                    <button id="teacherExportXlsxBtn" onclick="teacherExportResultsXlsx()" class="primary-btn" style="background:#1d7a45;">Export Excel</button>
                     <button id="teacherClearBtn" onclick="teacherClearResults()" class="secondary-btn" style="background:#dc3545; color:white;">Clear All</button>
                 </div>
             </div>

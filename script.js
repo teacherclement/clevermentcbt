@@ -2901,7 +2901,7 @@ async function loadRosterForEditing(className) {
     Object.keys(photos).forEach(function(k) { currentRosterEditPhotoKeys[k] = true; });
     currentRosterEditEntries = roster ? roster.map(function(e) {
         var p = photos[rosterKey(e.admissionNumber)] || '';
-        return { name: e.name || '', admissionNumber: e.admissionNumber || '', photo: p, photoDirty: false };
+        return { name: e.name || '', admissionNumber: e.admissionNumber || '', parentPhone: e.parentPhone || '', photo: p, photoDirty: false };
     }) : [];
 
     document.getElementById('rosterEditWrapper').style.display = 'block';
@@ -2917,7 +2917,8 @@ function syncRosterEditEntriesFromDOM() {
         var nameInput = rows[i].querySelector('.roster-edit-name');
         var admInput = rows[i].querySelector('.roster-edit-admission');
         var old = currentRosterEditEntries[i] || {};
-        entries.push({ name: nameInput.value, admissionNumber: admInput.value, photo: old.photo || '', photoDirty: !!old.photoDirty });
+        var parentInput = rows[i].querySelector('.roster-edit-parent');
+        entries.push({ name: nameInput.value, admissionNumber: admInput.value, parentPhone: parentInput ? parentInput.value : (old.parentPhone || ''), photo: old.photo || '', photoDirty: !!old.photoDirty });
     }
     currentRosterEditEntries = entries;
 }
@@ -2941,6 +2942,7 @@ function renderRosterEditList() {
             '</div>' +
             '<input type="text" class="roster-edit-name form-input" style="flex:2; min-width:130px;" placeholder="Student Name" value="' + escapeHtmlAttr(entry.name) + '">' +
             '<input type="text" class="roster-edit-admission form-input" style="flex:1; min-width:110px;" placeholder="Admission Number" value="' + escapeHtmlAttr(entry.admissionNumber) + '">' +
+            '<input type="tel" class="roster-edit-parent form-input" style="flex:1; min-width:120px;" placeholder="Parent phone (optional)" value="' + escapeHtmlAttr(entry.parentPhone || '') + '">' +
             '<button onclick="deleteRosterEditRow(' + i + ')" class="secondary-btn" style="background:#dc3545; color:white; padding:8px 12px;">✕</button>' +
             '</div>';
     }
@@ -2953,7 +2955,7 @@ function escapeHtmlAttr(str) {
 
 function addRosterEditRow() {
     syncRosterEditEntriesFromDOM();
-    currentRosterEditEntries.push({ name: '', admissionNumber: '', photo: '', photoDirty: false });
+    currentRosterEditEntries.push({ name: '', admissionNumber: '', parentPhone: '', photo: '', photoDirty: false });
     renderRosterEditList();
     var rows = document.querySelectorAll('#rosterEditList .roster-edit-row');
     var lastRow = rows[rows.length - 1];
@@ -3126,7 +3128,8 @@ async function saveRosterEdits() {
             alert('Every student needs both a Name and an Admission Number. Please fill in the incomplete row, or remove it.');
             return;
         }
-        cleaned.push({ name: name, admissionNumber: admissionNumber });
+        var pp = String(currentRosterEditEntries[i].parentPhone || '').trim();
+        cleaned.push(pp ? { name: name, admissionNumber: admissionNumber, parentPhone: pp } : { name: name, admissionNumber: admissionNumber });
     }
 
     var statusEl = document.getElementById('rosterEditStatus');
@@ -3396,6 +3399,7 @@ async function loadTeacherAnalytics() {
     if (!select || !container) return;
     cmRenderChartPanel('cmHostAnalytics', []);
     renderFlaggedQuestions(select.value);
+    renderQuestionQuality(select.value);
 
     var code = select.value;
     if (!code) {
@@ -7916,18 +7920,18 @@ function renderBroadsheet() {
         '</div>' +
         '<div class="scrollable-panel"><table class="pos-table"><thead><tr><th>Pos.</th><th>Student</th><th>Adm. No.</th>';
     data.subjects.forEach(function(s) { html += '<th>' + posEsc(s.label) + '</th>'; });
-    html += '<th>Total</th><th>Average</th></tr></thead><tbody>';
-    data.rows.forEach(function(r) {
+    html += '<th>Total</th><th>Average</th><th>Grade</th><th></th></tr></thead><tbody>';
+    data.rows.forEach(function(r, ri) {
         html += '<tr class="' + (r.position <= 3 ? 'pos-top-' + r.position : '') + '"><td class="pos-rank">' + posOrdinal(r.position) + '</td><td>' + posEsc(r.name) + '</td><td>' + posEsc(r.admission) + '</td>';
         data.subjects.forEach(function(s) {
             var v = r.cells[s.key];
             html += '<td>' + (v === null ? '<span class="pos-missing">-</span>' : v) + '</td>';
         });
-        html += '<td>' + r.total + '</td><td><strong>' + r.average + '%</strong></td></tr>';
+        html += '<td>' + r.total + '</td><td><strong>' + r.average + '%</strong></td><td><span class="grade-chip g-' + cmGradeFor(r.average).g + '">' + cmGradeFor(r.average).g + '</span></td><td><button type="button" class="wa-parent-btn" onclick="posWhatsAppParent(' + ri + ')" aria-label="Send result to parent on WhatsApp" title="Send to parent on WhatsApp"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/></svg></button></td></tr>';
     });
     html += '<tr class="pos-footer-row"><td></td><td>Class average</td><td></td>';
     data.subjects.forEach(function(s) { var v = data.subjectAverages[s.key]; html += '<td>' + (v === null ? '-' : v) + '</td>'; });
-    html += '<td></td><td>' + data.overallAverage + '%</td></tr></tbody></table></div>' +
+    html += '<td></td><td>' + data.overallAverage + '%</td><td></td><td></td></tr></tbody></table></div>' +
         '<p class="helper-text" style="margin-top:8px;">Position is by average score. A subject a student did not take is left out of their average. Students with equal averages share a position.</p>';
     box.innerHTML = html;
 }
@@ -7968,11 +7972,11 @@ function posExportSubjectCsv() {
 function posBroadsheetTable() {
     var b = posState.broad;
     var d = b.data;
-    var headers = ['Pos.', 'Student', 'Adm. No.'].concat(d.subjects.map(function(s) { return s.label; }), ['Total', 'Average']);
+    var headers = ['Pos.', 'Student', 'Adm. No.'].concat(d.subjects.map(function(s) { return s.label; }), ['Total', 'Average', 'Grade']);
     var rows = d.rows.map(function(r) {
-        return [posOrdinal(r.position), r.name, r.admission].concat(d.subjects.map(function(s) { var v = r.cells[s.key]; return v === null ? '-' : String(v); }), [String(r.total), r.average + '%']);
+        return [posOrdinal(r.position), r.name, r.admission].concat(d.subjects.map(function(s) { var v = r.cells[s.key]; return v === null ? '-' : String(v); }), [String(r.total), r.average + '%', cmGradeFor(r.average).g]);
     });
-    var footer = [['', 'Class average', ''].concat(d.subjects.map(function(s) { var v = d.subjectAverages[s.key]; return v === null ? '-' : String(v); }), ['', d.overallAverage + '%'])];
+    var footer = [['', 'Class average', ''].concat(d.subjects.map(function(s) { var v = d.subjectAverages[s.key]; return v === null ? '-' : String(v); }), ['', d.overallAverage + '%', cmGradeFor(d.overallAverage).g])];
     return { headers: headers, rows: rows, footer: footer };
 }
 
@@ -7980,8 +7984,8 @@ function posDownloadBroadsheetPdf() {
     if (!posState.broad || posState.broad.data.rows.length === 0) { alert('Choose a class that has results first.'); return; }
     var b = posState.broad, d = b.data, t = posBroadsheetTable();
     try {
-        var weights = [7, 30, 15].concat(d.subjects.map(function() { return 12; }), [10, 11]);
-        var align = ['center', 'left', 'left'].concat(d.subjects.map(function() { return 'center'; }), ['center', 'center']);
+        var weights = [7, 30, 15].concat(d.subjects.map(function() { return 12; }), [10, 11, 8]);
+        var align = ['center', 'left', 'left'].concat(d.subjects.map(function() { return 'center'; }), ['center', 'center', 'center']);
         var pdf = pdfBuildTable({
             orientation: d.subjects.length > 3 ? 'landscape' : 'portrait',
             title: b.className + ' - Class Broadsheet',
@@ -9298,6 +9302,179 @@ async function downloadAdminBackup(name) {
         if (!res.ok) throw new Error(d.error || 'Could not prepare the download.');
         window.open(d.url, '_blank');
     } catch (e) { alert(e.message); }
+}
+
+
+
+// ============================================================
+// DELIVERY B: grades, report cards, parent WhatsApp, question quality, Excel
+// ============================================================
+// Simple letter grades by percentage.
+function cmGradeFor(pct) {
+    pct = Number(pct) || 0;
+    if (pct >= 70) return { g: 'A', remark: 'Excellent' };
+    if (pct >= 60) return { g: 'B', remark: 'Very good' };
+    if (pct >= 50) return { g: 'C', remark: 'Good' };
+    if (pct >= 45) return { g: 'D', remark: 'Fair' };
+    if (pct >= 40) return { g: 'E', remark: 'Weak pass' };
+    return { g: 'F', remark: 'Needs urgent attention' };
+}
+
+function cmPhoneForWhatsApp(raw) {
+    var d = String(raw || '').replace(/[^0-9]/g, '');
+    if (d.length === 11 && d.charAt(0) === '0') d = '234' + d.slice(1);   // Nigerian numbers written 0803...
+    return d.length >= 10 && d.length <= 15 ? d : '';
+}
+
+function cmReportLines(student, data, className) {
+    var g = cmGradeFor(student.average);
+    var lines = [];
+    data.subjects.forEach(function(s) {
+        var v = student.cells[s.key];
+        if (v !== null && v !== undefined) lines.push([s.label, v + '%', cmGradeFor(v).g, cmGradeFor(v).remark]);
+    });
+    return { lines: lines, grade: g };
+}
+
+async function posRosterPhones(className) {
+    var email = currentTeacher ? currentTeacher.email : 'unknown';
+    var roster = await getRosterForClass(email, className);
+    var map = {};
+    (roster || []).forEach(function(e) { if (e.parentPhone) map[rosterKey(e.admissionNumber)] = e.parentPhone; });
+    return map;
+}
+
+async function posWhatsAppParent(rowIndex) {
+    var b = posState.broad;
+    if (!b || !b.data.rows[rowIndex]) return;
+    var st = b.data.rows[rowIndex];
+    var phones = await posRosterPhones(b.className);
+    var phone = cmPhoneForWhatsApp(phones[rosterKey(st.admission)]);
+    if (!phone) { alert('No parent phone number is saved for ' + st.name + '. Add it in Class Roster (the "Parent phone" box), then try again.'); return; }
+    var rep = cmReportLines(st, b.data, b.className);
+    var text = '\uD83D\uDCD8 *Result report* - ' + st.name + ' (' + b.className + ')\n' +
+        'Average: *' + st.average + '%* - Grade *' + rep.grade.g + '* (' + rep.grade.remark + ')\n' +
+        'Position: ' + posOrdinal(st.position) + ' of ' + b.data.classSize + '\n' +
+        rep.lines.map(function(l) { return '\u2022 ' + l[0] + ': ' + l[1] + ' (' + l[2] + ')'; }).join('\n') + '\n' +
+        'From ' + (currentTeacher && currentTeacher.name ? currentTeacher.name : 'your child\'s teacher') + ' via CleverMent';
+    var url = 'https://wa.me/' + phone + '?text=' + encodeURIComponent(text);
+    var win = window.open(url, '_blank');
+    if (!win) window.location.href = url;
+}
+
+// One report card PDF per student, bundled in a ZIP.
+async function posDownloadReportCards() {
+    var b = posState.broad;
+    if (!b || b.data.rows.length === 0) { alert('Choose a class that has results first.'); return; }
+    if (typeof JSZip === 'undefined') { alert('The ZIP tool did not load. Please check your internet connection and refresh.'); return; }
+    var zip = new JSZip(), used = {}, teacher = currentTeacher && currentTeacher.name ? currentTeacher.name : '';
+    try {
+        b.data.rows.forEach(function(st) {
+            var rep = cmReportLines(st, b.data, b.className);
+            var pdf = pdfBuildTable({
+                orientation: 'portrait',
+                title: 'Student Report Card',
+                lines: ['Student: ' + st.name + (st.admission ? '   |   Admission No.: ' + st.admission : '') + '   |   Class: ' + b.className,
+                        'Position: ' + posOrdinal(st.position) + ' of ' + b.data.classSize + '   |   Average: ' + st.average + '%   |   Overall grade: ' + rep.grade.g + ' (' + rep.grade.remark + ')',
+                        (teacher ? 'Teacher: ' + teacher + '   |   ' : '') + 'Date: ' + posTodayLabel()],
+                headers: ['Subject', 'Score', 'Grade', 'Remark'],
+                weights: [40, 14, 12, 34],
+                align: ['left', 'center', 'center', 'left'],
+                rows: rep.lines,
+                footerRows: [['Average', st.average + '%', rep.grade.g, rep.grade.remark]]
+            });
+            var base = 'Report-' + backupSafeName(st.name + (st.admission ? '-' + st.admission : ''));
+            var name = base + '.pdf', n = 2;
+            while (used[name]) { name = base + '-' + n + '.pdf'; n++; }
+            used[name] = true;
+            zip.file(name, pdf.output('arraybuffer'));
+        });
+        var blob = await zip.generateAsync({ type: 'blob' });
+        posDownloadBlob(blob, 'Report-cards-' + backupSafeName(b.className) + '.zip');
+    } catch (e) {
+        alert('Could not create the report cards: ' + e.message);
+    }
+}
+
+// ---------- Excel ----------
+function cmDownloadXlsx(fileName, header, rows) {
+    if (typeof XLSX === 'undefined') { alert('The Excel tool did not load. Please check your internet connection and refresh.'); return; }
+    var sheet = XLSX.utils.aoa_to_sheet([header].concat(rows));
+    sheet['!cols'] = header.map(function(h, i) {
+        var w = String(h).length;
+        rows.forEach(function(r) { w = Math.max(w, String(r[i] === undefined || r[i] === null ? '' : r[i]).length); });
+        return { wch: Math.min(40, w + 2) };
+    });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, 'CleverMent');
+    XLSX.writeFile(wb, fileName);
+}
+function teacherExportResultsXlsx() {
+    var filtered = getTeacherFilteredResults();
+    if (filtered.length === 0) { alert('No results to export.'); return; }
+    cmDownloadXlsx('CleverMent-results-' + new Date().toISOString().slice(0, 10) + '.xlsx',
+        ['Class', 'Student', 'Admission No.', 'Subject', 'Score %', 'Grade', 'Correct', 'Total', 'Time Taken', 'Tab Switches', 'Cam/Noise Flags', 'Fast Answer Warnings', 'Date'],
+        filtered.map(function(r) { return [r.className, r.studentName, r.admissionNumber || '', r.subject, Number(r.score), cmGradeFor(r.score).g, r.correctAnswers, r.totalQuestions, r.timeTaken, r.tabSwitches || 0, r.proctorViolations || 0, r.fastAnswerWarnings || 0, r.date]; }));
+}
+function posExportSubjectXlsx() {
+    if (!posState.subject) { alert('Choose an assessment that has results first.'); return; }
+    var a = posState.subject.assessment, d = posState.subject.data;
+    cmDownloadXlsx('Positions-' + backupSafeName(a.subject + '-' + a.className) + '.xlsx', ['Position', 'Student', 'Admission No.', 'Score %', 'Grade', 'Correct', 'Total', 'Remark'],
+        d.rows.map(function(r) { return [posOrdinal(r.position), r.name, r.admission, r.score, cmGradeFor(r.score).g, r.correct, r.total, r.score >= r.passMark ? 'Pass' : 'Fail']; }));
+}
+function posExportBroadsheetXlsx() {
+    if (!posState.broad || posState.broad.data.rows.length === 0) { alert('Choose a class that has results first.'); return; }
+    var t = posBroadsheetTable();
+    cmDownloadXlsx('Broadsheet-' + backupSafeName(posState.broad.className) + '.xlsx', t.headers, t.rows.concat(t.footer));
+}
+
+// ---------- Question quality report ----------
+// For each question: % who got it right, and how well it separates strong from weak students
+// (top 27% of students vs bottom 27%).
+function cmQuestionQuality(results) {
+    var n = results.length;
+    var sorted = results.slice().sort(function(a, b) { return (Number(b.score) || 0) - (Number(a.score) || 0); });
+    var k = Math.max(1, Math.floor(n * 0.27));
+    var top = sorted.slice(0, k), bottom = sorted.slice(n - k);
+    var count = 0;
+    results.forEach(function(r) { count = Math.max(count, (r.qCorrect || []).length); });
+    var out = [];
+    for (var i = 0; i < count; i++) {
+        var right = 0, tr = 0, br = 0;
+        results.forEach(function(r) { if (r.qCorrect && r.qCorrect[i]) right++; });
+        top.forEach(function(r) { if (r.qCorrect && r.qCorrect[i]) tr++; });
+        bottom.forEach(function(r) { if (r.qCorrect && r.qCorrect[i]) br++; });
+        var p = right / n, d = (tr - br) / k;
+        var verdict = 'Good question', level = 'good';
+        if (n >= 10 && d < 0) { verdict = 'Check the answer key: weaker students did better than strong ones'; level = 'bad'; }
+        else if (p < 0.2) { verdict = 'Very hard'; level = 'warn'; }
+        else if (p > 0.9) { verdict = 'Very easy'; level = 'warn'; }
+        else if (n >= 10 && d < 0.1) { verdict = 'Does not separate strong from weak students'; level = 'warn'; }
+        out.push({ index: i, percent: Math.round(p * 100), discrimination: Math.round(d * 100) / 100, verdict: verdict, level: level });
+    }
+    return out;
+}
+
+async function renderQuestionQuality(code) {
+    var host = document.getElementById('qualityReportHost');
+    if (!host) return;
+    if (!code) { host.innerHTML = ''; return; }
+    try { await ensureTeacherDataForReports(); } catch (e) {}
+    var assessment = (teacherAssessmentsCache || []).filter(function(a) { return a.code === code; })[0];
+    var results = (teacherResultsCache || []).filter(function(r) { return r.assessmentCode === code && Array.isArray(r.qCorrect) && r.qCorrect.length > 0; });
+    if (!assessment) { host.innerHTML = ''; return; }
+    var title = '<h4 style="margin:0 0 4px;">Question quality report</h4>';
+    if (assessment.questionLimit > 0) { host.innerHTML = '<div class="flag-box" style="border-color:#cfe1ff;">' + title + '<p class="helper-text" style="margin:0;">Not available for assessments that give each student a random selection of questions.</p></div>'; return; }
+    if (results.length < 5) { host.innerHTML = '<div class="flag-box" style="border-color:#cfe1ff;">' + title + '<p class="helper-text" style="margin:0;">Needs at least 5 submitted results (this one has ' + results.length + ').</p></div>'; return; }
+    var q = cmQuestionQuality(results);
+    var html = '<div class="flag-box" style="border-color:#cfe1ff;">' + title + '<p class="helper-text" style="margin:0 0 8px;">Based on ' + results.length + ' students. "Separates" compares the top and bottom 27% of students: closer to 1 is better.</p>' +
+        '<div class="scrollable-panel"><table class="pos-table"><thead><tr><th>Q</th><th>Question</th><th>% right</th><th>Separates</th><th>Verdict</th></tr></thead><tbody>';
+    q.forEach(function(x) {
+        var text = assessment.questions && assessment.questions[x.index] ? String(assessment.questions[x.index].question || '') : '';
+        if (text.length > 70) text = text.slice(0, 70) + '...';
+        html += '<tr><td>' + (x.index + 1) + '</td><td>' + escapeHtml(text) + '</td><td><strong>' + x.percent + '%</strong></td><td>' + x.discrimination + '</td><td><span class="quality-' + x.level + '">' + escapeHtml(x.verdict) + '</span></td></tr>';
+    });
+    host.innerHTML = html + '</tbody></table></div></div>';
 }
 
 
