@@ -3674,40 +3674,42 @@ var currentClassRosterForAutocomplete = [];
 async function loadRosterForNameAutocomplete() {
     currentClassRosterForAutocomplete = [];
     if (!currentAssessment) return;
-    var roster = await getRosterForClass(currentAssessment.teacherEmail, currentAssessment.className);
-    currentClassRosterForAutocomplete = roster || [];
+    currentClassRosterForAutocomplete = []; // suggestions are fetched from the server as the student types
 }
 
+var nameSuggestTimer = null;
+var nameSuggestSeq = 0;
+
+// Suggestions now come from the server (the roster is no longer readable from the browser).
 function showNameSuggestions() {
     var input = document.getElementById('studentNameInput');
     var box = document.getElementById('studentNameSuggestions');
-    var typed = input.value.trim().toLowerCase();
-
-    if (typed.length < 2 || currentClassRosterForAutocomplete.length === 0) {
-        box.style.display = 'none';
-        return;
-    }
-
-    var matches = currentClassRosterForAutocomplete.filter(function(entry) {
-        return entry.name && entry.name.toLowerCase().indexOf(typed) !== -1;
-    }).slice(0, 5);
-
-    if (matches.length === 0) {
-        box.style.display = 'none';
-        return;
-    }
-
-    var html = '';
-    for (var i = 0; i < matches.length; i++) {
-        var entry = matches[i];
-        html += '<div onmousedown="selectNameSuggestion(\'' + escapeJsString(entry.name) + '\', \'' + escapeJsString(entry.admissionNumber) + '\')" ' +
-            'style="padding:10px 14px; cursor:pointer; border-bottom:1px solid #eef2f6;" ' +
-            'onmouseover="this.style.background=\'#eef6ff\'" onmouseout="this.style.background=\'white\'">' +
-            '<strong>' + entry.name + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + entry.admissionNumber + ')</span>' +
-            '</div>';
-    }
-    box.innerHTML = html;
-    box.style.display = 'block';
+    var typed = input.value.trim();
+    if (typed.length < 2 || !currentAssessmentCode) { box.style.display = 'none'; return; }
+    if (nameSuggestTimer) clearTimeout(nameSuggestTimer);
+    var seq = ++nameSuggestSeq;
+    nameSuggestTimer = setTimeout(async function() {
+        try {
+            var res = await fetch(BACKEND_URL + '/api/quiz/roster-suggest?code=' + encodeURIComponent(currentAssessmentCode) + '&q=' + encodeURIComponent(typed));
+            if (!res.ok) { box.style.display = 'none'; return; }
+            var data = await res.json();
+            if (seq !== nameSuggestSeq) return; // a newer keystroke is already being handled
+            var matches = data.matches || [];
+            if (matches.length === 0) { box.style.display = 'none'; return; }
+            var html = '';
+            for (var i = 0; i < matches.length; i++) {
+                var entry = matches[i];
+                html += '<div onmousedown="selectNameSuggestion(\'' + escapeJsString(entry.name) + '\', \'' + escapeJsString(entry.admissionNumber) + '\')" ' +
+                    'ontouchstart="selectNameSuggestion(\'' + escapeJsString(entry.name) + '\', \'' + escapeJsString(entry.admissionNumber) + '\')" ' +
+                    'style="padding:10px 14px; cursor:pointer; border-bottom:1px solid #eef2f6;" ' +
+                    'onmouseover="this.style.background=\'#eef6ff\'" onmouseout="this.style.background=\'white\'">' +
+                    '<strong>' + escapeHtml(entry.name) + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + escapeHtml(entry.admissionNumber) + ')</span>' +
+                    '</div>';
+            }
+            box.innerHTML = html;
+            box.style.display = 'block';
+        } catch (e) { /* suggestions are a convenience only */ }
+    }, 250);
 }
 
 function selectNameSuggestion(name, admissionNumber) {
