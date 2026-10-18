@@ -34,6 +34,8 @@
         <div class="logo">
             <img src="logo.png" alt="CleverMent Logo" class="logo-image">
         </div>
+        <img id="schoolHeaderLogo" src="" alt="School logo" class="school-header-logo" style="display:none;">
+        <span class="header-divider" aria-hidden="true"></span>
         <p class="tagline">Intelligent Assessment. Instant Feedback.</p>
     </div>
 
@@ -77,13 +79,14 @@
             <div style="display:flex; gap:16px; justify-content:center; flex-wrap:wrap;">
                 <button onclick="showStudentAccess()" class="primary-btn" style="min-width:180px;">I'm a Student</button>
                 <button onclick="showTeacherLogin()" class="secondary-btn" style="min-width:180px;">I'm a Teacher</button>
-                <button onclick="showAdminLogin()" class="secondary-btn" style="min-width:180px; background:#6f42c1; color:white;">Admin</button>
+                <button id="landingAdminBtn" onclick="showAdminLogin()" class="secondary-btn" style="min-width:180px; background:#6f42c1; color:white;">Admin</button>
             </div>
         </div>
     </div>
 
     <!-- ===== STUDENT ACCESS ===== -->
     <div id="studentAccess" style="display:none;">
+            <div style="text-align:center;margin:6px 0 14px;"><button type="button" class="secondary-btn" onclick="openStudentLogin()">Log in with my name and PIN</button></div>
         <button onclick="backToLanding()" class="secondary-btn" style="font-size:13px; padding:6px 16px; margin-bottom:16px;">← Back</button>
         <h2>Enter Assessment Code</h2>
         <p style="color:#6b7a8f; margin-bottom:16px;">Enter the code your teacher gave you to access your assessment.</p>
@@ -587,6 +590,14 @@
                 <p class="helper-text" style="margin-top:4px;">Leave both blank for an assessment that's open any time the code is used. Times are based on your device's local time zone.</p>
             </div>
             <div class="form-group">
+                <label for="teacherAccessMode">Who can take this assessment?</label>
+                <select id="teacherAccessMode" class="form-input">
+                    <option value="roster" selected>Students on the class roster only (they log in with their PIN)</option>
+                    <option value="code">Anyone with the assessment code</option>
+                </select>
+                <p class="helper-text">Roster students need a PIN first. Set PINs in Class Roster.</p>
+            </div>
+            <div class="form-group">
                 <label for="teacherQuestionLimit">Questions per student (optional)</label>
                 <input type="number" id="teacherQuestionLimit" min="0" value="0" class="form-input">
                 <p class="helper-text">0 means every student gets all questions. For example, upload 100 questions and enter 40: each student gets a different random 40.</p>
@@ -725,6 +736,10 @@
                 </div>
                 <input type="file" id="rosterPhotoPicker" accept="image/*" style="display:none;" onchange="onRosterPhotoPicked(this)">
                 <div id="rosterEditList"></div>
+                <div class="flag-box" id="pinPanel" style="border-color:#cfe1ff;margin-top:12px;"><h4 style="margin:0 0 6px;">Student login PINs</h4>
+                    <p class="helper-text" style="margin:0 0 8px;">Each student logs in with their name and this 4-digit PIN. Generate PINs, then print or export them straight away. PINs are stored scrambled, so they cannot be shown again: reset a PIN if it is lost.</p>
+                    <button type="button" class="primary-btn" onclick="generateAllStudentPins()">Generate PINs for this class</button>
+                    <div id="pinPanelBody" style="margin-top:10px;"></div></div>
                 <button onclick="addRosterEditRow()" class="secondary-btn full-width" style="margin-top:8px;">+ Add Student</button>
                 <button onclick="saveRosterEdits()" class="primary-btn full-width" style="margin-top:10px;">Save Changes</button>
                 <p id="rosterEditStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
@@ -1332,6 +1347,37 @@
                 <button type="button" class="primary-btn" onclick="closeSubmitReview(); studentSubmitQuiz();">Submit now</button>
             </div>
         </div>
+    </div>
+
+    <!-- ===== Student login (name + PIN) ===== -->
+    <div id="studentLoginPage" style="display:none; padding:16px 16px 40px; max-width:520px; margin:0 auto;">
+        <button type="button" class="secondary-btn" onclick="studentLoginBack()">&larr; Back</button>
+        <h2 style="margin:12px 0 4px;">Student login</h2>
+        <p class="helper-text">Type your name, then tap your name in the list. Then enter the 4-digit PIN your teacher gave you.</p>
+        <label class="live-msg-label" for="slName">Your name</label>
+        <input id="slName" class="form-input" placeholder="Type your name" autocomplete="off" oninput="studentLoginSuggest()">
+        <div id="slSuggest" class="sl-suggest"></div>
+        <p id="slChosen" class="helper-text" style="font-weight:700;"></p>
+        <label class="live-msg-label" for="slPin" style="margin-top:8px;">PIN</label>
+        <input id="slPin" type="password" inputmode="numeric" maxlength="4" class="form-input" placeholder="4 digits">
+        <button type="button" class="primary-btn" style="margin-top:10px;width:100%;" onclick="studentLoginSubmit()">Log in</button>
+        <p id="slStatus" class="helper-text" style="min-height:20px;font-weight:600;"></p>
+    </div>
+
+    <!-- ===== Student home (after login) ===== -->
+    <div id="studentAreaPage" style="display:none; padding:12px 16px 90px; max-width:640px; margin:0 auto;">
+        <div class="sa-top">
+            <div id="saProfile" class="sa-profile"></div>
+            <button type="button" class="secondary-btn" onclick="studentLogout()">Log out</button>
+        </div>
+        <div id="saPanelHome" class="sa-panel"></div>
+        <div id="saPanelTodo" class="sa-panel" style="display:none;"></div>
+        <div id="saPanelDone" class="sa-panel" style="display:none;"></div>
+        <nav class="sa-nav">
+            <button type="button" data-p="home" onclick="studentAreaShow('home')">Home</button>
+            <button type="button" data-p="todo" onclick="studentAreaShow('todo')">To do</button>
+            <button type="button" data-p="done" onclick="studentAreaShow('done')">Done</button>
+        </nav>
     </div>
 
     <!-- ===== Connecting banner (shown while the app retries a slow connection) ===== -->

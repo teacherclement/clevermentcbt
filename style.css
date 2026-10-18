@@ -2408,3 +2408,38 @@ body.school-branded .primary-btn { background: var(--cm-primary, #2d6cdf) !impor
 body.school-branded .student-avatar { border-color: var(--cm-accent, #C9A84C); }
 body.school-branded .live-msg-card { border-left-color: var(--cm-accent, #C9A84C); }
 body.school-branded .dash-nav-item.active { background: var(--cm-primary, #2d6cdf) !important; color: #fff !important; }
+
+
+/* ===== Compact header: [logo] | [tagline] ===== */
+#mainHeader { display: flex !important; align-items: center; justify-content: flex-start; gap: 10px; padding: 10px 14px !important; text-align: left !important; flex-wrap: wrap; }
+#mainHeader .logo { margin: 0 !important; }
+#mainHeader .logo-image { height: 34px !important; width: auto !important; max-width: none !important; }
+#mainHeader .header-divider { width: 2px; height: 26px; background: #d5dce6; border-radius: 2px; flex: 0 0 auto; }
+#mainHeader .tagline { margin: 0 !important; font-size: 12px !important; letter-spacing: .3px !important; color: #6b7a8f !important; text-align: left !important; line-height: 1.3; }
+#mainHeader .school-header-logo { height: 34px; width: auto; max-width: 110px; object-fit: contain; }
+
+/* School links: CleverMent branding is replaced by the school's */
+body.school-branded #mainHeader .logo,
+body.school-branded #mainHeader .header-divider,
+body.school-branded #mainHeader .tagline,
+body.school-branded .dash-logo-image,
+body.school-branded .dash-tagline { display: none !important; }
+body.school-branded #mainHeader .school-header-logo { display: block !important; }
+body.school-link #landingAdminBtn { display: none !important; }
+
+
+/* ===== Student accounts ===== */
+.sl-suggest { display: grid; gap: 6px; margin-top: 6px; }
+.sl-suggest button { display: block; width: 100%; text-align: left; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; background: #fff; font-size: 15px; cursor: pointer; }
+.sl-suggest button span { color: #6b7a8f; font-size: 13px; }
+.sa-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.sa-profile { display: flex; align-items: center; gap: 12px; }
+.sa-avatar { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: #dfe8fb; border: 2.5px solid #C9A84C; display: flex; align-items: center; justify-content: center; font-weight: 800; color: #2d6cdf; font-size: 20px; flex: 0 0 auto; }
+.sa-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.sa-name { font-size: 19px; font-weight: 800; color: #172033; }
+.sa-panel { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+.sa-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; border: 1.5px solid #e2e8f0; border-radius: 12px; margin-bottom: 8px; }
+.sa-badge { font-size: 12px; font-weight: 700; color: #6b7a8f; background: #f1f4f8; padding: 6px 10px; border-radius: 999px; white-space: nowrap; }
+.sa-nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: #172033; z-index: 400; padding-bottom: env(safe-area-inset-bottom, 0px); }
+.sa-nav button { flex: 1; border: none; background: transparent; color: #cbd5e1; padding: 14px 6px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.sa-nav button.active { color: #fff; box-shadow: inset 0 3px 0 #C9A84C; }

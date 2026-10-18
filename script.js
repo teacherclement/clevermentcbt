@@ -2144,6 +2144,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         passMark: passMark,
         questionLimit: parseInt((document.getElementById('teacherQuestionLimit') || {}).value, 10) || 0,
         negativeMarking: Number((document.getElementById('teacherNegativeMarking') || {}).value) || 0,
+        accessMode: (document.getElementById('teacherAccessMode') || {}).value || 'code',
         availableFrom: availableFrom,
         availableUntil: availableUntil
     };
@@ -9503,6 +9504,11 @@ function cmApplySchoolBrand(school) {
     document.documentElement.style.setProperty('--cm-primary', school.primaryColor || '#2d6cdf');
     document.documentElement.style.setProperty('--cm-accent', school.accentColor || '#C9A84C');
     document.body.classList.add('school-branded');
+    var hl = document.getElementById('schoolHeaderLogo');
+    if (hl) {
+        if (school.logo) { hl.src = school.logo; hl.style.display = 'block'; }
+        else { hl.removeAttribute('src'); hl.style.display = 'none'; }
+    }
     if (bar) {
         bar.innerHTML = (school.logo ? '<img src="' + school.logo + '" alt="">' : '') + '<span>' + escapeHtml(school.name) + '</span>';
         bar.style.display = 'flex';
@@ -9513,6 +9519,8 @@ function cmClearSchoolBrand() {
     document.documentElement.style.removeProperty('--cm-primary');
     document.documentElement.style.removeProperty('--cm-accent');
     document.body.classList.remove('school-branded');
+    var hl2 = document.getElementById('schoolHeaderLogo');
+    if (hl2) { hl2.removeAttribute('src'); hl2.style.display = 'none'; }
     var bar = document.getElementById('schoolBrandBar');
     if (bar) { bar.style.display = 'none'; bar.innerHTML = ''; }
 }
@@ -9538,6 +9546,7 @@ async function cmLoadSchoolBySlug(slug) {
         if (data.school) {
             try { sessionStorage.setItem('cm_school_slug', slug); } catch (e) {}
             cmApplySchoolBrand(data.school);
+            document.body.classList.add('school-link');
         }
     } catch (e) {}
 }
@@ -9724,6 +9733,308 @@ async function addSchoolMemberAdmin(id) {
     if (!r.ok) alert(r.d.error || 'Could not add.');
     loadAdminSchools();
 }
+
+
+
+// ============================================================
+// STUDENT ACCOUNTS: log in with name + PIN, student home, To do / Done
+// ============================================================
+// Students' requests to the quiz API carry their login, so roster-only assessments can be opened.
+(function cmStudentAuthFetch() {
+    var orig = window.fetch.bind(window);
+    window.fetch = function(url, opts) {
+        try {
+            if (typeof url === 'string' && url.indexOf(BACKEND_URL + '/api/quiz/') === 0) {
+                var t = localStorage.getItem('cleverment_student_token');
+                if (t) {
+                    opts = Object.assign({}, opts || {});
+                    opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t });
+                }
+            }
+        } catch (e) {}
+        return orig(url, opts);
+    };
+})();
+
+var slChosen = null, slTimer = null, saTodo = [], saDone = [];
+
+function studentShowOnly(id) {
+    ['landingPage', 'studentAccess', 'studentAssessmentView', 'studentLoginPage', 'studentAreaPage'].forEach(function(x) {
+        var el = document.getElementById(x);
+        if (el) el.style.display = (x === id) ? 'block' : 'none';
+    });
+}
+function openStudentLogin() {
+    slChosen = null;
+    document.getElementById('slName').value = '';
+    document.getElementById('slPin').value = '';
+    document.getElementById('slChosen').textContent = '';
+    document.getElementById('slSuggest').innerHTML = '';
+    document.getElementById('slStatus').textContent = '';
+    studentShowOnly('studentLoginPage');
+}
+function studentLoginBack() { studentShowOnly('landingPage'); }
+
+function studentLoginSuggest() {
+    clearTimeout(slTimer);
+    slChosen = null;
+    document.getElementById('slChosen').textContent = '';
+    var q = document.getElementById('slName').value.trim();
+    var box = document.getElementById('slSuggest');
+    if (q.length < 2) { box.innerHTML = ''; return; }
+    slTimer = setTimeout(async function() {
+        try {
+            var r = await fetch(BACKEND_URL + '/api/student/suggest?q=' + encodeURIComponent(q));
+            var d = await r.json();
+            var matches = d.matches || [];
+            if (!matches.length) {
+                box.innerHTML = '<p class="helper-text">No student found with that name. Check the spelling, or ask your teacher whether your PIN is ready.</p>';
+                return;
+            }
+            box.innerHTML = matches.map(function(m, i) {
+                return '<button type="button" data-i="' + i + '">' + escapeHtml(m.name) + ' <span>(' + escapeHtml(m.admissionNumber) + ' · ' + escapeHtml(m.className) + ')</span></button>';
+            }).join('');
+            box.querySelectorAll('button').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    slChosen = matches[Number(btn.getAttribute('data-i'))];
+                    document.getElementById('slName').value = slChosen.name;
+                    box.innerHTML = '';
+                    document.getElementById('slChosen').textContent = 'Logging in as ' + slChosen.name + ' (' + slChosen.admissionNumber + ')';
+                    document.getElementById('slPin').focus();
+                });
+            });
+        } catch (e) {}
+    }, 300);
+}
+
+async function studentLoginSubmit() {
+    var st = document.getElementById('slStatus');
+    var pin = document.getElementById('slPin').value.trim();
+    if (!slChosen) { st.style.color = '#dc3545'; st.textContent = 'Type your name, then tap your name in the list.'; return; }
+    if (!/^[0-9]{4}$/.test(pin)) { st.style.color = '#dc3545'; st.textContent = 'Enter your 4-digit PIN.'; return; }
+    st.style.color = '#6b7a8f'; st.textContent = 'Logging in...';
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ teacherEmail: slChosen.teacherEmail, className: slChosen.className, admissionNumber: slChosen.admissionNumber, pin: pin })
+        });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not log in.');
+        localStorage.setItem('cleverment_student_token', d.token);
+        localStorage.setItem('cleverment_student_profile', JSON.stringify(d.student));
+        document.getElementById('slPin').value = '';
+        st.textContent = '';
+        openStudentArea();
+    } catch (e) {
+        st.style.color = '#dc3545';
+        st.textContent = e.message || 'Could not log in.';
+    }
+}
+
+function studentLogout() {
+    localStorage.removeItem('cleverment_student_token');
+    localStorage.removeItem('cleverment_student_profile');
+    saTodo = []; saDone = [];
+    studentShowOnly('landingPage');
+}
+
+async function openStudentArea() {
+    studentShowOnly('studentAreaPage');
+    studentAreaShow('home');
+    await loadStudentProfile();
+    await loadStudentAssessments();
+}
+
+function studentAreaShow(p) {
+    var map = { home: 'saPanelHome', todo: 'saPanelTodo', done: 'saPanelDone' };
+    Object.keys(map).forEach(function(k) {
+        var el = document.getElementById(map[k]);
+        if (el) el.style.display = (k === p) ? 'block' : 'none';
+    });
+    document.querySelectorAll('.sa-nav button').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-p') === p); });
+}
+
+function renderStudentProfile(me) {
+    var box = document.getElementById('saProfile');
+    var ini = String(me.name || '?').split(/\s+/).filter(Boolean).map(function(w) { return w.charAt(0); }).slice(0, 2).join('').toUpperCase();
+    box.innerHTML = '<div class="sa-avatar">' + (me.photo ? '<img src="' + me.photo + '" alt="">' : '<span>' + escapeHtml(ini) + '</span>') + '</div>' +
+        '<div><div class="sa-name">' + escapeHtml(me.name) + '</div>' +
+        '<div class="helper-text">Admission No. ' + escapeHtml(me.admissionNumber) + ' · ' + escapeHtml(me.className) + '</div>' +
+        (me.school && me.school.name ? '<div class="helper-text">' + escapeHtml(me.school.name) + '</div>' : '') +
+        (me.teacherName ? '<div class="helper-text">Teacher: ' + escapeHtml(me.teacherName) + '</div>' : '') + '</div>';
+    if (me.school) cmApplySchoolBrand(me.school);
+}
+
+async function loadStudentProfile() {
+    var t = localStorage.getItem('cleverment_student_token');
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/me', { headers: { 'Authorization': 'Bearer ' + t } });
+        if (r.status === 401) { studentLogout(); return null; }
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load your profile.');
+        renderStudentProfile(d);
+        return d;
+    } catch (e) {
+        document.getElementById('saProfile').innerHTML = '<p class="helper-text">Could not load your profile. Check your connection and try again.</p>';
+        return null;
+    }
+}
+
+async function loadStudentAssessments() {
+    var t = localStorage.getItem('cleverment_student_token');
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/assessments', { headers: { 'Authorization': 'Bearer ' + t } });
+        if (r.status === 401) { studentLogout(); return; }
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load assessments.');
+        saTodo = d.todo || []; saDone = d.done || [];
+        renderStudentTodo(saTodo);
+        renderStudentDone(saDone);
+        document.getElementById('saPanelHome').innerHTML =
+            '<h3 style="margin:0 0 8px;">Welcome</h3>' +
+            '<p style="margin:0 0 6px;"><b>' + saTodo.length + '</b> assessment' + (saTodo.length === 1 ? '' : 's') + ' to do.</p>' +
+            '<p style="margin:0;"><b>' + saDone.length + '</b> assessment' + (saDone.length === 1 ? '' : 's') + ' done.</p>' +
+            '<p class="helper-text" style="margin:10px 0 0;">Tap <b>To do</b> to start an assessment, or <b>Done</b> to see your results.</p>';
+    } catch (e) {
+        document.getElementById('saPanelTodo').innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load.') + '</p>';
+    }
+}
+
+function renderStudentTodo(list) {
+    var el = document.getElementById('saPanelTodo');
+    if (!list.length) { el.innerHTML = '<p class="helper-text">No assessments to do right now.</p>'; return; }
+    el.innerHTML = list.map(function(x) {
+        var label = x.status === 'upcoming' ? 'Opens soon' : (x.status === 'closed' ? 'Closed' : 'Start');
+        var meta = escapeHtml(x.className) + ' · ' + x.questionCount + ' questions' + (x.timeLimit ? ' · ' + Math.round(x.timeLimit / 60) + ' min' : '') +
+            (x.until ? ' · closes ' + escapeHtml(new Date(x.until).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : '');
+        return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div></div>' +
+            (x.status === 'open' ? '<button type="button" class="primary-btn" data-code="' + escapeHtml(x.code) + '" onclick="studentAreaStart(this.getAttribute(\'data-code\'))">' + label + '</button>' : '<span class="sa-badge">' + label + '</span>') + '</div>';
+    }).join('');
+}
+
+function renderStudentDone(list) {
+    var el = document.getElementById('saPanelDone');
+    if (!list.length) { el.innerHTML = '<p class="helper-text">You have not done any assessment yet.</p>'; return; }
+    el.innerHTML = list.map(function(x) {
+        var when = x.date ? new Date(x.date).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        var right = x.score === null ? '<span class="sa-badge">Submitted</span>' :
+            '<span class="pos-remark ' + (x.passed ? 'pass' : 'fail') + '">' + x.score + '% · ' + (x.passed ? 'Pass' : 'Fail') + '</span>';
+        return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + escapeHtml(when) + '</div></div>' + right + '</div>';
+    }).join('');
+}
+
+// Starts an assessment from the "To do" list using the student's own name and admission number.
+async function studentAreaStart(code) {
+    var prof = {};
+    try { prof = JSON.parse(localStorage.getItem('cleverment_student_profile') || '{}'); } catch (e) {}
+    studentShowOnly('studentAccess');
+    var input = document.getElementById('assessmentCode');
+    if (input) input.value = code;
+    try {
+        await verifyAssessmentCode();
+        document.getElementById('studentNameInput').value = prof.name || '';
+        document.getElementById('studentAdmissionNumber').value = prof.admissionNumber || '';
+        startStudentQuiz();
+    } catch (e) {
+        alert('Could not start this assessment. Please try again.');
+        openStudentArea();
+    }
+}
+
+// Logged-in students stay logged in on this phone until they tap Log out.
+setTimeout(function() {
+    try {
+        if (localStorage.getItem('cleverment_student_token') && !getCodeFromURL()) openStudentArea();
+    } catch (e) {}
+}, 900);
+
+// ============================================================
+// TEACHER: STUDENT PINS (inside Class Roster)
+// ============================================================
+var cmLastPins = [], cmLastPinsClass = '';
+
+async function loadPinPanel(cls) {
+    var body = document.getElementById('pinPanelBody');
+    if (!body) return;
+    if (!cls) { body.innerHTML = ''; return; }
+    if (cls !== cmLastPinsClass) { cmLastPins = []; cmLastPinsClass = cls; }
+    body.innerHTML = '<p class="helper-text">Loading...</p>';
+    try {
+        var r = await fetch(BACKEND_URL + '/api/teacher/student-pins?className=' + encodeURIComponent(cls), { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('cleverment_teacher_token') } });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load PINs.');
+        var have = d.students.filter(function(s) { return s.hasPin; }).length;
+        var html = '<p class="helper-text" style="margin:0 0 8px;"><b>' + have + '</b> of ' + d.students.length + ' students have a PIN.' +
+            (d.setupNeeded ? ' <span style="color:#b4232f;">Run supabase_student_accounts.sql in Supabase first.</span>' : '') + '</p><div id="pinResultHost"></div>';
+        html += '<div class="scrollable-panel"><table class="pos-table"><thead><tr><th>Name</th><th>Admission No.</th><th>PIN</th><th></th></tr></thead><tbody>';
+        d.students.forEach(function(s) {
+            var status = s.hasPin ? (s.locked ? '<span class="pos-remark fail">Locked</span>' : '<span class="pos-remark pass">Set</span>') : '<span class="pos-missing">Not set</span>';
+            html += '<tr><td>' + escapeHtml(s.name) + '</td><td>' + escapeHtml(s.admissionNumber) + '</td><td>' + status + '</td><td>' +
+                '<button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;" data-adm="' + escapeHtml(s.admissionNumber) + '" onclick="resetStudentPin(this.getAttribute(\'data-adm\'))">' + (s.hasPin ? 'Reset PIN' : 'Set PIN') + '</button></td></tr>';
+        });
+        body.innerHTML = html + '</tbody></table></div>';
+        renderLastPins();
+    } catch (e) {
+        body.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load.') + '</p>';
+    }
+}
+
+async function cmPinRequest(body) {
+    try {
+        var r = await fetch(BACKEND_URL + '/api/teacher/student-pins', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('cleverment_teacher_token') },
+            body: JSON.stringify(body)
+        });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not create PINs.');
+        cmLastPins = d.pins || [];
+        cmLastPinsClass = body.className;
+        await loadPinPanel(body.className);
+    } catch (e) { alert(e.message); }
+}
+
+async function generateAllStudentPins() {
+    var cls = currentRosterEditClass;
+    if (!cls) { alert('Choose a class first.'); return; }
+    if (!confirm('Generate NEW PINs for every student in ' + cls + '?\n\nAny PIN they already have will stop working. Print or export the list straight away.')) return;
+    await cmPinRequest({ className: cls });
+}
+
+async function resetStudentPin(adm) {
+    var cls = currentRosterEditClass;
+    if (!confirm('Give ' + adm + ' a new PIN? The old one will stop working.')) return;
+    await cmPinRequest({ className: cls, admissionNumber: adm });
+}
+
+function renderLastPins() {
+    var host = document.getElementById('pinResultHost');
+    if (!host || !cmLastPins.length) return;
+    host.innerHTML = '<div class="flag-box" style="border-color:#f0d28a;background:#fffdf4;"><b>New PINs: write them down or print now. They cannot be shown again.</b>' +
+        '<div class="scrollable-panel" style="margin-top:6px;"><table class="pos-table"><thead><tr><th>Name</th><th>Admission No.</th><th>PIN</th></tr></thead><tbody>' +
+        cmLastPins.map(function(p) { return '<tr><td>' + escapeHtml(p.name) + '</td><td>' + escapeHtml(p.admissionNumber) + '</td><td><b style="font-size:16px;letter-spacing:2px;">' + escapeHtml(p.pin) + '</b></td></tr>'; }).join('') +
+        '</tbody></table></div><button type="button" class="primary-btn" style="margin-top:8px;" onclick="printStudentPins()">Print</button> ' +
+        '<button type="button" class="secondary-btn" style="margin-top:8px;" onclick="exportStudentPinsCsv()">Export CSV</button></div>';
+}
+
+function printStudentPins() {
+    var w = window.open('', '_blank');
+    if (!w) { alert('Please allow pop-ups to print.'); return; }
+    var rows = cmLastPins.map(function(p) { return '<tr><td>' + escapeHtml(p.name) + '</td><td>' + escapeHtml(p.admissionNumber) + '</td><td style="font-size:18px;font-weight:bold;letter-spacing:3px;">' + escapeHtml(p.pin) + '</td></tr>'; }).join('');
+    w.document.write('<html><head><title>Student PINs</title><style>body{font-family:Arial,sans-serif;padding:20px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:8px;text-align:left}h2{margin:0 0 6px}</style></head><body><h2>CleverMent login PINs - ' + escapeHtml(cmLastPinsClass) + '</h2><p>Log in with your name and this 4-digit PIN.</p><table><tr><th>Name</th><th>Admission No.</th><th>PIN</th></tr>' + rows + '</table></body></html>');
+    w.document.close();
+    w.focus();
+    w.print();
+}
+
+function exportStudentPinsCsv() {
+    var lines = ['Name,Admission No.,PIN'].concat(cmLastPins.map(function(p) { return csvCell(p.name) + ',' + csvCell(p.admissionNumber) + ',' + csvCell(p.pin); }));
+    cbDownloadBlob(new Blob([lines.join('\n')], { type: 'text/csv' }), 'PINs-' + backupSafeName(cmLastPinsClass) + '.csv');
+}
+
+(function cmHookRosterPins() {
+    var orig = loadRosterForEditing;
+    loadRosterForEditing = async function(cls) { await orig(cls); loadPinPanel(cls); };
+})();
 
 
 function showTeacherSection(panelId, btn) {
