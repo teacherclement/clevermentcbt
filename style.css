@@ -2399,3 +2399,12 @@ tr.result-row-selected td { background: #eef3fd; }
 .quality-good { color: #1d7a45; font-weight: 700; }
 .quality-warn { color: #8a6d00; font-weight: 700; }
 .quality-bad { color: #b4232f; font-weight: 800; }
+
+
+/* ===== Schools ===== */
+.school-brand-bar { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 14px; background: var(--cm-primary, #2d6cdf); color: #fff; font-weight: 800; font-size: 17px; letter-spacing: .3px; border-bottom: 4px solid var(--cm-accent, #C9A84C); }
+.school-brand-bar img { height: 38px; max-width: 120px; object-fit: contain; background: rgba(255,255,255,0.92); border-radius: 8px; padding: 3px 6px; }
+body.school-branded .primary-btn { background: var(--cm-primary, #2d6cdf) !important; border-color: var(--cm-primary, #2d6cdf) !important; }
+body.school-branded .student-avatar { border-color: var(--cm-accent, #C9A84C); }
+body.school-branded .live-msg-card { border-left-color: var(--cm-accent, #C9A84C); }
+body.school-branded .dash-nav-item.active { background: var(--cm-primary, #2d6cdf) !important; color: #fff !important; }

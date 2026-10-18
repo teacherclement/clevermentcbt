@@ -69,6 +69,7 @@
     </div>
 
     <!-- ===== LANDING PAGE ===== -->
+    <div id="schoolBrandBar" class="school-brand-bar" style="display:none;"></div>
     <div id="landingPage">
         <div style="text-align:center; padding:20px 0;">
             <h2 style="font-size:28px; margin-bottom:8px;">Welcome to CleverMent</h2>
@@ -447,6 +448,7 @@
                     <button title="Class Positions" class="dash-nav-item" data-target="positionsSection" onclick="showTeacherSection('positionsSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.7V17c0 .6-.5 1-1.1 1.2C7.800 18.700 7 20.200 7 22"/><path d="M14 14.7V17c0 .6.5 1 1.100 1.200C16.200 18.700 17 20.200 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg><span>Class Positions</span></button>
                     <button title="Student Progress" class="dash-nav-item" data-target="progressSection" onclick="showTeacherSection('progressSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.500 15.500 8.500 10.500 2 17"/><polyline points="16 7 22 7 22 13"/></svg><span>Student Progress</span></button>
                     <button title="Backup & Export" class="dash-nav-item" data-target="backupSection" onclick="showTeacherSection('backupSection', this); showLastBackupTime();"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Backup &amp; Export</span></button>
+                    <button title="My School" class="dash-nav-item" data-target="schoolSection" style="display:none;" onclick="showTeacherSection('schoolSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span>My School</span></button>
                 </nav>
             </aside>
             <div class="sidebar-backdrop" onclick="toggleDashSidebar('teacherDashboard')"></div>
@@ -821,6 +823,11 @@
             </div>
         </div>
 
+        <div class="dash-panel" id="schoolSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-top:0;">My School</h3>
+            <div id="schoolBox"></div>
+        </div>
+
         <div class="dash-panel" id="backupSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-top:0;">Backup &amp; Export</h3>
             <p class="helper-text">Keep a safe copy of your work. The full backup is one ZIP file containing:</p>
@@ -955,6 +962,7 @@
                     <button title="Manage FAQs" class="dash-nav-item" data-target="adminFaqSection" onclick="showAdminSection('adminFaqSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span>Manage FAQs</span></button>
                     <button title="Reactivation Fee" class="dash-nav-item" data-target="adminFeeSection" onclick="showAdminSection('adminFeeSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span>Reactivation Fee</span></button>
                     <button title="Security" class="dash-nav-item" data-target="adminSecuritySection" onclick="showAdminSection('adminSecuritySection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Security</span></button>
+                    <button title="Schools" class="dash-nav-item" data-target="adminSchoolsSection" onclick="showAdminSection('adminSchoolsSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg><span>Schools</span></button>
                     <button title="Activity Log" class="dash-nav-item" data-target="adminActivitySection" onclick="showAdminSection('adminActivitySection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Activity Log</span></button>
                 </nav>
             </aside>
@@ -982,6 +990,11 @@
             </div>                    <div id="cmHostAdminOverview" class="cm-host"></div>
 <p class="helper-text" style="margin-top:12px;">Platform-wide stats at a glance. Use the menu on the left to manage teachers, assessments, FAQs, and view all results.</p>
                 </div>
+        <div class="dash-panel" id="adminSchoolsSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-top:0;">Schools</h3>
+            <div id="adminSchoolsBox"></div>
+        </div>
+
         <div class="dash-panel" id="adminSecuritySection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-top:0;">Security</h3>
             <div id="adminSecurityBox"></div>

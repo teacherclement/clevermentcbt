@@ -3652,6 +3652,7 @@ async function deletePublishedAssessment(id) {
 // ============================================================
 
 function showAssessmentForm() {
+    cmLoadSchoolForAssessment(currentAssessmentCode);
     // Students who arrive through a shared link never pressed "I'm a Student", so the Welcome page
     // is still showing. Hide it for the whole assessment (it used to stay on screen until the end).
     var landing = document.getElementById('landingPage');
@@ -4948,6 +4949,7 @@ function studentInitials(name) {
 
 // Shows the student's picture beside their name, or a circle with their initials when there is no picture.
 function studentRenderAvatar() {
+    cmLoadSchoolForAssessment(currentAssessmentCode);
     var img = document.getElementById('studentAvatarImg');
     var ini = document.getElementById('studentAvatarInitials');
     if (!img || !ini) return;
@@ -5504,9 +5506,16 @@ function buildCertificateElement(data) {
     content.style.cssText = 'position:absolute; z-index:10; top:17mm; left:50%; transform:translateX(-50%); width:235mm; height:174mm; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;';
 
     var logo = document.createElement('img');
-    logo.src = 'logo.png';
+    logo.src = data.schoolLogo || (window.cmActiveSchool && window.cmActiveSchool.logo) || 'logo.png';
     logo.style.cssText = 'width:42mm; height:27mm; object-fit:contain; display:block; margin:0 0 2mm 0';
     content.appendChild(logo);
+    var certSchool = (window.cmActiveSchool && window.cmActiveSchool.name) || '';
+    if (certSchool) {
+        var schoolLine = document.createElement('div');
+        schoolLine.textContent = certSchool;
+        schoolLine.style.cssText = 'font-family:Georgia,serif; font-size:13pt; font-weight:bold; letter-spacing:1px; color:#444; margin:0 0 2mm 0;';
+        content.appendChild(schoolLine);
+    }
 
     var h1 = document.createElement('div');
     h1.textContent = 'CERTIFICATE';
@@ -5916,6 +5925,7 @@ async function attachPassMarks(results, isAdmin) {
 }
 
 async function renderTeacherDashboard() {
+    cmLoadMySchool();
     try { var pingToken = localStorage.getItem('cleverment_teacher_token'); if (pingToken) fetch(BACKEND_URL + '/api/teacher/ping', { method: 'POST', headers: { 'Authorization': 'Bearer ' + pingToken } }).catch(function() {}); } catch (e) {}
     loadTeacherProfile();
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
@@ -8737,6 +8747,8 @@ var CM_REFRESH_ACTIONS = {
     adminOverviewPanel: async function() { cmAdminCache.t = 0; await renderAdminDashboard(); },
     adminFeeSection: function() { return renderAdminReactivationFee(); },
     adminSecuritySection: function() { return loadAdminSecurity(); },
+    adminSchoolsSection: function() { return loadAdminSchools(); },
+    schoolSection: function() { return loadSchoolPanel(); },
     adminFaqSection: async function() { if (typeof loadFaqs === 'function') await loadFaqs(); return renderAdminFaqList(); },
     adminLiveSection: function() { return loadAdminLive(); },
     adminSelectTeacherSection: function() { return loadAdminTeacherWorkspaceOptions(); },
@@ -9478,6 +9490,242 @@ async function renderQuestionQuality(code) {
 }
 
 
+
+// ============================================================
+// SCHOOLS (branding, school panel, platform-admin schools page)
+// ============================================================
+var cmSchoolCache = {};
+
+function cmApplySchoolBrand(school) {
+    var bar = document.getElementById('schoolBrandBar');
+    if (!school) { cmClearSchoolBrand(); return; }
+    window.cmActiveSchool = school;
+    document.documentElement.style.setProperty('--cm-primary', school.primaryColor || '#2d6cdf');
+    document.documentElement.style.setProperty('--cm-accent', school.accentColor || '#C9A84C');
+    document.body.classList.add('school-branded');
+    if (bar) {
+        bar.innerHTML = (school.logo ? '<img src="' + school.logo + '" alt="">' : '') + '<span>' + escapeHtml(school.name) + '</span>';
+        bar.style.display = 'flex';
+    }
+}
+function cmClearSchoolBrand() {
+    window.cmActiveSchool = null;
+    document.documentElement.style.removeProperty('--cm-primary');
+    document.documentElement.style.removeProperty('--cm-accent');
+    document.body.classList.remove('school-branded');
+    var bar = document.getElementById('schoolBrandBar');
+    if (bar) { bar.style.display = 'none'; bar.innerHTML = ''; }
+}
+
+// Student side: the school of the teacher who published the assessment.
+async function cmLoadSchoolForAssessment(code) {
+    if (!code) return;
+    var key = 'a:' + String(code).toUpperCase();
+    if (cmSchoolCache.hasOwnProperty(key)) { cmApplySchoolBrand(cmSchoolCache[key]); return; }
+    try {
+        var res = await fetch(BACKEND_URL + '/api/school/for-assessment?code=' + encodeURIComponent(code));
+        var data = await res.json();
+        cmSchoolCache[key] = data.school || null;
+        cmApplySchoolBrand(cmSchoolCache[key]);
+    } catch (e) { /* branding is a bonus */ }
+}
+// Dedicated school link: https://your-site/?school=oakwood
+async function cmLoadSchoolBySlug(slug) {
+    if (!slug) return;
+    try {
+        var res = await fetch(BACKEND_URL + '/api/school/public?slug=' + encodeURIComponent(slug));
+        var data = await res.json();
+        if (data.school) {
+            try { sessionStorage.setItem('cm_school_slug', slug); } catch (e) {}
+            cmApplySchoolBrand(data.school);
+        }
+    } catch (e) {}
+}
+(function cmInitSchoolLink() {
+    var slug = '';
+    try { slug = new URLSearchParams(window.location.search).get('school') || ''; } catch (e) {}
+    if (!slug) { try { slug = sessionStorage.getItem('cm_school_slug') || ''; } catch (e) {} }
+    if (slug) cmLoadSchoolBySlug(slug);
+})();
+
+// Teacher side: my school (shows the School menu to school admins and heads).
+var cmMySchoolInfo = null;
+async function cmLoadMySchool() {
+    var token = localStorage.getItem('cleverment_teacher_token');
+    var nav = document.querySelector('#teacherDashboard [data-target="schoolSection"]');
+    if (nav) nav.style.display = 'none';
+    if (!token) return;
+    try {
+        var res = await fetch(BACKEND_URL + '/api/school/me', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (!res.ok) { cmMySchoolInfo = null; return; }
+        var d = await res.json();
+        cmMySchoolInfo = d.school ? d : null;
+        if (d.school) {
+            cmApplySchoolBrand(d.school);
+            if (nav && (d.role === 'admin' || d.role === 'head')) nav.style.display = '';
+        } else if (window.cmActiveSchool) {
+            cmClearSchoolBrand();
+        }
+    } catch (e) {}
+}
+
+function cmSchoolLink(slug) { return window.location.origin + window.location.pathname + '?school=' + encodeURIComponent(slug); }
+function cmCopyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function() { alert('Copied.'); }, function() { prompt('Copy this link:', text); });
+    else prompt('Copy this link:', text);
+}
+
+async function loadSchoolPanel() {
+    var box = document.getElementById('schoolBox');
+    if (!box) return;
+    var token = localStorage.getItem('cleverment_teacher_token');
+    box.innerHTML = '<p class="helper-text">Loading...</p>';
+    try {
+        var res = await fetch(BACKEND_URL + '/api/school/me', { headers: { 'Authorization': 'Bearer ' + token } });
+        var d = await res.json();
+        if (!res.ok || !d.school) { box.innerHTML = '<p class="helper-text">You are not part of a school.</p>'; return; }
+        cmMySchoolInfo = d;
+        var sc = d.school, isAdmin = d.role === 'admin';
+        var link = cmSchoolLink(sc.slug);
+        var html = '<div class="flag-box" style="border-color:#cfe1ff;"><h4 style="margin:0 0 6px;">' + escapeHtml(sc.name) + '</h4>' +
+            '<p class="helper-text" style="margin:0 0 6px;">Your role: <b>' + (isAdmin ? 'School admin' : 'Head teacher (view results)') + '</b></p>' +
+            '<p class="helper-text" style="margin:0 0 6px;">Link for your students (shows your school\'s name, logo and colours):</p>' +
+            '<p style="margin:0 0 8px; word-break:break-all; user-select:all;"><b>' + escapeHtml(link) + '</b></p>' +
+            '<button type="button" class="secondary-btn" onclick="cmCopyText(\'' + escapeHtml(link) + '\')">Copy link</button> ' +
+            '<button type="button" class="secondary-btn whatsapp-share-btn" onclick="window.open(\'https://wa.me/?text=\' + encodeURIComponent(\'Open ' + escapeHtml(sc.name).replace(/'/g, '') + ' on CleverMent: ' + escapeHtml(link) + '\'), \'_blank\')">Share on WhatsApp</button></div>';
+        if (isAdmin) {
+            html += '<div class="flag-box" style="border-color:#cfe1ff;"><h4 style="margin:0 0 8px;">Branding</h4>' +
+                '<label class="live-msg-label" for="schoolNameInput">School name</label><input id="schoolNameInput" class="form-input" value="' + escapeHtml(sc.name) + '">' +
+                '<div class="pos-selects" style="margin-top:8px;"><div><label class="live-msg-label" for="schoolPrimary">Main colour</label><input type="color" id="schoolPrimary" value="' + escapeHtml(sc.primaryColor) + '" style="width:100%;height:42px;"></div>' +
+                '<div><label class="live-msg-label" for="schoolAccent">Second colour</label><input type="color" id="schoolAccent" value="' + escapeHtml(sc.accentColor) + '" style="width:100%;height:42px;"></div></div>' +
+                '<label class="live-msg-label" for="schoolLogoFile" style="margin-top:8px;">Logo ' + (sc.logo ? '(a logo is saved; choose a file to replace it)' : '') + '</label><input type="file" id="schoolLogoFile" accept="image/*" class="form-input">' +
+                '<p id="schoolBrandStatus" class="helper-text" style="margin:8px 0 0;"></p>' +
+                '<button type="button" class="primary-btn" style="margin-top:8px;" onclick="saveSchoolBranding()">Save branding</button></div>';
+        }
+        html += '<div class="flag-box" style="border-color:#cfe1ff;"><h4 style="margin:0 0 8px;">Teachers (' + d.teachers.length + ')</h4>';
+        d.teachers.forEach(function(t) {
+            html += '<div class="prog-bar-row"><div class="prog-bar-label" style="flex-basis:70%;"><b>' + escapeHtml(t.name) + '</b> <span class="helper-text">' + escapeHtml(t.email) + ' &middot; ' + escapeHtml(t.role) + (t.lastLogin ? ' &middot; last login ' + escapeHtml(cmAgo(t.lastLogin)) : '') + '</span></div>' +
+                (isAdmin && t.role !== 'admin' ? '<button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;background:#dc3545;color:#fff;" data-email="' + escapeHtml(t.email) + '" onclick="removeSchoolTeacher(this.getAttribute(\'data-email\'))">Remove</button>' : '') + '</div>';
+        });
+        if (isAdmin) {
+            html += '<h4 style="margin:14px 0 6px;">Add a teacher</h4><p class="helper-text" style="margin:0 0 6px;">If they already have a CleverMent account, just enter their email. Otherwise also enter a name and a password (8+ characters) to create one.</p>' +
+                '<input id="schoolAddEmail" class="form-input" placeholder="Teacher email" style="margin-bottom:6px;"><input id="schoolAddName" class="form-input" placeholder="Name (new accounts only)" style="margin-bottom:6px;"><input id="schoolAddPass" type="text" class="form-input" placeholder="Password (new accounts only)" style="margin-bottom:6px;">' +
+                '<select id="schoolAddRole" class="form-input" style="margin-bottom:8px;"><option value="teacher">Teacher</option><option value="head">Head teacher (can view all school results)</option></select>' +
+                '<p id="schoolAddStatus" class="helper-text"></p><button type="button" class="primary-btn" onclick="addSchoolTeacher()">Add to school</button>';
+        }
+        html += '</div><div class="flag-box" style="border-color:#cfe1ff;"><h4 style="margin:0 0 6px;">School results</h4><div id="cmHostSchool" class="cm-host"></div></div>';
+        box.innerHTML = html;
+        // charts of the whole school's results
+        try {
+            var rr = await fetch(BACKEND_URL + '/api/school/results', { headers: { 'Authorization': 'Bearer ' + token } });
+            var rd = await rr.json();
+            var rows = (rd.results || []).map(normalizeResultRow);
+            var withMarks = await attachPassMarks(rows, true);
+            cmRenderChartPanel('cmHostSchool', withMarks.length ? cmResultSources(withMarks, { admin: true }) : []);
+        } catch (e) {}
+    } catch (e) {
+        box.innerHTML = '<p class="helper-text" style="color:#dc3545;">Could not load your school.</p>';
+    }
+}
+async function saveSchoolBranding() {
+    var token = localStorage.getItem('cleverment_teacher_token');
+    var st = document.getElementById('schoolBrandStatus');
+    var body = { name: document.getElementById('schoolNameInput').value, primaryColor: document.getElementById('schoolPrimary').value, accentColor: document.getElementById('schoolAccent').value };
+    var file = document.getElementById('schoolLogoFile').files[0];
+    try {
+        if (file) body.logo = await prepareSignatureImage(file);
+        st.textContent = 'Saving...';
+        var res = await fetch(BACKEND_URL + '/api/school/branding', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify(body) });
+        var d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not save.');
+        cmApplySchoolBrand(d.school);
+        st.textContent = 'Saved.';
+        loadSchoolPanel();
+    } catch (e) { st.style.color = '#dc3545'; st.textContent = e.message; }
+}
+async function addSchoolTeacher() {
+    var token = localStorage.getItem('cleverment_teacher_token');
+    var st = document.getElementById('schoolAddStatus');
+    st.style.color = '#6b7a8f'; st.textContent = 'Adding...';
+    try {
+        var res = await fetch(BACKEND_URL + '/api/school/teachers', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ email: document.getElementById('schoolAddEmail').value, name: document.getElementById('schoolAddName').value, password: document.getElementById('schoolAddPass').value, role: document.getElementById('schoolAddRole').value }) });
+        var d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not add.');
+        loadSchoolPanel();
+    } catch (e) { st.style.color = '#dc3545'; st.textContent = e.message; }
+}
+async function removeSchoolTeacher(email) {
+    if (!confirm('Remove ' + email + ' from the school? Their account and results stay; they become an independent teacher.')) return;
+    var token = localStorage.getItem('cleverment_teacher_token');
+    try { await fetch(BACKEND_URL + '/api/school/teachers/remove', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ email: email }) }); } catch (e) {}
+    loadSchoolPanel();
+}
+
+// ---------- platform admin ----------
+async function loadAdminSchools() {
+    var box = document.getElementById('adminSchoolsBox');
+    if (!box) return;
+    var token = localStorage.getItem('cleverment_admin_token');
+    try {
+        var res = await fetch(BACKEND_URL + '/api/admin/schools', { headers: { 'Authorization': 'Bearer ' + token } });
+        var d = await res.json();
+        var html = '<div class="flag-box" style="border-color:#cfe1ff;"><h4 style="margin:0 0 8px;">Create a school</h4>' + (d.setupNeeded ? '<p class="helper-text" style="color:#b4232f;">Run supabase_schools.sql in Supabase first.</p>' : '') +
+            '<input id="newSchoolName" class="form-input" placeholder="School name" style="margin-bottom:6px;"><input id="newSchoolSlug" class="form-input" placeholder="Link name, e.g. oakwood (letters and numbers)" style="margin-bottom:6px;">' +
+            '<div class="pos-selects"><div><label class="live-msg-label">Main colour</label><input type="color" id="newSchoolPrimary" value="#2d6cdf" style="width:100%;height:42px;"></div><div><label class="live-msg-label">Second colour</label><input type="color" id="newSchoolAccent" value="#C9A84C" style="width:100%;height:42px;"></div></div>' +
+            '<label class="live-msg-label" style="margin-top:8px;">Logo (optional)</label><input type="file" id="newSchoolLogo" accept="image/*" class="form-input">' +
+            '<h4 style="margin:12px 0 6px;">School admin</h4><input id="newSchoolAdminEmail" class="form-input" placeholder="School admin email" style="margin-bottom:6px;"><input id="newSchoolAdminName" class="form-input" placeholder="Name (if a new account)" style="margin-bottom:6px;"><input id="newSchoolAdminPass" class="form-input" placeholder="Password (new accounts, 8+ characters)" style="margin-bottom:8px;">' +
+            '<p id="newSchoolStatus" class="helper-text"></p><button type="button" class="primary-btn" onclick="createSchoolAdminPanel()">Create school</button></div>';
+        (d.schools || []).forEach(function(sc) {
+            html += '<div class="flag-box" style="border-color:' + (sc.active ? '#cfe1ff' : '#f3b5ba') + ';">' +
+                '<div style="display:flex;align-items:center;gap:10px;">' + (sc.logo ? '<img src="' + sc.logo + '" alt="" style="height:38px;max-width:90px;object-fit:contain;">' : '') + '<h4 style="margin:0;flex:1;">' + escapeHtml(sc.name) + (sc.active ? '' : ' <span style="color:#b4232f;">(inactive)</span>') + '</h4>' +
+                '<span style="width:18px;height:18px;border-radius:50%;background:' + escapeHtml(sc.primaryColor) + ';display:inline-block;"></span><span style="width:18px;height:18px;border-radius:50%;background:' + escapeHtml(sc.accentColor) + ';display:inline-block;"></span></div>' +
+                '<p class="helper-text" style="margin:6px 0; word-break:break-all;">Student link: <b>' + escapeHtml(cmSchoolLink(sc.slug)) + '</b></p>' +
+                '<p class="helper-text" style="margin:0 0 6px;">' + sc.members.map(function(m) { return escapeHtml(m.name) + ' (' + escapeHtml(m.role) + ')'; }).join(', ') + '</p>' +
+                '<button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;" onclick="toggleSchoolActive(' + sc.id + ',' + (sc.active ? 'false' : 'true') + ')">' + (sc.active ? 'Deactivate' : 'Activate') + '</button> ' +
+                '<button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;" onclick="addSchoolMemberAdmin(' + sc.id + ')">Add teacher</button></div>';
+        });
+        box.innerHTML = html;
+    } catch (e) { box.innerHTML = '<p class="helper-text" style="color:#dc3545;">Could not load schools.</p>'; }
+}
+async function createSchoolAdminPanel() {
+    var token = localStorage.getItem('cleverment_admin_token'), st = document.getElementById('newSchoolStatus');
+    var body = { name: document.getElementById('newSchoolName').value, slug: document.getElementById('newSchoolSlug').value, primaryColor: document.getElementById('newSchoolPrimary').value, accentColor: document.getElementById('newSchoolAccent').value,
+        adminEmail: document.getElementById('newSchoolAdminEmail').value, adminName: document.getElementById('newSchoolAdminName').value, adminPassword: document.getElementById('newSchoolAdminPass').value };
+    try {
+        var f = document.getElementById('newSchoolLogo').files[0];
+        if (f) body.logo = await prepareSignatureImage(f);
+        st.style.color = '#6b7a8f'; st.textContent = 'Creating...';
+        var res = await fetch(BACKEND_URL + '/api/admin/schools', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify(body) });
+        var d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not create the school.');
+        loadAdminSchools();
+    } catch (e) { st.style.color = '#dc3545'; st.textContent = e.message; }
+}
+async function toggleSchoolActive(id, active) {
+    var token = localStorage.getItem('cleverment_admin_token');
+    try { await fetch(BACKEND_URL + '/api/admin/schools/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ active: active }) }); } catch (e) {}
+    loadAdminSchools();
+}
+async function addSchoolMemberAdmin(id) {
+    var email = prompt('Teacher email:'); if (!email) return;
+    var role = (prompt('Role: type teacher, head or admin', 'teacher') || 'teacher').trim().toLowerCase();
+    var name = '', pass = '';
+    var token = localStorage.getItem('cleverment_admin_token');
+    async function send() {
+        var res = await fetch(BACKEND_URL + '/api/admin/schools/' + id + '/members', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ email: email, role: role, name: name, password: pass }) });
+        return { ok: res.ok, d: await res.json() };
+    }
+    var r = await send();
+    if (!r.ok && /no CleverMent account/.test(r.d.error || '')) {
+        name = prompt('New account. Teacher name:') || ''; pass = prompt('Password (8+ characters):') || '';
+        r = await send();
+    }
+    if (!r.ok) alert(r.d.error || 'Could not add.');
+    loadAdminSchools();
+}
+
+
 function showTeacherSection(panelId, btn) {
     showDashSection('teacherDashboard', panelId, btn);
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
@@ -9488,6 +9736,9 @@ function showTeacherSection(panelId, btn) {
     }
     if (panelId === 'positionsSection') {
         initPositionsPanel();
+    }
+    if (panelId === 'schoolSection') {
+        loadSchoolPanel();
     }
     if (panelId === 'progressSection') {
         initProgressPanel();
@@ -9504,6 +9755,7 @@ function showAdminSection(panelId, btn) {
     if (panelId === 'adminAccessLogsSection') loadAdminAccessLogs();
     cmAdminPanelOpened(panelId);
     if (panelId === 'adminSecuritySection') loadAdminSecurity();
+    if (panelId === 'adminSchoolsSection') loadAdminSchools();
     if (panelId === 'adminLiveSection') startAdminLivePolling();
     else stopAdminLivePolling();
 }
