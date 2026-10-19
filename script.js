@@ -739,10 +739,8 @@ function setSelectValueEnsuringOption(selectEl, value, label) {
 // Puts every saved publish setting back into the publish form.
 function applyTeacherPublishSettings(st) {
     if (!st) return;
-    var timer = document.getElementById('teacherTimerSelect');
-    if (timer && st.timeLimit !== undefined && st.timeLimit !== null) {
-        var minutes = Math.round(Number(st.timeLimit) / 60);
-        setSelectValueEnsuringOption(timer, minutes, minutes === 0 ? 'No time limit' : (minutes + ' minutes'));
+    if (document.getElementById('teacherTimerSelect') && st.timeLimit !== undefined && st.timeLimit !== null) {
+        cmTpSet('teacherTimerSelect', Math.round(Number(st.timeLimit) / 60));
     }
     var pass = document.getElementById('teacherPassMark');
     if (pass && st.passMark !== undefined && st.passMark !== null) pass.value = st.passMark;
@@ -2390,21 +2388,6 @@ function renderAssessmentEditorSettings(a) {
     if (!box) return;
 
     var minutes = Math.round((Number(a.timeLimit) || 0) / 60);
-    var timeSrc = document.getElementById('teacherTimerSelect');
-    var timeHtml = '';
-    var timeFound = false;
-    if (timeSrc) {
-        for (var i = 0; i < timeSrc.options.length; i++) {
-            var o = timeSrc.options[i];
-            var isSel = Number(o.value) === minutes;
-            if (isSel) timeFound = true;
-            timeHtml += '<option value="' + o.value + '"' + (isSel ? ' selected' : '') + '>' + escapeAssessmentEditorHtml(o.textContent) + '</option>';
-        }
-    }
-    if (!timeFound) {
-        timeHtml = '<option value="' + minutes + '" selected>' + minutes + ' minutes</option>' + timeHtml;
-    }
-
     function toggle(id, label, desc, checked) {
         return '<label class="assessment-settings-toggle" for="' + id + '">' +
             '<span>' + label + (desc ? '<br><span style="font-weight:400; color:#6b7a8f; font-size:12px;">' + desc + '</span>' : '') + '</span>' +
@@ -2425,7 +2408,7 @@ function renderAssessmentEditorSettings(a) {
                 '<div><label for="aeCertName">Teacher\'s name on certificate</label>' +
                     '<input id="aeCertName" class="form-input" value="' + escapeAssessmentEditorHtml(a.teacherName || '') + '"></div>' +
                 '<div><label for="aeTime">Time limit</label>' +
-                    '<select id="aeTime" class="form-input">' + timeHtml + '</select></div>' +
+                    cmTimePickerHtml('aeTime') + '</div>' +
                 '<div><label for="aePassMark">Pass mark (%)</label>' +
                     '<input id="aePassMark" type="number" min="0" max="100" class="form-input" value="' + (a.passMark !== undefined && a.passMark !== null ? a.passMark : 50) + '"></div>' +
                 '<div><label for="aeQuestionLimit">Questions per student (0 = all)</label>' +
@@ -2441,6 +2424,7 @@ function renderAssessmentEditorSettings(a) {
             '</div>' +
         '</div>';
     box.style.display = 'block';
+    cmTpInit('aeTime', minutes);
 }
 
 // Reads the settings panel. Returns { error } or { settings }.
@@ -4263,6 +4247,43 @@ function showProctorWarningScreen() {
     btn.textContent = 'I UNDERSTAND, START ASSESSMENT';
 }
 
+// Asks for the camera and/or microphone ONE AT A TIME so we can tell the student exactly which one was refused.
+async function cmRequestProctorMedia(needsCamera, needsAudio) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        var u = new Error('unsupported'); u.cmWhich = 'browser'; throw u;
+    }
+    var tracks = [];
+    try {
+        if (needsCamera) {
+            try {
+                var vs = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+                tracks = tracks.concat(vs.getTracks());
+            } catch (e1) { e1.cmWhich = 'camera'; throw e1; }
+        }
+        if (needsAudio) {
+            try {
+                var as = await navigator.mediaDevices.getUserMedia({ audio: true });
+                tracks = tracks.concat(as.getTracks());
+            } catch (e2) { e2.cmWhich = 'microphone'; throw e2; }
+        }
+    } catch (err) {
+        tracks.forEach(function(t) { try { t.stop(); } catch (x) {} });
+        throw err;
+    }
+    return new MediaStream(tracks);
+}
+
+function cmProctorErrorText(e) {
+    var which = (e && e.cmWhich) || 'camera or microphone';
+    var name = (e && e.name) || '';
+    var head = 'This assessment cannot be opened. ';
+    if (which === 'browser') return head + 'Your browser cannot use the camera/microphone here. Open CleverMent in Chrome (Android) or Safari (iPhone) and make sure the page address starts with https.';
+    if (which === 'detector') return head + 'The camera check could not load. Check that your phone has internet, then tap Try again.';
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return head + 'No ' + which + ' was found on this device. This assessment needs a working ' + which + '.';
+    if (name === 'NotReadableError' || name === 'TrackStartError') return head + 'Your ' + which + ' is being used by another app. Close the other app, then tap Try again.';
+    return head + 'You did not allow access to your ' + which + '. Your teacher turned on live monitoring for this assessment, so ' + which + ' access is required. To fix this: tap the lock or settings icon next to the web address, set ' + which + ' to Allow for this site, then tap Try again. If it still fails, reload the page.';
+}
+
 async function dismissProctorWarningAndBegin() {
     var btn = document.getElementById('proctorUnderstandBtn');
     var errorBox = document.getElementById('proctorPermissionError');
@@ -4276,30 +4297,38 @@ async function dismissProctorWarningAndBegin() {
     try {
         if (needsCamera) {
             btn.textContent = 'Loading face detector...';
-            await loadFaceApiIfNeeded();
+            try { await loadFaceApiIfNeeded(); } catch (fe) { fe.cmWhich = 'detector'; throw fe; }
         }
 
-        var constraints = {};
-        if (needsCamera) constraints.video = { width: 320, height: 240 };
-        if (needsAudio) constraints.audio = true;
-
         btn.textContent = 'Requesting camera/mic access...';
-        proctorMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        proctorMediaStream = await cmRequestProctorMedia(needsCamera, needsAudio);
 
         document.getElementById('proctorWarningScreen').style.display = 'none';
         proceedToStartQuiz();
     } catch (e) {
         console.error('Proctor setup failed:', e);
-        errorBox.textContent = 'Camera/microphone access is required for this assessment. Please allow access when prompted, then try again. (' + (e.message || 'Permission denied') + ')';
+        errorBox.textContent = cmProctorErrorText(e);
         errorBox.style.display = 'block';
         btn.disabled = false;
-        btn.textContent = 'I UNDERSTAND, START ASSESSMENT';
+        btn.textContent = 'TRY AGAIN';
+        try { errorBox.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (x) {}
     }
 }
 
 function startProctorMonitoring() {
     proctorConsecutiveNoFace = 0;
     proctorConsecutiveLoudNoise = 0;
+    if (proctorMediaStream) {
+        proctorMediaStream.getTracks().forEach(function(t) {
+            t.onended = function() {
+                var ov = document.getElementById('proctorResumeOverlay');
+                if (ov && !studentIsTimeUp) {
+                    var b = document.getElementById('proctorResumeBtn'); if (b) { b.disabled = false; b.textContent = 'Allow access & Continue'; }
+                    ov.style.display = 'flex';
+                }
+            };
+        });
+    }
 
     if (currentAssessment.cameraMonitoring && proctorMediaStream) {
         var previewVideo = document.getElementById('proctorCameraPreview');
@@ -4438,17 +4467,12 @@ async function resumeProctorMonitoringAfterRefresh() {
     var needsAudio = currentAssessment.noiseMonitoring;
 
     try {
-        if (needsCamera) await loadFaceApiIfNeeded();
-
-        var constraints = {};
-        if (needsCamera) constraints.video = { width: 320, height: 240 };
-        if (needsAudio) constraints.audio = true;
-
-        proctorMediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (needsCamera) { try { await loadFaceApiIfNeeded(); } catch (fe) { fe.cmWhich = 'detector'; throw fe; } }
+        proctorMediaStream = await cmRequestProctorMedia(needsCamera, needsAudio);
         document.getElementById('proctorResumeOverlay').style.display = 'none';
         startProctorMonitoring();
     } catch (e) {
-        alert('Camera/microphone access is required to continue this assessment. Please allow access and try again.');
+        alert(cmProctorErrorText(e).replace('This assessment cannot be opened. ', 'You cannot continue this assessment. '));
         btn.disabled = false;
         btn.textContent = 'Resume Monitoring & Continue';
     }
@@ -8848,6 +8872,7 @@ var CM_REFRESH_ACTIONS = {
     adminSchoolsSection: function() { return loadAdminSchools(); },
     schoolSection: function() { return loadSchoolPanel(); },
     adminOptionsSection: function() { return loadAdminOptions(); },
+    adminAnnounceSection: function() { return loadAdminAnnouncements(); },
     adminFaqSection: async function() { if (typeof loadFaqs === 'function') await loadFaqs(); return renderAdminFaqList(); },
     adminLiveSection: function() { return loadAdminLive(); },
     adminSelectTeacherSection: function() { return loadAdminTeacherWorkspaceOptions(); },
@@ -10033,6 +10058,7 @@ async function loadStudentAssessments() {
         renderStudentTodo(saTodo);
         renderStudentClosed(saClosed);
         studentMsgBadge();
+        cmShowAnnouncements('students', 'saAnnounce');
         renderStudentDone(saDone);
         document.getElementById('saPanelHome').innerHTML =
             '<h2 style="margin:0 0 6px;color:#172033;">Your learning overview</h2>' +
@@ -10300,6 +10326,7 @@ function exportStudentPinsCsv() {
 
 function showTeacherSection(panelId, btn) {
     showDashSection('teacherDashboard', panelId, btn);
+    if (typeof cmShowAnnouncements === 'function') { cmShowAnnouncements('teachers', 'teacherAnnounce'); teacherMsgBadge(); }
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
         loadTeacherAnalytics();
     }
@@ -10316,6 +10343,7 @@ function showTeacherSection(panelId, btn) {
         initProgressPanel();
     }
     if (panelId === 'messagesSection') teacherMsgInit();
+    if (panelId === 'insightsSection') insightsInit();
     if (panelId === 'liveSection') {
         startTeacherLivePolling();
     } else {
@@ -11720,6 +11748,7 @@ async function studentMsgBadge() {
         var b = document.querySelector('.sa-nav button[data-p="messages"] span');
         if (!b) return;
         b.innerHTML = 'Messages' + (d.unread ? '<span class="cm-dot">' + d.unread + '</span>' : '');
+        studentMsgBar(d.unread || 0);
     } catch (e) {}
 }
 async function studentMsgLoad() {
@@ -11928,4 +11957,236 @@ async function adminOptionDelete(kind, value) {
         alert('Removed. It will disappear from the drop-downs the next time a page is opened.');
         await loadAdminOptions();
     } catch (e) { alert(e.message); }
+}
+
+// ============================================================
+// TIME LIMIT PICKER: two rollers (hours, minutes). Minimum 1 minute.
+// ============================================================
+var CM_TP_ROW = 44;
+function cmTpItems(max) { var h = ''; for (var i = 0; i <= max; i++) h += '<div class="cm-roll-item" data-v="' + i + '">' + (i < 10 ? '0' + i : i) + '</div>'; return h; }
+function cmTimePickerHtml(id) {
+    return '<div class="cm-tp" id="' + id + 'Box"><label class="cm-tp-none"><input type="checkbox" id="' + id + 'None" onchange="cmTpNoneChanged(\'' + id + '\')"> No time limit</label>' +
+        '<div class="cm-tp-rollers"><div class="cm-tp-col"><div class="cm-roll" data-kind="h">' + cmTpItems(23) + '</div><span class="cm-tp-unit">h</span></div>' +
+        '<div class="cm-tp-col"><div class="cm-roll" data-kind="m">' + cmTpItems(59) + '</div><span class="cm-tp-unit">m</span></div><div class="cm-tp-band"></div></div>' +
+        '<input type="hidden" id="' + id + '" value="10"></div>';
+}
+function cmTpRolls(id) { var box = document.getElementById(id + 'Box'); return box ? box.querySelectorAll('.cm-roll') : []; }
+function cmTpRead(id) {
+    var r = cmTpRolls(id); if (r.length < 2) return 0;
+    var h = Math.round(r[0].scrollTop / CM_TP_ROW), m = Math.round(r[1].scrollTop / CM_TP_ROW);
+    return Math.max(0, Math.min(23, h)) * 60 + Math.max(0, Math.min(59, m));
+}
+function cmTpPaint(id) {
+    var r = cmTpRolls(id);
+    Array.prototype.forEach.call(r, function(roll) {
+        var idx = Math.round(roll.scrollTop / CM_TP_ROW);
+        Array.prototype.forEach.call(roll.children, function(c, i) { c.classList.toggle('on', i === idx); });
+    });
+}
+function cmTpScrollTo(id, minutes) {
+    var r = cmTpRolls(id); if (r.length < 2) return;
+    r[0].scrollTop = Math.floor(minutes / 60) * CM_TP_ROW;
+    r[1].scrollTop = (minutes % 60) * CM_TP_ROW;
+    cmTpPaint(id);
+}
+function cmTpStore(id) {
+    var none = document.getElementById(id + 'None').checked, hid = document.getElementById(id);
+    var total = cmTpRead(id);
+    if (!none && total < 1) { total = 1; cmTpScrollTo(id, 1); }   // never less than 1 minute
+    hid.value = none ? '0' : String(total);
+    cmTpPaint(id);
+}
+function cmTpNoneChanged(id) {
+    var none = document.getElementById(id + 'None').checked;
+    var box = document.getElementById(id + 'Box'); if (box) box.classList.toggle('off', none);
+    if (!none && Number(document.getElementById(id).value) < 1) cmTpScrollTo(id, 10);
+    cmTpStore(id);
+}
+function cmTpSet(id, minutes) {
+    var hid = document.getElementById(id); if (!hid) return;
+    minutes = Math.max(0, Math.round(Number(minutes) || 0));
+    var none = document.getElementById(id + 'None'); none.checked = minutes === 0;
+    document.getElementById(id + 'Box').classList.toggle('off', minutes === 0);
+    hid.value = String(minutes);
+    hid.setAttribute('data-want', String(minutes === 0 ? 10 : minutes));
+    cmTpScrollTo(id, minutes === 0 ? 10 : minutes);
+}
+function cmTpInit(id, minutes) {
+    var box = document.getElementById(id + 'Box'); if (!box) return;
+    var timers = {};
+    Array.prototype.forEach.call(cmTpRolls(id), function(roll) {
+        roll.addEventListener('scroll', function() {
+            clearTimeout(timers[roll.getAttribute('data-kind')]);
+            timers[roll.getAttribute('data-kind')] = setTimeout(function() { cmTpStore(id); }, 120);
+        });
+    });
+    // when the picker becomes visible (it starts inside a hidden tab), put the rollers on the saved value
+    if (window.ResizeObserver) {
+        new ResizeObserver(function() {
+            var hid = document.getElementById(id); if (!hid || !box.offsetParent) return;
+            var want = Number(hid.value) === 0 ? Number(hid.getAttribute('data-want') || 10) : Number(hid.value);
+            var r = cmTpRolls(id);
+            if (r.length && (Math.round(r[0].scrollTop / CM_TP_ROW) * 60 + Math.round(r[1].scrollTop / CM_TP_ROW)) !== want) cmTpScrollTo(id, want);
+        }).observe(box);
+    }
+    cmTpSet(id, minutes);
+}
+(function mountPublishTimer() {
+    var host = document.getElementById('teacherTimerHost');
+    if (!host) return;
+    host.innerHTML = cmTimePickerHtml('teacherTimerSelect');
+    cmTpInit('teacherTimerSelect', 10);
+})();
+
+
+// ============================================================
+// "YOU HAVE A NEW MESSAGE" BARS (student and teacher)
+// ============================================================
+function studentMsgBar(n) {
+    var bar = document.getElementById('saNewMsgBar'); if (!bar) return;
+    var onMsgs = document.getElementById('saPanelMessages') && document.getElementById('saPanelMessages').style.display === 'block';
+    bar.style.display = (n > 0 && !onMsgs) ? 'flex' : 'none';
+    var t = bar.querySelector('span'); if (t) t.textContent = n > 1 ? 'You have ' + n + ' new messages. Tap to read.' : 'You have a new message. Tap to read.';
+}
+setInterval(function() {
+    var area = document.getElementById('studentAreaPage');
+    if (area && area.style.display !== 'none' && localStorage.getItem('cleverment_student_token') && !document.hidden) studentMsgBadge();
+}, 45000);
+
+async function teacherMsgBadge() {
+    var dash = document.getElementById('teacherDashboard');
+    var bar = document.getElementById('teacherNewMsgBar');
+    if (!dash || !bar || dash.style.display === 'none' || !localStorage.getItem('cleverment_teacher_token')) return;
+    try {
+        var r = await fetch(BACKEND_URL + '/api/teacher/messages/unread', { headers: tmAuth() });
+        var d = await r.json();
+        var n = d.unread || 0;
+        var onMsgs = document.getElementById('messagesSection') && document.getElementById('messagesSection').classList.contains('active');
+        bar.style.display = (n > 0 && !onMsgs) ? 'flex' : 'none';
+        var t = bar.querySelector('span');
+        if (t) t.textContent = n > 1 ? 'You have ' + n + ' new messages from students. Tap to read.' : 'You have a new message from a student. Tap to read.';
+    } catch (e) {}
+}
+function teacherOpenMessages() {
+    var btn = document.querySelector('#teacherDashboard .dash-nav-item[data-target="messagesSection"]');
+    showTeacherSection('messagesSection', btn);
+    var bar = document.getElementById('teacherNewMsgBar'); if (bar) bar.style.display = 'none';
+}
+setInterval(function() { if (!document.hidden) teacherMsgBadge(); }, 45000);
+setTimeout(teacherMsgBadge, 2500);
+
+
+// ============================================================
+// ANNOUNCEMENTS (admin posts, teachers and students see them)
+// ============================================================
+async function cmShowAnnouncements(audience, hostId) {
+    var host = document.getElementById(hostId); if (!host) return;
+    try {
+        var r = await fetch(BACKEND_URL + '/api/announcements?audience=' + audience);
+        var d = await r.json();
+        var hidden = {}; try { hidden = JSON.parse(sessionStorage.getItem('cm_ann_hidden') || '{}'); } catch (e) {}
+        host.innerHTML = (d.announcements || []).filter(function(a) { return !hidden[a.id]; }).map(function(a) {
+            return '<div class="cm-announce">&#128226; <span>' + escapeHtml(a.message) + '</span><button type="button" aria-label="Dismiss" onclick="cmHideAnnouncement(' + a.id + ', this)">&times;</button></div>';
+        }).join('');
+    } catch (e) {}
+}
+function cmHideAnnouncement(id, btn) {
+    var h = {}; try { h = JSON.parse(sessionStorage.getItem('cm_ann_hidden') || '{}'); } catch (e) {}
+    h[id] = true; sessionStorage.setItem('cm_ann_hidden', JSON.stringify(h));
+    if (btn && btn.parentNode) btn.parentNode.remove();
+}
+async function loadAdminAnnouncements() {
+    var el = document.getElementById('annList'); if (!el) return;
+    el.innerHTML = '<p class="helper-text">Loading...</p>';
+    try {
+        var r = await fetch(BACKEND_URL + '/api/admin/announcements', { headers: adminAuthJson() });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load.');
+        if (d.setupNeeded) { el.innerHTML = '<p class="helper-text" style="color:#b4232f;">Run supabase_announcements.sql in Supabase first.</p>'; return; }
+        var names = { all: 'Teachers and students', teachers: 'Teachers', students: 'Students' };
+        el.innerHTML = (d.announcements || []).length ? d.announcements.map(function(a) {
+            return '<div class="cm-trow"><div style="flex:1;"><div>' + escapeHtml(a.message) + '</div><div class="helper-text">' + escapeHtml(names[a.audience] || a.audience) + ' · ' + escapeHtml(new Date(a.created_at).toLocaleDateString()) + '</div></div><button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;" onclick="adminAnnounceDelete(' + a.id + ')">Remove</button></div>';
+        }).join('') : '<p class="helper-text">No announcements yet.</p>';
+    } catch (e) { el.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message) + '</p>'; }
+}
+async function adminAnnounceAdd() {
+    var t = (document.getElementById('annText').value || '').trim();
+    if (!t) { alert('Type the announcement first.'); return; }
+    try {
+        var r = await fetch(BACKEND_URL + '/api/admin/announcements', { method: 'POST', headers: adminAuthJson(), body: JSON.stringify({ message: t, audience: document.getElementById('annAudience').value }) });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not post.');
+        document.getElementById('annText').value = '';
+        loadAdminAnnouncements();
+    } catch (e) { alert(e.message); }
+}
+async function adminAnnounceDelete(id) {
+    if (!confirm('Remove this announcement?')) return;
+    try {
+        await fetch(BACKEND_URL + '/api/admin/announcements/delete', { method: 'POST', headers: adminAuthJson(), body: JSON.stringify({ id: id }) });
+        loadAdminAnnouncements();
+    } catch (e) { alert('Could not remove it.'); }
+}
+setTimeout(function() { if (document.getElementById('teacherDashboard') && document.getElementById('teacherDashboard').style.display !== 'none') cmShowAnnouncements('teachers', 'teacherAnnounce'); }, 3000);
+setInterval(function() {
+    if (document.hidden) return;
+    var t = document.getElementById('teacherDashboard'), a = document.getElementById('studentAreaPage');
+    if (t && t.style.display !== 'none') cmShowAnnouncements('teachers', 'teacherAnnounce');
+    if (a && a.style.display !== 'none') cmShowAnnouncements('students', 'saAnnounce');
+}, 120000);
+
+// ============================================================
+// TEACHER INSIGHTS
+// ============================================================
+async function insightsInit() {
+    var cs = document.getElementById('insClassSelect'), src = document.getElementById('rosterClassSelect');
+    if (cs && src && !cs.options.length) cs.innerHTML = src.innerHTML;
+    var as = document.getElementById('insAssessSelect');
+    try {
+        var list = await getTeacherAssessmentsFromBackend();
+        as.innerHTML = '<option value="">-- Choose an assessment --</option>' + (list || []).map(function(a) {
+            return '<option value="' + escapeHtml(a.code) + '">' + escapeHtml(a.subject) + ' · ' + escapeHtml(a.className || '') + ' (' + escapeHtml(a.code) + ')</option>';
+        }).join('');
+    } catch (e) {}
+}
+async function insightsLoadQuestions() {
+    var code = document.getElementById('insAssessSelect').value, el = document.getElementById('insQuestions');
+    if (!code) { el.innerHTML = ''; return; }
+    el.innerHTML = '<p class="helper-text">Analysing...</p>';
+    try {
+        var r = await fetch(BACKEND_URL + '/api/teacher/insights/questions?code=' + encodeURIComponent(code), { headers: tmAuth() });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load.');
+        if (!d.questions.length) { el.innerHTML = '<p class="helper-text">No question details yet. Results appear after students submit.</p>'; return; }
+        el.innerHTML = '<p class="helper-text">Based on ' + d.students + ' submission(s). Hardest first.</p>' + d.questions.map(function(q) {
+            var col = q.correctPct < 40 ? '#dc3545' : (q.correctPct < 70 ? '#e0a100' : '#2d9c5c');
+            return '<div class="cm-flash" style="margin:8px 0;padding:12px;"><div style="display:flex;justify-content:space-between;gap:8px;"><b style="color:' + col + ';">' + q.correctPct + '% correct</b><span class="helper-text">' + q.attempts + ' answered</span></div><div style="margin:6px 0;">' + q.question + '</div>' +
+                (q.commonWrong ? '<div class="helper-text">Most common wrong answer: <b>' + escapeHtml(q.commonWrong) + '</b> (' + q.commonWrongCount + ')</div>' : '') + '</div>';
+        }).join('');
+        if (typeof renderMathIn === 'function') renderMathIn(el);
+    } catch (e) { el.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message) + '</p>'; }
+}
+async function insightsLoadAttention() {
+    var cls = document.getElementById('insClassSelect').value, el = document.getElementById('insAttention');
+    if (!cls) { el.innerHTML = ''; return; }
+    el.innerHTML = '<p class="helper-text">Loading...</p>';
+    try {
+        var r = await fetch(BACKEND_URL + '/api/teacher/insights/attention?className=' + encodeURIComponent(cls), { headers: tmAuth() });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load.');
+        if (!d.students.length) { el.innerHTML = '<p class="helper-text">Great news: no student in this class needs attention right now (' + d.total + ' on the roster).</p>'; return; }
+        el.innerHTML = d.students.map(function(s) {
+            var info = s.taken === 0 ? 'No assessment taken yet' : 'Average ' + s.average + '% over ' + s.taken + ' assessment(s)';
+            return '<div class="cm-trow"><div style="flex:1;min-width:0;"><b>' + escapeHtml(s.name) + '</b><div class="helper-text">' + escapeHtml(info) + '</div></div><button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;" data-adm="' + escapeHtml(s.admissionNumber) + '" onclick="insightsMessage(this.getAttribute(\'data-adm\'))">Message</button></div>';
+        }).join('');
+    } catch (e) { el.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message) + '</p>'; }
+}
+async function insightsMessage(adm) {
+    var cls = document.getElementById('insClassSelect').value;
+    var btn = document.querySelector('#teacherDashboard .dash-nav-item[data-target="messagesSection"]');
+    showTeacherSection('messagesSection', btn);
+    var sel = document.getElementById('msgClassSelect');
+    sel.value = cls;
+    await teacherMsgLoadStudents();
+    teacherMsgOpen(adm);
 }
