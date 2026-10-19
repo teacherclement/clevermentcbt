@@ -9883,6 +9883,11 @@ function studentAreaShow(p) {
     document.querySelectorAll('.sa-nav button').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-p') === p); });
 }
 
+function studentSidebarToggle() {
+    var page = document.getElementById('studentAreaPage');
+    if (page) page.classList.toggle('sa-sidebar-collapsed');
+}
+
 function renderStudentProfile(me) {
     var box = document.getElementById('saProfile');
     var ini = String(me.name || '?').split(/\s+/).filter(Boolean).map(function(w) { return w.charAt(0); }).slice(0, 2).join('').toUpperCase();
@@ -9920,10 +9925,14 @@ async function loadStudentAssessments() {
         renderStudentTodo(saTodo);
         renderStudentDone(saDone);
         document.getElementById('saPanelHome').innerHTML =
-            '<h3 style="margin:0 0 8px;">Welcome</h3>' +
-            '<p style="margin:0 0 6px;"><b>' + saTodo.length + '</b> assessment' + (saTodo.length === 1 ? '' : 's') + ' to do.</p>' +
-            '<p style="margin:0;"><b>' + saDone.length + '</b> assessment' + (saDone.length === 1 ? '' : 's') + ' done.</p>' +
-            '<p class="helper-text" style="margin:10px 0 0;">Tap <b>To do</b> to start an assessment, or <b>Done</b> to see your results.</p>';
+            '<h2 style="margin:0 0 6px;color:#172033;">Your learning overview</h2>' +
+            '<p class="helper-text" style="margin:0 0 18px;">Keep track of assessments assigned to you and review your completed work.</p>' +
+            '<div class="sa-summary-grid">' +
+            '<div class="sa-summary-card"><span>Available assessments</span><strong>' + saTodo.length + '</strong><button type="button" class="secondary-btn" onclick="studentAreaShow(\'todo\')">View assessments</button></div>' +
+            '<div class="sa-summary-card"><span>Completed assessments</span><strong>' + saDone.length + '</strong><button type="button" class="secondary-btn" onclick="studentAreaShow(\'done\')">View history</button></div>' +
+            '<div class="sa-summary-card"><span>Learning tip</span><strong style="font-size:18px;">Be prepared</strong><p class="helper-text">Check the time limit and instructions before starting each assessment.</p></div>' +
+            '</div><h3 style="margin:22px 0 10px;">Quick actions</h3>' +
+            '<div class="sa-quick-actions"><button type="button" class="primary-btn" onclick="studentAreaShow(\'todo\')">Find an assessment</button><button type="button" class="secondary-btn" onclick="studentAreaShow(\'done\')">Review my results</button><button type="button" class="secondary-btn" onclick="loadStudentAssessments()">Refresh dashboard</button></div>';
     } catch (e) {
         document.getElementById('saPanelTodo').innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load.') + '</p>';
     }
@@ -9931,7 +9940,7 @@ async function loadStudentAssessments() {
 
 function renderStudentTodo(list) {
     var el = document.getElementById('saPanelTodo');
-    if (!list.length) { el.innerHTML = '<p class="helper-text">No assessments to do right now.</p>'; return; }
+    if (!list.length) { el.innerHTML = '<h2>Available Assessments</h2><p class="helper-text">You are all caught up. New assessments from your teacher will appear here.</p><button type="button" class="secondary-btn" onclick="loadStudentAssessments()">Refresh list</button>'; return; }
     el.innerHTML = list.map(function(x) {
         var label = x.status === 'upcoming' ? 'Opens soon' : (x.status === 'closed' ? 'Closed' : 'Start');
         var meta = escapeHtml(x.className) + ' · ' + x.questionCount + ' questions' + (x.timeLimit ? ' · ' + Math.round(x.timeLimit / 60) + ' min' : '') +
@@ -9943,7 +9952,7 @@ function renderStudentTodo(list) {
 
 function renderStudentDone(list) {
     var el = document.getElementById('saPanelDone');
-    if (!list.length) { el.innerHTML = '<p class="helper-text">You have not done any assessment yet.</p>'; return; }
+    if (!list.length) { el.innerHTML = '<h2>Assessment History</h2><p class="helper-text">Completed assessments and available results will appear here.</p>'; return; }
     el.innerHTML = list.map(function(x) {
         var when = x.date ? new Date(x.date).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '';
         var right = x.score === null ? '<span class="sa-badge">Submitted</span>' :
