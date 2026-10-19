@@ -9883,12 +9883,13 @@ async function openStudentArea() {
 }
 
 function studentAreaShow(p) {
-    var map = { home: 'saPanelHome', todo: 'saPanelTodo', done: 'saPanelDone' };
+    var map = { home: 'saPanelHome', todo: 'saPanelTodo', done: 'saPanelDone', review: 'saPanelReview' };
     Object.keys(map).forEach(function(k) {
         var el = document.getElementById(map[k]);
         if (el) el.style.display = (k === p) ? 'block' : 'none';
     });
-    document.querySelectorAll('.sa-nav button').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-p') === p); });
+    var activeNav = (p === 'review') ? 'done' : p;
+    document.querySelectorAll('.sa-nav button').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-p') === activeNav); });
     if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) studentMenuToggle(false);
 }
 
@@ -9968,12 +9969,109 @@ function renderStudentTodo(list) {
 function renderStudentDone(list) {
     var el = document.getElementById('saPanelDone');
     if (!list.length) { el.innerHTML = '<h2>Assessment History</h2><p class="helper-text">Completed assessments and available results will appear here.</p>'; return; }
-    el.innerHTML = list.map(function(x) {
+    el.innerHTML = '<h2 style="margin:0 0 12px;">Assessment History</h2><p class="helper-text" style="margin:0 0 12px;">Tap an assessment to see the correct answers and download its certificate.</p>' + list.map(function(x) {
         var when = x.date ? new Date(x.date).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '';
         var right = x.score === null ? '<span class="sa-badge">Submitted</span>' :
             '<span class="pos-remark ' + (x.passed ? 'pass' : 'fail') + '">' + x.score + '% · ' + (x.passed ? 'Pass' : 'Fail') + '</span>';
+        if (x.canReview && x.code) {
+            return '<div class="sa-card sa-card-click" role="button" tabindex="0" onclick="studentHistoryOpen(\'' + escapeHtml(String(x.code)).replace(/'/g, '') + '\')" onkeydown="if(event.key===\'Enter\'){studentHistoryOpen(\'' + escapeHtml(String(x.code)).replace(/'/g, '') + '\');}">' +
+                '<div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + escapeHtml(when) + '</div></div>' +
+                '<div class="sa-card-actions">' + right + '<span class="sa-badge">View answers</span></div></div>';
+        }
         return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + escapeHtml(when) + '</div></div>' + right + '</div>';
     }).join('');
+}
+
+// ---- History: open one finished assessment (correct answers + certificate) ----
+var saReviewData = null;
+
+function studentHistoryBack() { studentAreaShow('done'); }
+
+async function studentHistoryOpen(code) {
+    var t = localStorage.getItem('cleverment_student_token');
+    var scoreBox = document.getElementById('saReviewScore');
+    var corrBox = document.getElementById('saReviewCorrections');
+    saReviewData = null;
+    scoreBox.innerHTML = '<span class="result-details">Loading your result...</span>';
+    corrBox.innerHTML = '';
+    studentAreaShow('review');
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/result/' + encodeURIComponent(code), { headers: { 'Authorization': 'Bearer ' + t } });
+        if (r.status === 401) { studentLogout(); return; }
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load this result.');
+        saReviewData = d;
+        var grade = getGrade(d.score);
+        scoreBox.innerHTML =
+            '<span class="grade">' + escapeHtml(grade) + '</span>' +
+            d.score + '% (' + d.correctAnswers + '/' + d.totalQuestions + ')<br>' +
+            '<span style="display:inline-block; margin-top:6px; padding:4px 14px; border-radius:20px; font-weight:700; font-size:13px; background:' + (d.passed ? '#e6f7ec' : '#fdecec') + '; color:' + (d.passed ? '#1f8a4c' : '#c0392b') + ';">' + (d.passed ? 'PASSED' : 'NOT PASSED') + ' (Pass mark: ' + d.passMark + '%)</span><br>' +
+            '<span class="result-details">Class: ' + escapeHtml(d.className || '') + ' | Student: ' + escapeHtml(d.studentName || '') + ' | Subject: ' + escapeHtml(d.subject || '') + (d.timeTaken ? ' | Time: ' + escapeHtml(d.timeTaken) : '') + '</span>';
+        corrBox.innerHTML = '<h3>Corrections</h3>';
+        var corrections = d.corrections || [];
+        if (!corrections.length) {
+            corrBox.innerHTML += '<p class="helper-text">The correct answers for this assessment are not available.</p>';
+        }
+        for (var j = 0; j < corrections.length; j++) {
+            var item = corrections[j];
+            var div = document.createElement('div');
+            div.className = 'correction-item';
+            div.innerHTML =
+                '<p><strong>Q' + (j + 1) + ':</strong> ' + item.question + '</p>' +
+                '<p>Your answer: <strong style="color:' + (item.isCorrect ? '#2d9c5c' : '#dc3545') + '">' + (item.userAnswerText || 'Not answered') + '</strong></p>' +
+                (!item.isCorrect ? '<p>Correct answer: <strong style="color:#2d9c5c">' + item.correctAnswerText + '</strong></p>' : '') +
+                (item.explanation ? '<p class="explain">&#128161; ' + escapeHtml(item.explanation) + '</p>' : '') +
+                '<p>' + (item.isCorrect ? 'Correct' : 'Wrong') + '</p>';
+            corrBox.appendChild(div);
+            if (typeof renderMathIn === 'function') renderMathIn(div);
+        }
+    } catch (e) {
+        scoreBox.innerHTML = '<span class="result-details" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load this result.') + '</span>';
+    }
+}
+
+// Certificate for the opened History result (PDF or image) - same design as the one given after submitting.
+function studentHistoryDownload(kind) {
+    var d = saReviewData;
+    if (!d) { alert('Please wait for the result to finish loading.'); return; }
+    var tempDiv = document.createElement('div');
+    tempDiv.style.cssText = 'position:fixed; left:-9999px; top:0; width:297mm; height:210mm; margin:0; padding:0; background:white; z-index:-1; overflow:hidden;';
+    var cleanCert = buildCertificateElement({
+        studentName: d.studentName,
+        subject: d.subject,
+        score: d.score,
+        teacherName: d.teacherName,
+        teacherSignature: d.teacherSignature,
+        code: d.code,
+        studentPhoto: d.photo || '',
+        admissionNumber: d.admissionNumber,
+        dateObj: d.date ? new Date(d.date) : new Date()
+    });
+    tempDiv.appendChild(cleanCert);
+    document.body.appendChild(tempDiv);
+    var cleanup = function() { if (tempDiv.parentNode) tempDiv.parentNode.removeChild(tempDiv); };
+    waitForCertificateImages(cleanCert, 4000).then(function() {
+        return html2canvas(cleanCert, { scale: 3, useCORS: true, backgroundColor: '#ffffff', width: 297 * 3.779, height: 210 * 3.779, logging: false });
+    }).then(function(canvas) {
+        if (kind === 'image') {
+            var link = document.createElement('a');
+            link.download = 'Certificate-' + d.studentName + '-' + d.subject + '.png';
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            var jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+            if (!jsPDFCtor) throw new Error('jsPDF library not found. Please check that jspdf.umd.min.js loaded correctly.');
+            var pdf = new jsPDFCtor('landscape', 'mm', 'a4');
+            pdf.addImage(canvas.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, 297, 210);
+            pdf.save('Certificate-' + d.studentName + '-' + d.subject + '.pdf');
+        }
+        cleanup();
+    }).catch(function(error) {
+        cleanup();
+        alert('Could not create the certificate: ' + (error && error.message ? error.message : error));
+    });
 }
 
 // Starts an assessment from the "To do" list using the student's own name and admission number.

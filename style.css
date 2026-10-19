@@ -2573,10 +2573,10 @@ body.school-link #landingAdminBtn { display: none !important; }
     width:38px; height:38px; border:1px solid #d7deea; border-radius:10px; background:#fff;
     color:#172033; font-size:28px; line-height:1; cursor:pointer; z-index:3;
 }
-#teacherDashboard, #adminDashboard { padding-top:68px; }
+#teacherDashboard, #adminDashboard { padding-top:0; }
 #studentAreaPage {
-    width:100% !important; max-width:none !important; min-height:100vh; margin:0 !important;
-    padding:82px 24px 36px !important; box-sizing:border-box; position:relative; left:0 !important; right:auto !important;
+    width:100% !important; max-width:none !important; min-height:0; margin:0 !important;
+    padding:6px 0 28px !important; box-sizing:border-box; position:relative; left:0 !important; right:auto !important;
     background:#f4f6fb;
 }
 #studentAreaPage .sa-nav {
@@ -2605,8 +2605,8 @@ body.school-link #landingAdminBtn { display: none !important; }
     background:rgba(244,246,251,.97); border-top:1px solid #e2e8f0; z-index:20;
 }
 @media (max-width:900px) {
-    #teacherDashboard, #adminDashboard { padding:68px 12px 20px !important; }
-    #studentAreaPage { padding:76px 14px 24px !important; }
+    #teacherDashboard, #adminDashboard { padding:0 0 20px !important; }
+    #studentAreaPage { padding:6px 0 24px !important; }
     #studentAreaPage .sa-nav { width:min(290px, 88vw) !important; }
     #studentAreaPage.sa-sidebar-collapsed { padding-left:14px !important; }
     #studentAreaPage.sa-sidebar-collapsed .sa-nav { width:min(290px, 88vw) !important; }
@@ -2615,3 +2615,66 @@ body.school-link #landingAdminBtn { display: none !important; }
     #studentAreaPage.sa-sidebar-collapsed .sa-nav button { justify-content:flex-start !important; }
     .student-login-page { padding-left:18px !important; padding-right:18px !important; }
 }
+
+
+/* ============================================================
+   LAYOUT FIX: logo top-left ABOVE the menu button, footer at the foot,
+   student pages left-aligned (student pages now sit inside .container)
+   ============================================================ */
+.container {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 32px);
+    min-height: calc(100dvh - 32px);
+}
+.container > div { width: 100%; }
+.container > .cm-flex-spacer { flex: 1 0 0; width: auto; min-height: 0; }
+.container > #mainFooter { flex: 0 0 auto; }
+
+/* The menu button is no longer fixed over the logo: it sits right under it in the page flow,
+   and stays at the top of the screen (sticky) while the page scrolls. */
+.dashboard-menu-top.sidebar-toggle,
+.student-menu-open {
+    position: sticky;
+    left: auto;
+    top: 10px;
+    margin: 0 0 12px 0;
+    vertical-align: top;
+    align-self: flex-start;
+    flex: 0 0 auto;
+}
+.dashboard-menu-top.sidebar-toggle { display: flex; }
+
+/* Student login page: sits under the logo, no second footer */
+#studentLoginPage[style*="display: block"] { display: flex !important; }
+.container > .student-login-page { min-height: 0 !important; padding: 18px 16px 24px !important; }
+.student-login-footnote { display: none !important; }
+
+/* Student dashboard pages are aligned to the left edge, like the logo */
+#studentAreaPage { text-align: left; }
+#studentAreaPage .sa-panel, #studentAreaPage .sa-top { margin-left: 0; margin-right: auto; }
+
+/* ===== History: open one finished assessment ===== */
+.sa-card.sa-card-click { cursor: pointer; transition: box-shadow .15s ease, border-color .15s ease; }
+.sa-card.sa-card-click:hover { border-color: #2d6cdf; box-shadow: 0 3px 12px rgba(45,108,223,.12); }
+.sa-card-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sa-review-title { color: #1a1a2e; font-size: 22px; font-weight: 600; margin: 14px 0 12px; text-align: left; }
+#saReviewScore {
+    font-size: 34px; font-weight: 700; text-align: left; color: #2d9c5c; padding: 24px; background: white;
+    border-radius: 12px; margin-bottom: 20px; border: 1.5px solid #eef2f6;
+}
+#saReviewScore .grade { display: block; font-size: 18px; font-weight: 500; color: #4a5a6e; margin-top: 4px; }
+#saReviewScore .result-details { display: block; font-size: 16px; font-weight: 400; color: #6b7a8f; margin-top: 4px; }
+#saReviewCorrections h3 { color: #1a1a2e; margin-bottom: 16px; font-size: 18px; font-weight: 600; }
+#saReviewCorrections .correction-item {
+    background: white; padding: 18px 22px; margin: 10px 0; border-radius: 10px;
+    border: 1.5px solid #eef2f6; border-left: 4px solid #2d6cdf;
+}
+#saReviewCorrections .correction-item p { margin: 4px 0; font-size: 14px; line-height: 1.5; }
+@media (max-width: 768px) {
+    #saReviewScore { font-size: 28px; padding: 18px; }
+    #saReviewCorrections .correction-item { padding: 14px 16px; }
+}
+
+#mainHeader { padding-left: 0 !important; }
+@media (max-width: 768px) { .container > #mainFooter { padding-bottom: 84px; } }
