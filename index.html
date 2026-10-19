@@ -86,6 +86,7 @@
 
     <!-- ===== STUDENT ACCESS ===== -->
     <div id="studentAccess" style="display:none;">
+            <div style="text-align:center;margin:6px 0 14px;"><button type="button" class="secondary-btn" onclick="openStudentLogin()">Log in with my name and PIN</button></div>
         <button onclick="backToLanding()" class="secondary-btn" style="font-size:13px; padding:6px 16px; margin-bottom:16px;">← Back</button>
         <h2>Enter Assessment Code</h2>
         <p style="color:#6b7a8f; margin-bottom:16px;">Enter the code your teacher gave you to access your assessment.</p>
@@ -93,9 +94,8 @@
             <label for="assessmentCode">Assessment Code</label>
             <input type="text" id="assessmentCode" placeholder="e.g., MAT-PRI-865" class="form-input" maxlength="11" style="text-transform:uppercase; letter-spacing:2px; font-weight:600;">
         </div>
-        <button onclick="verifyAssessmentCode()" class="primary-btn full-width student-access-code-btn">Enter Assessment Code</button>
+        <button onclick="verifyAssessmentCode()" class="primary-btn full-width">Access Assessment</button>
         <p class="helper-text" style="margin-top:8px;">Ask your teacher for the assessment code</p>
-        <div class="student-login-alternative"><span>Already have a student account?</span><button type="button" onclick="openStudentLogin()" class="secondary-btn student-login-access-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0M19 8h3m-1.5-1.5v3"/></svg> Login as Student</button></div>
     </div>
 
     <!-- ===== STUDENT ASSESSMENT VIEW ===== -->
@@ -714,12 +714,7 @@
                 </select>
             </div>
             <div class="custom-class-wrapper-roster" style="display:none; margin-top:8px; margin-bottom:16px;">
-                <label for="rosterCustomClass">Custom class name</label>
-                <div class="roster-custom-class-entry">
-                    <input type="text" id="rosterCustomClass" placeholder="Enter custom class name" class="form-input" autocomplete="off">
-                    <button type="button" id="rosterCustomClassLoad" class="secondary-btn" aria-label="Load custom class roster" title="Load this class" onclick="loadCustomRosterClass()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg> Load</button>
-                </div>
-                <p class="helper-text">Enter the exact class name and tap Load to view or edit its roster.</p>
+                <input type="text" id="rosterCustomClass" placeholder="Enter custom class name" class="form-input">
             </div>
             <button onclick="downloadRosterTemplate()" class="secondary-btn full-width" style="margin-bottom:12px;">1. Download Roster Template for This Class</button>
             <p class="helper-text" style="margin-bottom:12px;">Fill in each student's Name and Admission Number in the downloaded spreadsheet, then upload it back below.</p>
@@ -1355,7 +1350,7 @@
     </div>
 
     <!-- ===== Student login (name + PIN) ===== -->
-    <div id="studentLoginPage" class="student-login-page" style="display:none;">
+    <div id="studentLoginPage" style="display:none; padding:16px 16px 40px; max-width:520px; margin:0 auto;">
         <button type="button" class="secondary-btn" onclick="studentLoginBack()">&larr; Back</button>
         <h2 style="margin:12px 0 4px;">Student login</h2>
         <p class="helper-text">Type your name, then tap your name in the list. Then enter the 4-digit PIN your teacher gave you.</p>
@@ -1366,25 +1361,23 @@
         <label class="live-msg-label" for="slPin" style="margin-top:8px;">PIN</label>
         <input id="slPin" type="password" inputmode="numeric" maxlength="4" class="form-input" placeholder="4 digits">
         <button type="button" class="primary-btn" style="margin-top:10px;width:100%;" onclick="studentLoginSubmit()">Log in</button>
-        <p id="slStatus" class="helper-text" style="min-height:20px;font-weight:600;"></p><div class="student-login-footnote">© 2026 CleverMent · Built by Teacher Clement<br>Empowering education for all levels</div>
+        <p id="slStatus" class="helper-text" style="min-height:20px;font-weight:600;"></p>
     </div>
 
     <!-- ===== Student home (after login) ===== -->
     <div id="studentAreaPage" style="display:none; padding:12px 16px 90px; max-width:640px; margin:0 auto;">
-        <nav class="sa-nav" id="saNav">
-            <div class="sa-brand"><img src="logo.png" alt="CleverMent"><span>CleverMent</span><button type="button" class="sa-collapse" onclick="studentSidebarToggle()" aria-label="Collapse sidebar"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button></div>
-            <button type="button" data-p="home" onclick="studentAreaShow('home')"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span>Overview</span></button>
-            <button type="button" data-p="todo" onclick="studentAreaShow('todo')"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Available Assessments</span></button>
-            <button type="button" data-p="done" onclick="studentAreaShow('done')"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>Assessment History</span></button>
-            <div class="sa-nav-spacer"></div><button type="button" onclick="studentLogout()"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5m5 5H3m9-9h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg><span>Log out</span></button>
-        </nav>
         <div class="sa-top">
             <div id="saProfile" class="sa-profile"></div>
-            <button type="button" class="secondary-btn sa-mobile-logout" onclick="studentLogout()">Log out</button>
+            <button type="button" class="secondary-btn" onclick="studentLogout()">Log out</button>
         </div>
         <div id="saPanelHome" class="sa-panel"></div>
         <div id="saPanelTodo" class="sa-panel" style="display:none;"></div>
         <div id="saPanelDone" class="sa-panel" style="display:none;"></div>
+        <nav class="sa-nav">
+            <button type="button" data-p="home" onclick="studentAreaShow('home')">Home</button>
+            <button type="button" data-p="todo" onclick="studentAreaShow('todo')">To do</button>
+            <button type="button" data-p="done" onclick="studentAreaShow('done')">Done</button>
+        </nav>
     </div>
 
     <!-- ===== Connecting banner (shown while the app retries a slow connection) ===== -->
