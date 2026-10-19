@@ -1166,6 +1166,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    if (rosterCustomInput) {
+        rosterCustomInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') { event.preventDefault(); loadCustomRosterClass(); }
+        });
+        rosterCustomInput.addEventListener('change', function() {
+            // Keep the class name editable; loading is explicit to avoid querying on every keystroke.
+        });
+    }
+
     var teacherSubjectSelect = document.getElementById('teacherSubjectSelect');
     var teacherSubjWrapper = document.querySelector('.custom-subject-wrapper-teacher');
     var teacherSubjInput = document.getElementById('teacherCustomSubject');
@@ -2893,6 +2902,21 @@ var rosterPhotoTargetIndex = -1;
 function rosterKey(a) { return String(a || '').trim().toLowerCase(); }
 function rosterLooseKey(a) { return String(a || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 
+async function loadCustomRosterClass() {
+    var input = document.getElementById('rosterCustomClass');
+    var className = input ? input.value.trim() : '';
+    if (!className) {
+        alert('Enter the custom class name first.');
+        if (input) input.focus();
+        return;
+    }
+    var statusEl = document.getElementById('rosterUploadStatus');
+    if (statusEl) statusEl.style.display = 'none';
+    var editStatus = document.getElementById('rosterEditStatus');
+    if (editStatus) editStatus.style.display = 'none';
+    await loadRosterForEditing(className);
+}
+
 async function loadRosterForEditing(className) {
     currentRosterEditClass = className;
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
@@ -3829,7 +3853,12 @@ async function verifyAssessmentCode() {
         var data = await res.json();
 
         if (!res.ok) {
-            if (data.error === 'not_yet_open') {
+            if (data.reason === 'login_required') {
+                openStudentLogin();
+                var loginStatus = document.getElementById('slStatus');
+                if (loginStatus) loginStatus.textContent = data.error || 'Please log in with your name and PIN to access this class assessment.';
+                return;
+            } else if (data.error === 'not_yet_open') {
                 alert('This assessment is not open yet. It becomes available on ' + formatDate(new Date(data.availableFrom)) + '.');
             } else if (data.error === 'closed') {
                 alert('This assessment window has closed. It was available until ' + formatDate(new Date(data.availableUntil)) + '.');
