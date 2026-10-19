@@ -445,6 +445,7 @@
                     <button title="Access Attempts" class="dash-nav-item" data-target="accessLogsSection" onclick="showTeacherSection('accessLogsSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M7 8h10M7 12h7M7 16h10"/></svg><span>Access Attempts</span></button>
                     <button title="Publish Assessment" class="dash-nav-item" data-target="uploadSection" onclick="showTeacherSection('uploadSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><span>Publish Assessment</span></button>
                     <button title="Published Assessments" class="dash-nav-item" data-target="publishedSection" onclick="showTeacherSection('publishedSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg><span>Published Assessments</span></button>
+                    <button title="Messages" class="dash-nav-item" data-target="messagesSection" onclick="showTeacherSection('messagesSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Messages</span></button>
                     <button title="Class Roster" class="dash-nav-item" data-target="rosterSection" onclick="showTeacherSection('rosterSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Class Roster</span></button>
                     <button title="Analytics & Attendance" class="dash-nav-item" data-target="analyticsSection" onclick="showTeacherSection('analyticsSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg><span>Analytics &amp; Attendance</span></button>
                     <button title="Results" class="dash-nav-item" data-target="adminSection" onclick="showTeacherSection('adminSection', this)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Results</span></button>
@@ -688,6 +689,12 @@
             </div>
         </div>
 
+        <div class="dash-panel" id="messagesSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
+            <h3 style="margin-bottom:12px;">Messages</h3>
+            <p class="helper-text" style="margin-bottom:10px;">Send a message to the whole class, to selected students, or to one student. Students can reply, and you will see the replies here. Students need to have a PIN to read messages.</p>
+            <div class="form-group"><label for="msgClassSelect">Class</label><select id="msgClassSelect" class="form-input" onchange="teacherMsgLoadStudents()"></select></div>
+            <div id="msgListHost"></div>
+        </div>
         <div class="dash-panel" id="rosterSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">Class Roster</h3>
             <p class="helper-text" style="margin-bottom:10px;">Upload the list of students expected in a class (with admission numbers) so only those students can take assessments published for this class, and so you can see who hasn't submitted yet.</p>
@@ -1180,6 +1187,11 @@
             <button type="button" data-p="todo" onclick="studentAreaShow('todo')"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Available Assessments</span></button>
             <button type="button" data-p="closed" onclick="studentAreaShow('closed')"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Closed Assessments</span></button>
             <button type="button" data-p="done" onclick="studentAreaShow('done')"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>Assessment History</span></button>
+            <button type="button" data-p="progress" onclick="studentAreaShow('progress')"><svg viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg><span>My Progress</span></button>
+            <button type="button" data-p="certs" onclick="studentAreaShow('certs')"><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/></svg><span>Certificates</span></button>
+            <button type="button" data-p="study" onclick="studentAreaShow('study')"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></svg><span>Study &amp; Practice</span></button>
+            <button type="button" data-p="messages" onclick="studentAreaShow('messages')"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Messages</span></button>
+            <button type="button" data-p="profile" onclick="studentAreaShow('profile')"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>My Profile</span></button>
             <div class="sa-nav-spacer"></div><button type="button" onclick="studentLogout()"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5m5 5H3m9-9h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg><span>Log out</span></button>
         </nav>
         <div class="sa-top">
@@ -1189,6 +1201,11 @@
         <div id="saPanelHome" class="sa-panel"></div>
         <div id="saPanelTodo" class="sa-panel" style="display:none;"></div>
         <div id="saPanelClosed" class="sa-panel" style="display:none;"></div>
+        <div id="saPanelProgress" class="sa-panel" style="display:none;"></div>
+        <div id="saPanelCerts" class="sa-panel" style="display:none;"></div>
+        <div id="saPanelStudy" class="sa-panel" style="display:none;"></div>
+        <div id="saPanelMessages" class="sa-panel" style="display:none;"></div>
+        <div id="saPanelProfile" class="sa-panel" style="display:none;"></div>
         <div id="saPanelDone" class="sa-panel" style="display:none;"></div>
         <div id="saPanelReview" class="sa-panel" style="display:none;">
             <button type="button" class="secondary-btn" onclick="studentHistoryBack()">&larr; Back to History</button>

@@ -9934,11 +9934,16 @@ async function openStudentArea() {
 }
 
 function studentAreaShow(p) {
-    var map = { home: 'saPanelHome', todo: 'saPanelTodo', closed: 'saPanelClosed', done: 'saPanelDone', review: 'saPanelReview' };
+    var map = { home: 'saPanelHome', todo: 'saPanelTodo', closed: 'saPanelClosed', done: 'saPanelDone', review: 'saPanelReview', progress: 'saPanelProgress', certs: 'saPanelCerts', study: 'saPanelStudy', messages: 'saPanelMessages', profile: 'saPanelProfile' };
     Object.keys(map).forEach(function(k) {
         var el = document.getElementById(map[k]);
         if (el) el.style.display = (k === p) ? 'block' : 'none';
     });
+    if (p === 'progress') renderStudentProgress();
+    if (p === 'certs') renderStudentCerts();
+    if (p === 'study') renderStudentStudy();
+    if (p === 'messages') studentMsgLoad();
+    if (p === 'profile') renderStudentProfilePanel();
     var activeNav = (p === 'review') ? 'done' : p;
     document.querySelectorAll('.sa-nav button').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-p') === activeNav); });
     if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) studentMenuToggle(false);
@@ -9956,6 +9961,7 @@ function studentMenuToggle(open) {
 function studentSidebarToggle() { studentMenuToggle(false); }
 
 function renderStudentProfile(me) {
+    saMe = me;
     var box = document.getElementById('saProfile');
     var ini = String(me.name || '?').split(/\s+/).filter(Boolean).map(function(w) { return w.charAt(0); }).slice(0, 2).join('').toUpperCase();
     box.innerHTML = '<div class="sa-avatar">' + (me.photo ? '<img src="' + me.photo + '" alt="">' : '<span>' + escapeHtml(ini) + '</span>') + '</div>' +
@@ -9994,6 +10000,7 @@ async function loadStudentAssessments() {
         saDone = d.done || [];
         renderStudentTodo(saTodo);
         renderStudentClosed(saClosed);
+        studentMsgBadge();
         renderStudentDone(saDone);
         document.getElementById('saPanelHome').innerHTML =
             '<h2 style="margin:0 0 6px;color:#172033;">Your learning overview</h2>' +
@@ -10274,6 +10281,7 @@ function showTeacherSection(panelId, btn) {
     if (panelId === 'progressSection') {
         initProgressPanel();
     }
+    if (panelId === 'messagesSection') teacherMsgInit();
     if (panelId === 'liveSection') {
         startTeacherLivePolling();
     } else {
@@ -11579,3 +11587,242 @@ function cleverBotCopyValue(raw) {
     restorePosition(); updateVisibility();
     setInterval(updateVisibility,700);
 })();
+
+
+// ============================================================
+// STUDENT: PROGRESS, CERTIFICATES, STUDY, MESSAGES, PROFILE
+// ============================================================
+var saMe = null;
+function stAuth() { return { 'Authorization': 'Bearer ' + localStorage.getItem('cleverment_student_token') }; }
+function stScored() { return (saDone || []).filter(function(x) { return x.score !== null && x.score !== undefined; }); }
+
+function renderStudentProgress() {
+    var el = document.getElementById('saPanelProgress');
+    var list = stScored().slice().sort(function(a, b) { return new Date(a.date) - new Date(b.date); });
+    if (!list.length) { el.innerHTML = '<h2>My Progress</h2><p class="helper-text">Your progress will appear after you complete an assessment whose results are available.</p>'; return; }
+    var sum = 0, pass = 0, subj = {};
+    list.forEach(function(x) { sum += Number(x.score); if (x.passed) pass++; var k = x.subject || 'Other'; (subj[k] = subj[k] || []).push(Number(x.score)); });
+    var avg = Math.round(sum / list.length), rate = Math.round(pass / list.length * 100);
+    var W = 320, H = 140, pad = 22, pts = list.map(function(x, i) { return [list.length === 1 ? W / 2 : pad + i * (W - 2 * pad) / (list.length - 1), H - pad - (Number(x.score) / 100) * (H - 2 * pad)]; });
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;max-width:520px;background:#fff;border:1.5px solid #eef2f6;border-radius:12px;">' +
+        '<line x1="' + pad + '" y1="' + (H - pad) + '" x2="' + (W - pad) + '" y2="' + (H - pad) + '" stroke="#cfd8e6"/><line x1="' + pad + '" y1="' + pad + '" x2="' + pad + '" y2="' + (H - pad) + '" stroke="#cfd8e6"/>' +
+        '<polyline fill="none" stroke="#2d6cdf" stroke-width="2.5" points="' + pts.map(function(q) { return q[0] + ',' + q[1]; }).join(' ') + '"/>' +
+        pts.map(function(q, i) { return '<circle cx="' + q[0] + '" cy="' + q[1] + '" r="3.5" fill="#2d6cdf"><title>' + escapeHtml(list[i].subject) + ': ' + list[i].score + '%</title></circle>'; }).join('') +
+        '<text x="4" y="' + (pad + 4) + '" font-size="10" fill="#6b7a8f">100</text><text x="8" y="' + (H - pad + 4) + '" font-size="10" fill="#6b7a8f">0</text></svg>';
+    var bars = Object.keys(subj).map(function(k) {
+        var a = Math.round(subj[k].reduce(function(x, y) { return x + y; }, 0) / subj[k].length);
+        return '<div style="margin:8px 0;"><div style="display:flex;justify-content:space-between;font-size:14px;"><b>' + escapeHtml(k) + '</b><span>' + a + '%</span></div><div class="cm-bar"><i style="width:' + a + '%"></i></div></div>';
+    }).join('');
+    el.innerHTML = '<h2>My Progress</h2><div class="cm-stat-row"><div class="cm-stat"><span>Average score</span><strong>' + avg + '%</strong></div><div class="cm-stat"><span>Pass rate</span><strong>' + rate + '%</strong></div><div class="cm-stat"><span>Assessments</span><strong>' + list.length + '</strong></div></div>' +
+        '<h3 style="margin:6px 0;">Score trend</h3>' + svg + '<h3 style="margin:16px 0 4px;">Average by subject</h3>' + bars;
+}
+
+function renderStudentCerts() {
+    var el = document.getElementById('saPanelCerts');
+    var list = (saDone || []).filter(function(x) { return x.canReview && x.code; });
+    if (!list.length) { el.innerHTML = '<h2>Certificates</h2><p class="helper-text">Certificates for your completed assessments will appear here.</p>'; return; }
+    el.innerHTML = '<h2 style="margin:0 0 6px;">Certificates</h2><p class="helper-text" style="margin:0 0 8px;">Download the certificate for any assessment you completed.</p>' + list.map(function(x) {
+        var when = x.date ? new Date(x.date).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        var c = escapeHtml(String(x.code)).replace(/'/g, '');
+        return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + escapeHtml(when) + ' · ' + x.score + '%</div></div><div class="sa-card-actions"><button type="button" class="secondary-btn" onclick="studentCertDownload(\'' + c + '\',\'pdf\')">PDF</button><button type="button" class="secondary-btn" onclick="studentCertDownload(\'' + c + '\',\'image\')">Image</button></div></div>';
+    }).join('');
+}
+async function studentCertDownload(code, kind) {
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/result/' + encodeURIComponent(code), { headers: stAuth() });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load the certificate.');
+        saReviewData = d;
+        studentHistoryDownload(kind);
+    } catch (e) { alert(e.message); }
+}
+
+var STUDY_TIPS = ['Study in short sessions (20-30 minutes) with a 5-minute break.', 'After each assessment, read the corrections and try the questions you missed again.', 'Explain a topic aloud in your own words. If you get stuck, that is what to revise.', 'Practise a little every day instead of cramming the night before.', 'Sleep well and eat before an assessment; a rested brain recalls more.', 'Read each question twice before choosing an answer, and manage your time.'];
+var studyCards = [], studyIdx = 0;
+function renderStudentStudy() {
+    var el = document.getElementById('saPanelStudy');
+    var weak = '';
+    var sc = {}; stScored().forEach(function(x) { (sc[x.subject] = sc[x.subject] || []).push(Number(x.score)); });
+    var worst = null, wa = 101; Object.keys(sc).forEach(function(k) { var a = sc[k].reduce(function(p, q) { return p + q; }, 0) / sc[k].length; if (a < wa) { wa = a; worst = k; } });
+    if (worst) weak = '<div class="cm-tip"><b>Focus area:</b> your lowest average is in ' + escapeHtml(worst) + ' (' + Math.round(wa) + '%). Spend a little extra time there.</div>';
+    el.innerHTML = '<h2>Study &amp; Practice</h2>' + weak + '<h3 style="margin:14px 0 4px;">Study tips</h3>' + STUDY_TIPS.map(function(t) { return '<div class="cm-tip">' + escapeHtml(t) + '</div>'; }).join('') +
+        '<h3 style="margin:16px 0 4px;">Practise my mistakes</h3><p class="helper-text">Questions you got wrong in past assessments. Try to answer, then check.</p><button type="button" class="primary-btn" onclick="studyStart()">Start practice</button><div id="studyHost"></div>';
+}
+async function studyStart() {
+    var host = document.getElementById('studyHost');
+    host.innerHTML = '<p class="helper-text">Loading your questions...</p>';
+    var recent = (saDone || []).filter(function(x) { return x.canReview && x.code; }).slice(0, 6);
+    var all = [];
+    await Promise.all(recent.map(function(x) {
+        return fetch(BACKEND_URL + '/api/student/result/' + encodeURIComponent(x.code), { headers: stAuth() }).then(function(r) { return r.ok ? r.json() : null; }).then(function(d) {
+            if (d && Array.isArray(d.corrections)) d.corrections.forEach(function(c) { if (!c.isCorrect && c.question) all.push({ subject: d.subject, q: c.question, a: c.correctAnswerText, why: c.explanation || '' }); });
+        }).catch(function() {});
+    }));
+    if (!all.length) { host.innerHTML = '<p class="helper-text">No mistakes to practise yet. Great job, or complete more assessments first.</p>'; return; }
+    for (var i = all.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = all[i]; all[i] = all[j]; all[j] = t; }
+    studyCards = all.slice(0, 10); studyIdx = 0; studyShow(false);
+}
+function studyShow(reveal) {
+    var host = document.getElementById('studyHost');
+    if (studyIdx >= studyCards.length) { host.innerHTML = '<div class="cm-flash"><b>Practice complete!</b><br><button type="button" class="primary-btn" style="margin-top:8px;" onclick="studyStart()">Practise again</button></div>'; return; }
+    var c = studyCards[studyIdx];
+    host.innerHTML = '<div class="cm-flash"><div class="helper-text">' + escapeHtml(c.subject || '') + ' · ' + (studyIdx + 1) + ' of ' + studyCards.length + '</div><p>' + c.q + '</p>' +
+        (reveal ? '<p>Correct answer: <b style="color:#2d9c5c">' + c.a + '</b></p>' + (c.why ? '<div class="explain">' + escapeHtml(c.why) + '</div>' : '') + '<button type="button" class="primary-btn" onclick="studyIdx++;studyShow(false)">Next</button>' : '<button type="button" class="secondary-btn" onclick="studyShow(true)">Show answer</button>') + '</div>';
+    if (typeof renderMathIn === 'function') renderMathIn(host);
+}
+
+function cmBubbles(list, meSender) {
+    if (!list.length) return '<p class="helper-text">No messages yet.</p>';
+    return '<div class="cm-bubbles" id="cmBubbleBox">' + list.map(function(m) {
+        var when = new Date(m.created_at).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+        return '<div class="cm-bubble ' + (m.sender === meSender ? 'me' : 'them') + '">' + escapeHtml(m.body) + '<small>' + escapeHtml(when) + '</small></div>';
+    }).join('') + '</div>';
+}
+function cmScrollBubbles() { var b = document.getElementById('cmBubbleBox'); if (b) b.scrollTop = b.scrollHeight; }
+async function studentMsgBadge() {
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/messages/unread', { headers: stAuth() });
+        var d = await r.json();
+        var b = document.querySelector('.sa-nav button[data-p="messages"] span');
+        if (!b) return;
+        b.innerHTML = 'Messages' + (d.unread ? '<span class="cm-dot">' + d.unread + '</span>' : '');
+    } catch (e) {}
+}
+async function studentMsgLoad() {
+    var el = document.getElementById('saPanelMessages');
+    el.innerHTML = '<h2>Messages</h2><p class="helper-text">Loading...</p>';
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/messages', { headers: stAuth() });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load messages.');
+        el.innerHTML = '<h2>Messages</h2>' + (d.setupNeeded ? '<p class="helper-text">Messaging is not set up yet.</p>' : cmBubbles(d.messages || [], 'student') +
+            '<textarea id="stMsgInput" class="cm-compose" maxlength="1000" placeholder="Write a reply to your teacher..."></textarea><button type="button" class="primary-btn" style="margin-top:8px;" onclick="studentMsgSend()">Send reply</button>');
+        cmScrollBubbles(); studentMsgBadge();
+    } catch (e) { el.innerHTML = '<h2>Messages</h2><p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message) + '</p>'; }
+}
+async function studentMsgSend() {
+    var inp = document.getElementById('stMsgInput');
+    var body = (inp.value || '').trim();
+    if (!body) return;
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/messages', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, stAuth()), body: JSON.stringify({ body: body }) });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not send.');
+        studentMsgLoad();
+    } catch (e) { alert(e.message); }
+}
+
+function renderStudentProfilePanel() {
+    var el = document.getElementById('saPanelProfile');
+    var m = saMe || {};
+    var ini = String(m.name || '?').split(/\s+/).filter(Boolean).map(function(w) { return w.charAt(0); }).slice(0, 2).join('').toUpperCase();
+    el.innerHTML = '<h2>My Profile</h2><div style="display:flex;align-items:center;gap:14px;margin:8px 0 14px;"><div class="sa-avatar">' + (m.photo ? '<img src="' + m.photo + '" alt="">' : '<span>' + escapeHtml(ini) + '</span>') + '</div><div><div class="sa-name">' + escapeHtml(m.name || '') + '</div></div></div>' +
+        '<div class="cm-trow"><b>Class</b><span>' + escapeHtml(m.className || '') + '</span></div><div class="cm-trow"><b>Admission No.</b><span>' + escapeHtml(m.admissionNumber || '') + '</span></div>' +
+        (m.teacherName ? '<div class="cm-trow"><b>Teacher</b><span>' + escapeHtml(m.teacherName) + '</span></div>' : '') + (m.school && m.school.name ? '<div class="cm-trow"><b>School</b><span>' + escapeHtml(m.school.name) + '</span></div>' : '') +
+        '<p class="helper-text">To change your name, class or photo, ask your teacher.</p><h3 style="margin:16px 0 6px;">Change my PIN</h3>' +
+        '<div class="form-group"><label>Current PIN</label><input id="pinCur" class="form-input" type="password" inputmode="numeric" maxlength="4" placeholder="4 digits"></div>' +
+        '<div class="form-group"><label>New PIN</label><input id="pinNew" class="form-input" type="password" inputmode="numeric" maxlength="4" placeholder="4 digits"></div>' +
+        '<div class="form-group"><label>Confirm new PIN</label><input id="pinNew2" class="form-input" type="password" inputmode="numeric" maxlength="4" placeholder="4 digits"></div><button type="button" class="primary-btn" onclick="studentChangePin()">Change PIN</button>';
+}
+async function studentChangePin() {
+    var c = document.getElementById('pinCur').value, n = document.getElementById('pinNew').value, n2 = document.getElementById('pinNew2').value;
+    if (!/^[0-9]{4}$/.test(c) || !/^[0-9]{4}$/.test(n)) { alert('A PIN must be exactly 4 digits.'); return; }
+    if (n !== n2) { alert('The new PIN and the confirmation do not match.'); return; }
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/change-pin', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, stAuth()), body: JSON.stringify({ currentPin: c, newPin: n }) });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not change the PIN.');
+        alert('Your PIN has been changed. Use the new PIN next time you log in.');
+        renderStudentProfilePanel();
+    } catch (e) { alert(e.message); }
+}
+
+// ============================================================
+// TEACHER: MESSAGES (bulk, selected students, single student)
+// ============================================================
+var msgSelected = {}, msgStudents = [];
+function tmAuth() { return { 'Authorization': 'Bearer ' + localStorage.getItem('cleverment_teacher_token') }; }
+function teacherMsgInit() {
+    var sel = document.getElementById('msgClassSelect'), src = document.getElementById('rosterClassSelect');
+    if (sel && src && !sel.options.length) { sel.innerHTML = src.innerHTML; }
+}
+async function teacherMsgLoadStudents() {
+    var cls = document.getElementById('msgClassSelect').value;
+    var host = document.getElementById('msgListHost');
+    msgSelected = {};
+    if (!cls) { host.innerHTML = ''; return; }
+    host.innerHTML = '<p class="helper-text">Loading...</p>';
+    try {
+        var r = await fetch(BACKEND_URL + '/api/teacher/messages/students?className=' + encodeURIComponent(cls), { headers: tmAuth() });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load students.');
+        msgStudents = d.students || [];
+        teacherMsgRenderList(d.setupNeeded);
+    } catch (e) { host.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message) + '</p>'; }
+}
+function teacherMsgRenderList(setupNeeded) {
+    var host = document.getElementById('msgListHost');
+    if (!msgStudents.length) { host.innerHTML = '<p class="helper-text">No students on this class roster yet.</p>'; return; }
+    var n = Object.keys(msgSelected).length;
+    host.innerHTML = (setupNeeded ? '<p class="helper-text" style="color:#b4232f;">Run supabase_messages.sql in Supabase first.</p>' : '') +
+        '<textarea id="msgCompose" class="cm-compose" maxlength="1000" placeholder="Write your message..."></textarea>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 14px;"><button type="button" class="primary-btn" onclick="teacherMsgSend(true)">Send to whole class</button><button type="button" class="secondary-btn" id="msgSelBtn" onclick="teacherMsgSend(false)">Send to selected (' + n + ')</button></div>' +
+        '<label style="display:flex;gap:8px;align-items:center;font-weight:600;margin-bottom:6px;"><input type="checkbox" onchange="teacherMsgAll(this.checked)" ' + (n === msgStudents.length ? 'checked' : '') + ' style="width:18px;height:18px;"> Select all</label>' +
+        msgStudents.map(function(s) {
+            var a = escapeHtml(s.admissionNumber);
+            return '<div class="cm-trow"><input type="checkbox" class="msg-pick" data-adm="' + a + '" ' + (msgSelected[s.admissionNumber] ? 'checked ' : '') + 'onchange="teacherMsgPick(this)" style="width:18px;height:18px;"><div style="flex:1;min-width:0;"><b>' + escapeHtml(s.name) + '</b>' + (s.unread ? '<span class="cm-dot">' + s.unread + '</span>' : '') +
+                '<div class="helper-text" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(s.lastMessage || 'No messages yet') + '</div></div><button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;" data-adm="' + a + '" onclick="teacherMsgOpen(this.getAttribute(\'data-adm\'))">Open</button></div>';
+        }).join('') + '<div id="msgThreadHost"></div>';
+}
+function teacherMsgPick(cb) {
+    var a = cb.getAttribute('data-adm');
+    var real = (msgStudents.filter(function(s) { return escapeHtml(s.admissionNumber) === a; })[0] || {}).admissionNumber || a;
+    if (cb.checked) msgSelected[real] = true; else delete msgSelected[real];
+    var b = document.getElementById('msgSelBtn'); if (b) b.textContent = 'Send to selected (' + Object.keys(msgSelected).length + ')';
+}
+function teacherMsgAll(on) {
+    msgSelected = {}; if (on) msgStudents.forEach(function(s) { msgSelected[s.admissionNumber] = true; });
+    document.querySelectorAll('.msg-pick').forEach(function(c) { c.checked = !!on; });
+    var b = document.getElementById('msgSelBtn'); if (b) b.textContent = 'Send to selected (' + Object.keys(msgSelected).length + ')';
+}
+async function teacherMsgPost(payload) {
+    var r = await fetch(BACKEND_URL + '/api/teacher/messages', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, tmAuth()), body: JSON.stringify(payload) });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'Could not send.');
+    return d;
+}
+async function teacherMsgSend(all) {
+    var cls = document.getElementById('msgClassSelect').value, body = (document.getElementById('msgCompose').value || '').trim();
+    var adms = Object.keys(msgSelected);
+    if (!body) { alert('Type a message first.'); return; }
+    if (!all && !adms.length) { alert('Select at least one student.'); return; }
+    if (!confirm(all ? 'Send this message to the whole class (' + msgStudents.length + ' students)?' : 'Send this message to ' + adms.length + ' selected student(s)?')) return;
+    try {
+        var d = await teacherMsgPost({ className: cls, body: body, all: !!all, admissionNumbers: adms });
+        alert('Message sent to ' + d.sent + ' student(s).');
+        teacherMsgLoadStudents();
+    } catch (e) { alert(e.message); }
+}
+var msgOpenAdm = '';
+async function teacherMsgOpen(adm) {
+    msgOpenAdm = adm;
+    var cls = document.getElementById('msgClassSelect').value, host = document.getElementById('msgThreadHost');
+    var st = msgStudents.filter(function(s) { return s.admissionNumber === adm; })[0] || {};
+    host.innerHTML = '<p class="helper-text">Loading...</p>';
+    try {
+        var r = await fetch(BACKEND_URL + '/api/teacher/messages/thread?className=' + encodeURIComponent(cls) + '&admissionNumber=' + encodeURIComponent(adm), { headers: tmAuth() });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not load.');
+        host.innerHTML = '<div class="flag-box" style="margin-top:14px;"><h4 style="margin:0 0 8px;">Conversation with ' + escapeHtml(st.name || adm) + '</h4>' + cmBubbles(d.messages || [], 'teacher') +
+            '<textarea id="msgReply" class="cm-compose" maxlength="1000" placeholder="Message ' + escapeHtml(st.name || 'student') + '..."></textarea><button type="button" class="primary-btn" style="margin-top:8px;" onclick="teacherMsgReply()">Send to this student</button></div>';
+        cmScrollBubbles(); host.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) { host.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message) + '</p>'; }
+}
+async function teacherMsgReply() {
+    var body = (document.getElementById('msgReply').value || '').trim();
+    if (!body) return;
+    try {
+        await teacherMsgPost({ className: document.getElementById('msgClassSelect').value, body: body, admissionNumbers: [msgOpenAdm] });
+        await teacherMsgOpen(msgOpenAdm);
+    } catch (e) { alert(e.message); }
+}

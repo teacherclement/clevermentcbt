@@ -2678,3 +2678,20 @@ body.school-link #landingAdminBtn { display: none !important; }
 
 #mainHeader { padding-left: 0 !important; }
 @media (max-width: 768px) { .container > #mainFooter { padding-bottom: 84px; } }
+
+/* ===== Messages, progress, study, profile ===== */
+.cm-bubbles { display:flex; flex-direction:column; gap:8px; max-height:50vh; overflow-y:auto; padding:6px 2px; margin-bottom:10px; }
+.cm-bubble { max-width:85%; padding:9px 13px; border-radius:14px; font-size:14px; line-height:1.45; white-space:pre-wrap; word-break:break-word; }
+.cm-bubble small { display:block; opacity:.65; font-size:11px; margin-top:3px; }
+.cm-bubble.them { align-self:flex-start; background:#fff; border:1.5px solid #e3e9f2; }
+.cm-bubble.me { align-self:flex-end; background:#2d6cdf; color:#fff; }
+.cm-compose { width:100%; box-sizing:border-box; min-height:70px; padding:10px; border:1.5px solid #dbe3ee; border-radius:10px; font:inherit; resize:vertical; }
+.cm-dot { display:inline-block; min-width:18px; padding:0 5px; margin-left:6px; border-radius:10px; background:#dc3545; color:#fff; font-size:11px; font-weight:700; text-align:center; line-height:18px; }
+.cm-stat-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin:10px 0 16px; }
+.cm-stat { background:#fff; border:1.5px solid #eef2f6; border-radius:12px; padding:12px; }
+.cm-stat span { display:block; font-size:12px; color:#6b7a8f; }
+.cm-stat strong { font-size:24px; }
+.cm-bar { height:10px; background:#e8edf5; border-radius:6px; overflow:hidden; } .cm-bar i { display:block; height:100%; background:#2d6cdf; }
+.cm-tip { background:#fff; border:1.5px solid #eef2f6; border-left:4px solid #C9A84C; border-radius:10px; padding:10px 14px; margin:8px 0; font-size:14px; }
+.cm-flash { background:#fff; border:1.5px solid #dbe3ee; border-radius:14px; padding:18px; margin:12px 0; }
+.cm-trow { display:flex; align-items:center; gap:10px; padding:9px 4px; border-bottom:1px solid #eef2f6; font-size:14px; }
