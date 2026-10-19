@@ -3890,9 +3890,16 @@ function reportStudentAccessNetworkError(code, studentName, admissionNumber, sou
     } catch (e) {}
 }
 
-async function verifyAssessmentCode() {
-    var codeFromURL = getCodeFromURL();
-    var code = codeFromURL || document.getElementById('assessmentCode').value.trim().toUpperCase();
+function cmStudentAuthHeader() {
+    var t = null;
+    try { t = localStorage.getItem('cleverment_student_token'); } catch (e) {}
+    return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+
+async function verifyAssessmentCode(opts) {
+    opts = opts || {};
+    var codeFromURL = opts.code ? '' : getCodeFromURL();
+    var code = opts.code ? String(opts.code).trim().toUpperCase() : (codeFromURL || document.getElementById('assessmentCode').value.trim().toUpperCase());
 
     if (!code) {
         alert('Please enter the assessment code provided by your teacher.');
@@ -3900,11 +3907,14 @@ async function verifyAssessmentCode() {
     }
 
     try {
-        var res = await fetchWithRetry(BACKEND_URL + '/api/quiz/assessment/' + encodeURIComponent(code), undefined, { attempts: 6, label: 'Connecting to CleverMent' });
+        var res = await fetchWithRetry(BACKEND_URL + '/api/quiz/assessment/' + encodeURIComponent(code), { headers: cmStudentAuthHeader() }, { attempts: 6, label: 'Connecting to CleverMent' });
         var data = await res.json();
 
         if (!res.ok) {
-            if (data.reason === 'login_required') {
+            if (data.reason === 'login_required' && opts.silent) {
+                alert(data.error || 'This assessment is not for your class.');
+                return false;
+            } else if (data.reason === 'login_required') {
                 openStudentLogin();
                 var loginStatus = document.getElementById('slStatus');
                 if (loginStatus) loginStatus.textContent = data.error || 'Please log in with your name and PIN to access this class assessment.';
@@ -3916,7 +3926,7 @@ async function verifyAssessmentCode() {
             } else {
                 alert('Invalid assessment code. Please check with your teacher.');
             }
-            return;
+            return false;
         }
 
         currentAssessment = {
@@ -3939,6 +3949,7 @@ async function verifyAssessmentCode() {
         window.assessmentTeacherName = data.teacherName;
         window.assessmentTeacherSignature = data.teacherSignature;
 
+        if (opts.silent) return true;
         if (codeFromURL) {
             document.getElementById('studentAccess').style.display = 'none';
             showAssessmentForm();
@@ -3946,6 +3957,7 @@ async function verifyAssessmentCode() {
         } else {
             showAssessmentForm();
         }
+        return true;
     } catch (e) {
         reportStudentAccessNetworkError(code, '', '', 'assessment_code');
         hideConnectBanner();
@@ -4046,7 +4058,7 @@ async function restoreQuizState() {
     try {
         var eligibilityRes = await fetchWithRetry(BACKEND_URL + '/api/quiz/start-check', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: Object.assign({ 'Content-Type': 'application/json' }, cmStudentAuthHeader()),
             body: JSON.stringify({
                 code: state.currentAssessmentCode,
                 // The server's start-check REQUIRES the student's name (it also
@@ -4527,7 +4539,7 @@ async function startStudentQuiz() {
     try {
         var eligibilityRes = await fetchWithRetry(BACKEND_URL + '/api/quiz/start-check', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: Object.assign({ 'Content-Type': 'application/json' }, cmStudentAuthHeader()),
             body: JSON.stringify({
                 code: currentAssessmentCode,
                 studentName: studentName,
@@ -8835,6 +8847,7 @@ var CM_REFRESH_ACTIONS = {
     adminSecuritySection: function() { return loadAdminSecurity(); },
     adminSchoolsSection: function() { return loadAdminSchools(); },
     schoolSection: function() { return loadSchoolPanel(); },
+    adminOptionsSection: function() { return loadAdminOptions(); },
     adminFaqSection: async function() { if (typeof loadFaqs === 'function') await loadFaqs(); return renderAdminFaqList(); },
     adminLiveSection: function() { return loadAdminLive(); },
     adminSelectTeacherSection: function() { return loadAdminTeacherWorkspaceOptions(); },
@@ -9852,7 +9865,24 @@ function studentShowOnly(id) {
     if (menuButton) menuButton.style.display = id === 'studentAreaPage' ? 'inline-flex' : 'none';
     if (id !== 'studentAreaPage') studentMenuToggle(false);
 }
+async function studentLoginLoadClasses() {
+    var sel = document.getElementById('slClass');
+    if (!sel || sel.options.length > 1) return;
+    try {
+        var r = await fetch(BACKEND_URL + '/api/student/classes');
+        var d = await r.json();
+        (d.classes || []).forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+    } catch (e) {}
+}
+function studentLoginClassChanged() {
+    slChosen = null;
+    document.getElementById('slName').value = '';
+    document.getElementById('slChosen').textContent = '';
+    document.getElementById('slSuggest').innerHTML = '';
+}
 function openStudentLogin() {
+    studentLoginLoadClasses();
+    var cs = document.getElementById('slClass'); if (cs) cs.value = '';
     slChosen = null;
     document.getElementById('slName').value = '';
     document.getElementById('slPin').value = '';
@@ -9869,10 +9899,12 @@ function studentLoginSuggest() {
     document.getElementById('slChosen').textContent = '';
     var q = document.getElementById('slName').value.trim();
     var box = document.getElementById('slSuggest');
+    var cls = document.getElementById('slClass').value;
+    if (!cls) { box.innerHTML = q.length ? '<p class="helper-text">Choose your class first.</p>' : ''; return; }
     if (q.length < 2) { box.innerHTML = ''; return; }
     slTimer = setTimeout(async function() {
         try {
-            var r = await fetch(BACKEND_URL + '/api/student/suggest?q=' + encodeURIComponent(q));
+            var r = await fetch(BACKEND_URL + '/api/student/suggest?q=' + encodeURIComponent(q) + '&className=' + encodeURIComponent(cls));
             var d = await r.json();
             var matches = d.matches || [];
             if (!matches.length) {
@@ -10152,16 +10184,18 @@ function studentHistoryDownload(kind) {
 async function studentAreaStart(code) {
     var prof = {};
     try { prof = JSON.parse(localStorage.getItem('cleverment_student_profile') || '{}'); } catch (e) {}
-    studentShowOnly('studentAccess');
-    var input = document.getElementById('assessmentCode');
-    if (input) input.value = code;
     try {
-        await verifyAssessmentCode();
-        // A restricted assessment may redirect to student login instead of loading the quiz.
-        if (!currentAssessment || currentAssessmentCode !== String(code || '').trim().toUpperCase()) return;
+        var ok = await verifyAssessmentCode({ silent: true, code: code });
+        if (!ok) return; // the reason was already shown; the student stays on the dashboard
+        studentShowOnly('studentAssessmentView');
+        showAssessmentForm();
+        var info = document.getElementById('studentInfoForm');
+        if (info) info.style.display = 'none';
         document.getElementById('studentNameInput').value = prof.name || '';
         document.getElementById('studentAdmissionNumber').value = prof.admissionNumber || '';
         await startStudentQuiz();
+        var quiz = document.getElementById('studentQuizSection');
+        if (!quiz || quiz.style.display === 'none') openStudentArea();
     } catch (e) {
         alert('Could not start this assessment. Please try again.');
         openStudentArea();
@@ -11824,5 +11858,74 @@ async function teacherMsgReply() {
     try {
         await teacherMsgPost({ className: document.getElementById('msgClassSelect').value, body: body, admissionNumbers: [msgOpenAdm] });
         await teacherMsgOpen(msgOpenAdm);
+    } catch (e) { alert(e.message); }
+}
+
+
+// ============================================================
+// CLASSES & SUBJECTS ADDED BY THE ADMIN
+// ============================================================
+var cmCustomOptions = { classes: [], subjects: [] };
+function cmFillSelect(sel, values) {
+    var have = {};
+    Array.prototype.forEach.call(sel.options, function(o) { have[o.value.toLowerCase()] = true; });
+    var other = null;
+    Array.prototype.forEach.call(sel.options, function(o) { if (o.value === 'Other') other = o; });
+    values.forEach(function(v) {
+        if (have[String(v).toLowerCase()]) return;
+        var o = document.createElement('option'); o.value = v; o.textContent = v;
+        if (other) sel.insertBefore(o, other); else sel.appendChild(o);
+        have[String(v).toLowerCase()] = true;
+    });
+}
+function cmApplyCustomOptions() {
+    document.querySelectorAll('select').forEach(function(sel) {
+        var vals = Array.prototype.map.call(sel.options, function(o) { return o.value; });
+        if (vals.indexOf('Primary 1') !== -1) cmFillSelect(sel, cmCustomOptions.classes);
+        if (vals.indexOf('Mathematics') !== -1) cmFillSelect(sel, cmCustomOptions.subjects);
+    });
+}
+async function cmLoadCustomOptions() {
+    try {
+        var r = await fetch(BACKEND_URL + '/api/options');
+        var d = await r.json();
+        cmCustomOptions = { classes: d.classes || [], subjects: d.subjects || [] };
+        cmApplyCustomOptions();
+    } catch (e) {}
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cmLoadCustomOptions); else cmLoadCustomOptions();
+
+function adminAuthJson() { return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('cleverment_admin_token') }; }
+async function loadAdminOptions() {
+    await cmLoadCustomOptions();
+    var draw = function(id, list, kind) {
+        var el = document.getElementById(id); if (!el) return;
+        el.innerHTML = list.length ? list.map(function(v) {
+            return '<div class="cm-trow"><span style="flex:1;">' + escapeHtml(v) + '</span><button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;" data-v="' + escapeHtml(v) + '" onclick="adminOptionDelete(\'' + kind + '\', this.getAttribute(\'data-v\'))">Remove</button></div>';
+        }).join('') : '<p class="helper-text">Nothing added yet.</p>';
+    };
+    draw('optClassList', cmCustomOptions.classes, 'class');
+    draw('optSubjectList', cmCustomOptions.subjects, 'subject');
+}
+async function adminOptionAdd(kind) {
+    var inp = document.getElementById(kind === 'class' ? 'optNewClass' : 'optNewSubject');
+    var v = (inp.value || '').trim();
+    if (!v) { alert('Type a name first.'); return; }
+    try {
+        var r = await fetch(BACKEND_URL + '/api/admin/options', { method: 'POST', headers: adminAuthJson(), body: JSON.stringify({ kind: kind, value: v }) });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not add.');
+        inp.value = '';
+        await loadAdminOptions();
+    } catch (e) { alert(e.message); }
+}
+async function adminOptionDelete(kind, value) {
+    if (!confirm('Remove "' + value + '" from the list? Assessments already using it are not affected.')) return;
+    try {
+        var r = await fetch(BACKEND_URL + '/api/admin/options/delete', { method: 'POST', headers: adminAuthJson(), body: JSON.stringify({ kind: kind, value: value }) });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not remove.');
+        alert('Removed. It will disappear from the drop-downs the next time a page is opened.');
+        await loadAdminOptions();
     } catch (e) { alert(e.message); }
 }
