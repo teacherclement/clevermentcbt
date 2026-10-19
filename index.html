@@ -1178,6 +1178,7 @@
             <div class="sa-brand"><img src="logo.png" alt="CleverMent"><span>CleverMent</span><button type="button" class="sa-menu-close" onclick="studentMenuToggle(false)" aria-label="Close student menu" title="Close menu">×</button></div>
             <button type="button" data-p="home" onclick="studentAreaShow('home')"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span>Overview</span></button>
             <button type="button" data-p="todo" onclick="studentAreaShow('todo')"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Available Assessments</span></button>
+            <button type="button" data-p="closed" onclick="studentAreaShow('closed')"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Closed Assessments</span></button>
             <button type="button" data-p="done" onclick="studentAreaShow('done')"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>Assessment History</span></button>
             <div class="sa-nav-spacer"></div><button type="button" onclick="studentLogout()"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5m5 5H3m9-9h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg><span>Log out</span></button>
         </nav>
@@ -1187,6 +1188,7 @@
         </div>
         <div id="saPanelHome" class="sa-panel"></div>
         <div id="saPanelTodo" class="sa-panel" style="display:none;"></div>
+        <div id="saPanelClosed" class="sa-panel" style="display:none;"></div>
         <div id="saPanelDone" class="sa-panel" style="display:none;"></div>
         <div id="saPanelReview" class="sa-panel" style="display:none;">
             <button type="button" class="secondary-btn" onclick="studentHistoryBack()">&larr; Back to History</button>

@@ -2255,6 +2255,50 @@ function getAvailabilityLabel(a) {
     return { text: 'Live now', color: '#2d9c5c' };
 }
 
+var publishedSelectedIds = {};
+
+function publishedToggle(id, checked) {
+    if (checked) publishedSelectedIds[String(id)] = true; else delete publishedSelectedIds[String(id)];
+    publishedUpdateBar();
+}
+function publishedUpdateBar() {
+    var n = Object.keys(publishedSelectedIds).length;
+    var btn = document.getElementById('publishedBulkDeleteBtn');
+    var all = document.getElementById('publishedSelectAll');
+    if (btn) { btn.disabled = n === 0; btn.textContent = n ? 'Delete selected (' + n + ')' : 'Delete selected'; btn.style.opacity = n ? '1' : '.5'; }
+    if (all) {
+        var total = (teacherAssessmentsCache || []).length;
+        all.checked = total > 0 && n === total;
+    }
+}
+function publishedSelectAll(checked) {
+    publishedSelectedIds = {};
+    var list = teacherAssessmentsCache || [];
+    if (checked) list.forEach(function(a) { publishedSelectedIds[String(a.id)] = true; });
+    document.querySelectorAll('.published-pick').forEach(function(cb) { cb.checked = !!checked; });
+    publishedUpdateBar();
+}
+async function publishedDeleteSelected() {
+    var ids = Object.keys(publishedSelectedIds);
+    if (!ids.length) { alert('Select at least one assessment first.'); return; }
+    if (!confirm('Delete the ' + ids.length + ' selected assessment(s)? This cannot be undone.')) return;
+    var teacherToken = localStorage.getItem('cleverment_teacher_token');
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/assessments/bulk-delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + teacherToken },
+            body: JSON.stringify({ ids: ids.map(function(x) { var n = Number(x); return Number.isFinite(n) ? n : x; }) })
+        });
+        var data = await res.json();
+        if (!res.ok) { alert('Error: ' + (data.error || 'Could not delete the assessments.')); return; }
+    } catch (e) {
+        alert('Could not reach the server. Please check your connection.');
+        return;
+    }
+    publishedSelectedIds = {};
+    renderTeacherPublishedList();
+}
+
 async function renderTeacherPublishedList() {
     var container = document.getElementById('teacherPublishedList');
     if (!container) return;
@@ -2271,14 +2315,20 @@ async function renderTeacherPublishedList() {
         return;
     }
 
-    var html = '';
+    var stillThere = {};
+    filtered.forEach(function(x) { stillThere[String(x.id)] = true; });
+    Object.keys(publishedSelectedIds).forEach(function(k) { if (!stillThere[k]) delete publishedSelectedIds[k]; });
+
+    var html = '<div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:10px;">' +
+        '<label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:14px; cursor:pointer;"><input type="checkbox" id="publishedSelectAll" onchange="publishedSelectAll(this.checked)" style="width:18px; height:18px;"> Select all</label>' +
+        '<button type="button" id="publishedBulkDeleteBtn" onclick="publishedDeleteSelected()" class="secondary-btn" style="font-size:13px; padding:6px 14px; background:#dc3545; color:white; opacity:.5;" disabled>Delete selected</button></div>';
     for (var i = 0; i < filtered.length; i++) {
         var a = filtered[i];
         var timeDisplay = a.timeLimit > 0 ? Math.floor(a.timeLimit / 60) + ' min' : 'No limit';
         var avail = getAvailabilityLabel(a);
         html += '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
-            '<div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span>' + getMonitoringBadge(a) + '<br>' +
-            '<span style="color:' + avail.color + '; font-size:12px; font-weight:600;">' + avail.text + '</span></div>' +
+            '<div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="published-pick" aria-label="Select this assessment" ' + (publishedSelectedIds[String(a.id)] ? 'checked ' : '') + 'onchange="publishedToggle(' + a.id + ', this.checked)" style="width:18px; height:18px; margin-top:3px; flex:0 0 auto;"><div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span>' + getMonitoringBadge(a) + '<br>' +
+            '<span style="color:' + avail.color + '; font-size:12px; font-weight:600;">' + avail.text + '</span></div></div>' +
             '<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">' +
             '<span style="background:#eef6ff; padding:4px 12px; border-radius:6px; font-weight:600; font-size:13px; color:#2d6cdf;">Code: ' + a.code + '</span>' +
             '<button onclick="copyAssessmentCode(\'' + a.code + '\')" class="secondary-btn" style="font-size:12px; padding:4px 12px;">Copy Code</button>' +
@@ -2288,6 +2338,7 @@ async function renderTeacherPublishedList() {
             '</div></div>';
     }
     container.innerHTML = html;
+    publishedUpdateBar();
 }
 
 
@@ -9790,7 +9841,7 @@ async function addSchoolMemberAdmin(id) {
     };
 })();
 
-var slChosen = null, slTimer = null, saTodo = [], saDone = [];
+var slChosen = null, slTimer = null, saTodo = [], saClosed = [], saDone = [];
 
 function studentShowOnly(id) {
     ['landingPage', 'studentAccess', 'studentAssessmentView', 'studentLoginPage', 'studentAreaPage'].forEach(function(x) {
@@ -9871,7 +9922,7 @@ async function studentLoginSubmit() {
 function studentLogout() {
     localStorage.removeItem('cleverment_student_token');
     localStorage.removeItem('cleverment_student_profile');
-    saTodo = []; saDone = [];
+    saTodo = []; saClosed = []; saDone = [];
     studentShowOnly('landingPage');
 }
 
@@ -9883,7 +9934,7 @@ async function openStudentArea() {
 }
 
 function studentAreaShow(p) {
-    var map = { home: 'saPanelHome', todo: 'saPanelTodo', done: 'saPanelDone', review: 'saPanelReview' };
+    var map = { home: 'saPanelHome', todo: 'saPanelTodo', closed: 'saPanelClosed', done: 'saPanelDone', review: 'saPanelReview' };
     Object.keys(map).forEach(function(k) {
         var el = document.getElementById(map[k]);
         if (el) el.style.display = (k === p) ? 'block' : 'none';
@@ -9937,14 +9988,19 @@ async function loadStudentAssessments() {
         if (r.status === 401) { studentLogout(); return; }
         var d = await r.json();
         if (!r.ok) throw new Error(d.error || 'Could not load assessments.');
-        saTodo = d.todo || []; saDone = d.done || [];
+        var allTodo = d.todo || [];
+        saTodo = allTodo.filter(function(x) { return x.status !== 'closed'; });
+        saClosed = allTodo.filter(function(x) { return x.status === 'closed'; });
+        saDone = d.done || [];
         renderStudentTodo(saTodo);
+        renderStudentClosed(saClosed);
         renderStudentDone(saDone);
         document.getElementById('saPanelHome').innerHTML =
             '<h2 style="margin:0 0 6px;color:#172033;">Your learning overview</h2>' +
             '<p class="helper-text" style="margin:0 0 18px;">Keep track of assessments assigned to you and review your completed work.</p>' +
             '<div class="sa-summary-grid">' +
             '<div class="sa-summary-card"><span>Available assessments</span><strong>' + saTodo.length + '</strong><button type="button" class="secondary-btn" onclick="studentAreaShow(\'todo\')">View assessments</button></div>' +
+            '<div class=\"sa-summary-card\"><span>Closed assessments</span><strong>' + saClosed.length + '</strong><button type=\"button\" class=\"secondary-btn\" onclick=\"studentAreaShow(\'closed\')\">View closed</button></div>' +
             '<div class="sa-summary-card"><span>Completed assessments</span><strong>' + saDone.length + '</strong><button type="button" class="secondary-btn" onclick="studentAreaShow(\'done\')">View history</button></div>' +
             '<div class="sa-summary-card"><span>Learning tip</span><strong style="font-size:18px;">Be prepared</strong><p class="helper-text">Check the time limit and instructions before starting each assessment.</p></div>' +
             '</div><h3 style="margin:22px 0 10px;">Quick actions</h3>' +
@@ -9963,6 +10019,17 @@ function renderStudentTodo(list) {
             (x.until ? ' · closes ' + escapeHtml(new Date(x.until).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : '');
         return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div></div>' +
             (x.status === 'open' ? '<button type="button" class="primary-btn" data-code="' + escapeHtml(x.code) + '" onclick="studentAreaStart(this.getAttribute(\'data-code\'))">' + label + '</button>' : '<span class="sa-badge">' + label + '</span>') + '</div>';
+    }).join('');
+}
+
+function renderStudentClosed(list) {
+    var el = document.getElementById('saPanelClosed');
+    if (!el) return;
+    if (!list.length) { el.innerHTML = '<h2>Closed Assessments</h2><p class="helper-text">Assessments whose time has ended and that you did not take will appear here.</p>'; return; }
+    el.innerHTML = '<h2 style="margin:0 0 12px;">Closed Assessments</h2><p class="helper-text" style="margin:0 0 12px;">These assessments are no longer open. Ask your teacher if you missed one.</p>' + list.map(function(x) {
+        var meta = escapeHtml(x.className) + ' · ' + x.questionCount + ' questions' + (x.timeLimit ? ' · ' + Math.round(x.timeLimit / 60) + ' min' : '') +
+            (x.until ? ' · closed ' + escapeHtml(new Date(x.until).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : '');
+        return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div></div><span class="sa-badge">Closed</span></div>';
     }).join('');
 }
 
