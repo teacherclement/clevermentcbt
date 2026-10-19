@@ -2520,3 +2520,98 @@ body.school-link #landingAdminBtn { display: none !important; }
 .sa-summary-card > strong { color:#172033; font-size:32px; line-height:1.1; }
 .sa-summary-card .helper-text { margin:0; }
 .sa-quick-actions { display:flex; gap:10px; flex-wrap:wrap; }
+
+/* ============================================================
+   Unified off-canvas navigation: Teacher, Admin and Student
+   Sidebars are fully hidden until the top-left hamburger is tapped.
+   ============================================================ */
+.dashboard-menu-top.sidebar-toggle,
+.student-menu-open {
+    display: inline-flex;
+    position: fixed;
+    left: 16px;
+    top: 14px;
+    z-index: 1500;
+    width: 46px;
+    height: 46px;
+    padding: 10px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #d7deea;
+    border-radius: 12px;
+    background: #172033;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(23,32,51,.18);
+    cursor: pointer;
+}
+.dashboard-menu-top svg,
+.student-menu-open svg { width: 24px; height: 24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+.dashboard-menu-top { font-size:0; margin:0; }
+.dash-layout { display:block !important; }
+.dash-layout .dash-main { width:100%; min-width:0; }
+.dash-layout .dash-sidebar {
+    position:fixed !important; top:0 !important; bottom:0 !important; left:0 !important;
+    width:min(290px, 88vw) !important; max-height:none !important; height:100dvh;
+    border-radius:0 16px 16px 0 !important; z-index:1600 !important;
+    overflow-y:auto; transform:translateX(-110%) !important;
+    transition:transform .24s ease !important;
+    box-shadow:0 14px 48px rgba(0,0,0,.28);
+    padding:22px 14px !important; box-sizing:border-box;
+}
+.dash-layout.sidebar-open .dash-sidebar { transform:translateX(0) !important; }
+.dash-layout .sidebar-backdrop { display:none; position:fixed; inset:0; background:rgba(10,16,28,.56); z-index:1550; }
+.dash-layout.sidebar-open .sidebar-backdrop { display:block !important; }
+.dash-layout.sidebar-collapsed .dash-sidebar { width:min(290px, 88vw) !important; flex-basis:auto !important; }
+.dash-layout.sidebar-collapsed .dash-branding { padding:4px 4px 14px !important; margin-bottom:8px !important; }
+.dash-layout.sidebar-collapsed .dash-logo-image { max-width:100% !important; max-height:72px !important; }
+.dash-layout.sidebar-collapsed .dash-tagline { opacity:1 !important; max-height:none !important; }
+.dash-layout.sidebar-collapsed .dash-nav-item { justify-content:flex-start !important; gap:10px !important; padding:10px 12px !important; }
+.dash-layout.sidebar-collapsed .dash-nav-item span { display:block !important; position:static !important; width:auto !important; height:auto !important; clip:auto !important; overflow:visible !important; }
+.dash-layout .sidebar-collapse-toggle { display:none !important; }
+.sidebar-close-btn {
+    display:flex; align-items:center; justify-content:center; position:sticky; top:0; margin-left:auto; margin-bottom:8px;
+    width:38px; height:38px; border:1px solid #d7deea; border-radius:10px; background:#fff;
+    color:#172033; font-size:28px; line-height:1; cursor:pointer; z-index:3;
+}
+#teacherDashboard, #adminDashboard { padding-top:68px; }
+#studentAreaPage {
+    width:100% !important; max-width:none !important; min-height:100vh; margin:0 !important;
+    padding:82px 24px 36px !important; box-sizing:border-box; position:relative; left:0 !important; right:auto !important;
+    background:#f4f6fb;
+}
+#studentAreaPage .sa-nav {
+    position:fixed !important; top:0 !important; bottom:0 !important; left:0 !important;
+    width:min(290px, 88vw) !important; height:100dvh; padding:20px 14px !important;
+    border-radius:0 16px 16px 0; transform:translateX(-110%); transition:transform .24s ease;
+    z-index:1600 !important; box-shadow:0 14px 48px rgba(0,0,0,.28); box-sizing:border-box;
+}
+#studentAreaPage.sa-sidebar-open .sa-nav { transform:translateX(0); }
+#studentAreaPage .sa-brand { padding-bottom:18px; }
+#studentAreaPage .sa-menu-close {
+    display:flex; align-items:center; justify-content:center; margin-left:auto; padding:0 !important;
+    width:38px !important; height:38px; border:1px solid #475569 !important; border-radius:10px;
+    background:#26354f !important; color:#fff !important; font-size:28px; line-height:1; cursor:pointer;
+}
+#studentAreaPage.sa-sidebar-open::before { content:""; position:fixed; inset:0; z-index:1500; background:rgba(10,16,28,.56); }
+#studentAreaPage .sa-nav { z-index:1601 !important; }
+#studentAreaPage .sa-panel { width:100%; max-width:none; box-sizing:border-box; }
+#studentAreaPage .sa-top { width:100%; box-sizing:border-box; }
+#studentAreaPage .sa-mobile-logout { display:inline-flex; }
+.student-login-page { min-height:calc(100dvh - 20px) !important; padding:36px 16px 74px !important; justify-content:center; }
+.student-login-footnote {
+    position:fixed !important; left:0 !important; right:0 !important; bottom:0 !important; width:100% !important;
+    margin:0 !important; padding:12px 16px calc(12px + env(safe-area-inset-bottom)) !important;
+    box-sizing:border-box; text-align:center !important; color:#718096; font-size:12px; line-height:1.5;
+    background:rgba(244,246,251,.97); border-top:1px solid #e2e8f0; z-index:20;
+}
+@media (max-width:900px) {
+    #teacherDashboard, #adminDashboard { padding:68px 12px 20px !important; }
+    #studentAreaPage { padding:76px 14px 24px !important; }
+    #studentAreaPage .sa-nav { width:min(290px, 88vw) !important; }
+    #studentAreaPage.sa-sidebar-collapsed { padding-left:14px !important; }
+    #studentAreaPage.sa-sidebar-collapsed .sa-nav { width:min(290px, 88vw) !important; }
+    #studentAreaPage.sa-sidebar-collapsed .sa-brand span,
+    #studentAreaPage.sa-sidebar-collapsed .sa-nav button span { display:inline !important; }
+    #studentAreaPage.sa-sidebar-collapsed .sa-nav button { justify-content:flex-start !important; }
+    .student-login-page { padding-left:18px !important; padding-right:18px !important; }
+}

@@ -422,7 +422,7 @@
 
     <!-- ===== TEACHER DASHBOARD ===== -->
     <div id="teacherDashboard" style="display:none;">
-        <button class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('teacherDashboard')">&#9776; Menu</button>
+        <button type="button" class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('teacherDashboard')" aria-label="Open teacher menu" title="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
             <div>
                 <h2 id="teacherDashboardName">Teacher Dashboard</h2>
@@ -433,6 +433,7 @@
 
         <div class="dash-layout">
             <aside class="dash-sidebar">
+                <button type="button" class="sidebar-close-btn" onclick="toggleDashSidebar('teacherDashboard')" aria-label="Close menu" title="Close menu">×</button>
                 <button type="button" class="sidebar-collapse-toggle" onclick="toggleDashSidebarCollapse('teacherDashboard', this)" aria-label="Collapse sidebar" title="Collapse sidebar"><span aria-hidden="true">‹</span></button>
                 <div class="dash-branding">
                     <img src="logo.png" alt="CleverMent Logo" class="dash-logo-image">
@@ -958,7 +959,7 @@
     </div>
 
     <div id="adminDashboard" style="display:none;">
-        <button class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('adminDashboard')">&#9776; Menu</button>
+        <button type="button" class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('adminDashboard')" aria-label="Open admin menu" title="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
             <h2>Admin Dashboard</h2>
             <button onclick="adminLogout()" class="secondary-btn" style="font-size:13px; padding:6px 16px;">Logout</button>
@@ -966,6 +967,7 @@
 
         <div class="dash-layout">
             <aside class="dash-sidebar">
+                <button type="button" class="sidebar-close-btn" onclick="toggleDashSidebar('adminDashboard')" aria-label="Close menu" title="Close menu">×</button>
                 <button type="button" class="sidebar-collapse-toggle" onclick="toggleDashSidebarCollapse('adminDashboard', this)" aria-label="Collapse sidebar" title="Collapse sidebar"><span aria-hidden="true">‹</span></button>
                 <div class="dash-branding">
                     <img src="logo.png" alt="CleverMent Logo" class="dash-logo-image">
@@ -1370,9 +1372,10 @@
     </div>
 
     <!-- ===== Student home (after login) ===== -->
+    <button type="button" id="studentMenuOpen" class="student-menu-open" style="display:none;" onclick="studentMenuToggle(true)" aria-label="Open student menu" title="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     <div id="studentAreaPage" style="display:none; padding:12px 16px 90px; max-width:640px; margin:0 auto;">
         <nav class="sa-nav" id="saNav">
-            <div class="sa-brand"><img src="logo.png" alt="CleverMent"><span>CleverMent</span><button type="button" class="sa-collapse" onclick="studentSidebarToggle()" aria-label="Collapse sidebar"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button></div>
+            <div class="sa-brand"><img src="logo.png" alt="CleverMent"><span>CleverMent</span><button type="button" class="sa-menu-close" onclick="studentMenuToggle(false)" aria-label="Close student menu" title="Close menu">×</button></div>
             <button type="button" data-p="home" onclick="studentAreaShow('home')"><svg viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span>Overview</span></button>
             <button type="button" data-p="todo" onclick="studentAreaShow('todo')"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Available Assessments</span></button>
             <button type="button" data-p="done" onclick="studentAreaShow('done')"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg><span>Assessment History</span></button>

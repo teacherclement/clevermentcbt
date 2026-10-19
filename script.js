@@ -7469,7 +7469,12 @@ if ('serviceWorker' in navigator) {
 
 function toggleDashSidebar(dashboardId) {
     var layout = document.querySelector('#' + dashboardId + ' .dash-layout');
-    if (layout) layout.classList.toggle('sidebar-open');
+    if (!layout) return;
+    var opening = !layout.classList.contains('sidebar-open');
+    layout.classList.toggle('sidebar-open', opening);
+    var trigger = document.querySelector('#' + dashboardId + ' .dashboard-menu-top');
+    if (trigger) trigger.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    document.body.classList.toggle('cm-menu-open', opening);
 }
 
 // Desktop sidebar collapse: icon-only mode with a compact CleverMent logo.
@@ -9792,6 +9797,9 @@ function studentShowOnly(id) {
         var el = document.getElementById(x);
         if (el) el.style.display = (x === id) ? 'block' : 'none';
     });
+    var menuButton = document.getElementById('studentMenuOpen');
+    if (menuButton) menuButton.style.display = id === 'studentAreaPage' ? 'inline-flex' : 'none';
+    if (id !== 'studentAreaPage') studentMenuToggle(false);
 }
 function openStudentLogin() {
     slChosen = null;
@@ -9881,12 +9889,19 @@ function studentAreaShow(p) {
         if (el) el.style.display = (k === p) ? 'block' : 'none';
     });
     document.querySelectorAll('.sa-nav button').forEach(function(b) { b.classList.toggle('active', b.getAttribute('data-p') === p); });
+    if (window.matchMedia && window.matchMedia('(max-width: 900px)').matches) studentMenuToggle(false);
 }
 
-function studentSidebarToggle() {
+function studentMenuToggle(open) {
     var page = document.getElementById('studentAreaPage');
-    if (page) page.classList.toggle('sa-sidebar-collapsed');
+    var trigger = document.getElementById('studentMenuOpen');
+    if (!page) return;
+    var shouldOpen = (typeof open === 'boolean') ? open : !page.classList.contains('sa-sidebar-open');
+    page.classList.toggle('sa-sidebar-open', shouldOpen);
+    if (trigger) trigger.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    document.body.classList.toggle('cm-menu-open', shouldOpen);
 }
+function studentSidebarToggle() { studentMenuToggle(false); }
 
 function renderStudentProfile(me) {
     var box = document.getElementById('saProfile');
@@ -9970,9 +9985,11 @@ async function studentAreaStart(code) {
     if (input) input.value = code;
     try {
         await verifyAssessmentCode();
+        // A restricted assessment may redirect to student login instead of loading the quiz.
+        if (!currentAssessment || currentAssessmentCode !== String(code || '').trim().toUpperCase()) return;
         document.getElementById('studentNameInput').value = prof.name || '';
         document.getElementById('studentAdmissionNumber').value = prof.admissionNumber || '';
-        startStudentQuiz();
+        await startStudentQuiz();
     } catch (e) {
         alert('Could not start this assessment. Please try again.');
         openStudentArea();
