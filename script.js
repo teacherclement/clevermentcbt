@@ -9195,6 +9195,7 @@ function cmOnPopState(e) {
 
     cmNavSuppress = true;
     try {
+        ['studentLoginPage', 'studentAreaPage', 'studentMenuOpen'].forEach(function(id) { var e0 = document.getElementById(id); if (e0) e0.style.display = 'none'; });
         var teacherIn = !!currentTeacher;
         var adminIn = false;
         try { adminIn = !!localStorage.getItem('cleverment_admin_token'); } catch (err) {}
@@ -12222,37 +12223,66 @@ function learnSaveProgress(id, score, total) {
     t.attempts++; t.last = Math.round(score / total * 100); t.best = Math.max(t.best, t.last); p[id] = t;
     try { localStorage.setItem('cm_learn_progress', JSON.stringify(p)); } catch (e) {}
 }
+function learnCard(title, sub, onclick, soon) {
+    return '<div class="sa-card' + (soon ? '' : ' sa-card-click') + '" data-s="' + escapeHtml((title + ' ' + (sub || '')).toLowerCase()) + '"' + (soon ? '' : ' role="button" tabindex="0" onclick="' + onclick + '"') + '><div><b>' + escapeHtml(title) + '</b>' + (sub ? '<div class="helper-text">' + escapeHtml(sub) + '</div>' : '') + '</div>' + (soon ? '<span class="sa-badge">Coming soon</span>' : '') + '</div>';
+}
+function learnSearchBox(ph, fn) { return '<input type="search" id="learnSearch" class="form-input learn-search" placeholder="' + ph + '" oninput="' + fn + '(this.value)" autocomplete="off">'; }
+function learnFilter(q) {
+    q = String(q || '').toLowerCase().trim();
+    var shown = 0;
+    document.querySelectorAll('#learnList .sa-card').forEach(function(c) { var ok = !q || c.getAttribute('data-s').indexOf(q) >= 0; c.style.display = ok ? '' : 'none'; if (ok) shown++; });
+    document.querySelectorAll('#learnList .learn-strand').forEach(function(h) { var any = false, n = h.nextElementSibling; while (n && !n.classList.contains('learn-strand')) { if (n.style.display !== 'none') any = true; n = n.nextElementSibling; } h.style.display = any ? '' : 'none'; });
+    var e = document.getElementById('learnEmpty'); if (e) e.style.display = shown ? 'none' : 'block';
+}
 async function learnHome() {
     var el = learnEl(); el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text">Loading...</p>';
     try {
-        if (!learnIndex) { var r = await fetch('learning-index.json?v=4'); if (!r.ok) throw new Error('missing-file:index'); learnIndex = await r.json(); }
-        el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text">Choose your class. Each topic has a lesson and a practice test where you choose how many questions to answer.</p>' +
-            learnIndex.classes.map(function(c) {
+        if (!learnIndex) { var r = await fetch('learning-index.json?v=5'); if (!r.ok) throw new Error('missing-file:index'); learnIndex = await r.json(); }
+        el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text">Search for a class, subject or topic, or tap a class below.</p>' + learnSearchBox('Search class, subject or topic...', 'learnGlobalSearch') +
+            '<div id="learnList" class="learn-scroll">' + learnIndex.classes.map(function(c) {
                 var ready = c.subjects && c.subjects.length;
-                return '<div class="sa-card sa-card-click" onclick="learnClass(\'' + c.key + '\')"><div><b>' + escapeHtml(c.name) + '</b><div class="helper-text">' + escapeHtml((c.tracks || []).join(' · ') || c.level) + '</div></div><span class="sa-badge">' + (ready ? 'Open' : 'Coming soon') + '</span></div>';
-            }).join('');
+                return learnCard(c.name, (c.tracks || []).join(' \u00B7 ') || c.level, "learnClass('" + c.key + "')", false).replace('</div></div>', '</div>' + (ready ? '' : '<span class="sa-badge">Coming soon</span>') + '</div>');
+            }).join('') + '</div><p id="learnEmpty" class="helper-text" style="display:none;">Nothing found.</p>';
     } catch (e) { el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text" style="color:#dc3545;">' + escapeHtml(learnFail(e)) + '</p><button type="button" class="secondary-btn" onclick="learnIndex=null;learnHome()">Try again</button>'; }
+}
+function learnGlobalSearch(q) {
+    q = String(q || '').toLowerCase().trim();
+    var list = document.getElementById('learnList'); if (!list) return;
+    if (q.length < 2) { learnHome(); return; }
+    var out = [];
+    learnIndex.classes.forEach(function(c) {
+        if (c.name.toLowerCase().indexOf(q) >= 0) out.push(learnCard(c.name, 'Class', "learnClass('" + c.key + "')", false));
+        (c.subjects || []).forEach(function(sb) {
+            if (sb.name.toLowerCase().indexOf(q) >= 0) out.push(learnCard(sb.name, c.name, "learnGo('" + c.key + "','" + sb.key + "')", false));
+            sb.topics.forEach(function(t) { if (t.status === 'ready' && t.title.toLowerCase().indexOf(q) >= 0 && out.length < 60) out.push(learnCard(t.title, c.name + ' \u203A ' + sb.name, "learnGo('" + c.key + "','" + sb.key + "','" + t.id + "')", false)); });
+        });
+    });
+    list.innerHTML = out.length ? out.join('') : '<p class="helper-text">Nothing found. Try another word.</p>';
+}
+function learnGo(ck, sk, tid) {
+    learnCur = { cls: learnIndex.classes.filter(function(c) { return c.key === ck; })[0] };
+    learnSubject(sk);
+    if (tid) learnTopic(tid);
 }
 function learnClass(key) {
     var c = learnIndex.classes.filter(function(x) { return x.key === key; })[0]; learnCur = { cls: c };
     var el = learnEl();
     var back = '<button type="button" class="secondary-btn" onclick="learnHome()">&larr; All classes</button>';
     if (!c.subjects || !c.subjects.length) { el.innerHTML = back + '<h2>' + escapeHtml(c.name) + '</h2><p class="helper-text">Lessons and practice for this class are being prepared. Please check back soon.</p>'; return; }
-    el.innerHTML = back + '<h2>' + escapeHtml(c.name) + '</h2>' + c.subjects.map(function(s) {
-        return '<div class="sa-card sa-card-click" onclick="learnSubject(\'' + s.key + '\')"><div><b>' + escapeHtml(s.name) + '</b><div class="helper-text">' + escapeHtml((s.tracks || []).join(' · ')) + '</div></div><span class="sa-badge">Open</span></div>';
-    }).join('');
+    el.innerHTML = back + '<h2>' + escapeHtml(c.name) + '</h2>' + learnSearchBox('Search subjects...', 'learnFilter') + '<div id="learnList" class="learn-scroll">' + c.subjects.map(function(sb) { return learnCard(sb.name, (sb.tracks || []).join(' \u00B7 '), "learnSubject('" + sb.key + "')", false); }).join('') + '</div><p id="learnEmpty" class="helper-text" style="display:none;">Nothing found.</p>';
 }
 function learnSubject(key) {
     var c = learnCur.cls, sub = c.subjects.filter(function(x) { return x.key === key; })[0]; learnCur.sub = sub;
     var prog = learnProgress(), last = '';
     var ready = sub.topics.filter(function(t) { return t.status === 'ready'; }).length;
-    learnEl().innerHTML = '<button type="button" class="secondary-btn" onclick="learnClass(\'' + c.key + '\')">&larr; ' + escapeHtml(c.name) + '</button><h2>' + escapeHtml(sub.name) + '</h2><p class="helper-text">' + ready + ' of ' + sub.topics.length + ' topics are ready to practise.</p>' + sub.topics.map(function(t) {
-        var head = '';
-        if (t.strand && t.strand !== last) { last = t.strand; head = '<h3 style="margin:16px 0 6px;color:#2d6cdf;">' + escapeHtml(t.strand) + '</h3>'; }
-        var p = prog[t.id];
-        if (t.status !== 'ready') return head + '<div class="sa-card"><div><b>' + escapeHtml(t.title) + '</b></div><span class="sa-badge">Coming soon</span></div>';
-        return head + '<div class="sa-card sa-card-click" onclick="learnTopic(\'' + t.id + '\')"><div><b>' + escapeHtml(t.title) + '</b><div class="helper-text">' + (p ? 'Best score: ' + p.best + '% · ' + p.attempts + ' practice(s)' : 'Not practised yet') + '</div></div><span class="sa-badge">Open</span></div>';
-    }).join('');
+    learnEl().innerHTML = '<button type="button" class="secondary-btn" onclick="learnClass(\'' + c.key + '\')">&larr; ' + escapeHtml(c.name) + '</button><h2>' + escapeHtml(sub.name) + '</h2><p class="helper-text">' + ready + ' of ' + sub.topics.length + ' topics are ready to practise.</p>' + learnSearchBox('Search topics...', 'learnFilter') +
+        '<div id="learnList" class="learn-scroll">' + sub.topics.map(function(t) {
+            var head = '';
+            if (t.strand && t.strand !== last) { last = t.strand; head = '<h3 class="learn-strand">' + escapeHtml(t.strand) + '</h3>'; }
+            var p = prog[t.id];
+            if (t.status !== 'ready') return head + learnCard(t.title, '', '', true);
+            return head + learnCard(t.title, p ? 'Best score: ' + p.best + '% \u00B7 ' + p.attempts + ' practice(s)' : 'Not practised yet', "learnTopic('" + t.id + "')", false);
+        }).join('') + '</div><p id="learnEmpty" class="helper-text" style="display:none;">Nothing found.</p>';
 }
 async function learnTopic(id) {
     var t = learnCur.sub.topics.filter(function(x) { return x.id === id; })[0]; learnCur.topic = t;
@@ -12262,10 +12292,22 @@ async function learnTopic(id) {
         var d;
         if (t.lesson) { d = t.lesson; }
         else {
-            var ex = window.CMLearnGen.get(t.id, 0);
-            d = { title: t.title, summary: t.strand || '', objectives: [],
-                html: '<h3>Key idea</h3><p>' + escapeHtml(t.note || '') + '</p>' + (ex ? '<h3>Worked example</h3>' + (ex.svg || '') + '<p>' + escapeHtml(ex.q) + '</p><p><b>Answer: ' + escapeHtml(ex.options[ex.answer]) + '</b></p><div class="explain">' + escapeHtml(ex.explain) + '</div>' : '') + '<div class="cm-tip">A full illustrated lesson for this topic is being added. Practise below to learn by doing.</div>' };
+            d = { title: t.title, summary: t.strand || '', objectives: [], html: '<h3>Key idea</h3><p>' + escapeHtml(t.note || '') + '</p>' };
         }
+        d = Object.assign({}, d);
+        var extra = '';
+        if (t.steps && t.steps.length) extra += '<h3>How to do it, step by step</h3><ol>' + t.steps.map(function(x) { return '<li>' + escapeHtml(x) + '</li>'; }).join('') + '</ol>';
+        var shown = {}, exs = [], tries = [3, 41, 87, 150, 233, 311, 420, 555];
+        for (var q = 0; q < tries.length && exs.length < 4; q++) {
+            var ex = window.CMLearnGen.get(t.id, tries[q]);
+            if (ex && !shown[ex.q]) { shown[ex.q] = 1; exs.push(ex); }
+        }
+        if (exs.length) extra += '<h3>Worked examples</h3>' + exs.map(function(ex, i) {
+            return '<div class="cm-flash" style="padding:12px;"><b>Example ' + (i + 1) + '</b>' + (ex.svg || '') + '<p>' + escapeHtml(ex.q) + '</p><p>Answer: <b style="color:#2d9c5c;">' + escapeHtml(ex.options[ex.answer]) + '</b></p><div class="explain"><b>Working:</b> ' + escapeHtml(ex.explain) + '</div></div>';
+        }).join('');
+        if (t.mistake) extra += '<div class="cm-tip" style="border-left-color:#dc3545;"><b>Common mistake:</b> ' + escapeHtml(t.mistake) + '</div>';
+        extra += '<div class="cm-tip"><b>Remember:</b> read the question carefully, write your working, and check your answer by estimating or doing the opposite operation.</div>';
+        d.html += extra;
         el.innerHTML = '<button type="button" class="secondary-btn" onclick="learnSubject(\'' + learnCur.sub.key + '\')">&larr; ' + escapeHtml(learnCur.sub.name) + '</button><h2>' + escapeHtml(d.title) + '</h2><p class="helper-text">' + escapeHtml(d.summary || '') + '</p>' +
             (d.objectives && d.objectives.length ? '<div class="cm-flash"><b>By the end you can:</b><ul>' + d.objectives.map(function(o) { return '<li>' + escapeHtml(o) + '</li>'; }).join('') + '</ul></div>' : '') +
             '<div class="cm-lesson">' + d.html + '</div>' +
@@ -12290,22 +12332,25 @@ function learnShow() {
         var pc = Math.round(R.score / R.qs.length * 100);
         el.innerHTML = '<h2>Practice complete</h2><div class="cm-stat-row"><div class="cm-stat"><span>Score</span><strong>' + pc + '%</strong></div><div class="cm-stat"><span>Correct</span><strong>' + R.score + '/' + R.qs.length + '</strong></div></div>' +
             '<p>' + (pc >= 80 ? 'Excellent work!' : (pc >= 50 ? 'Good effort. Practise again to improve.' : 'Read the lesson again, then try once more.')) + '</p>' +
-            (R.wrong.length ? '<h3>Review your mistakes</h3>' + R.wrong.map(function(q) { return '<div class="cm-flash" style="padding:12px;">' + q.svg + '<p>' + escapeHtml(q.q) + '</p><p>Correct answer: <b style="color:#2d9c5c;">' + escapeHtml(q.options[q.answer]) + '</b></p><div class="explain">' + escapeHtml(q.explain) + '</div></div>'; }).join('') : '') +
+            (R.wrong.length ? '<h3>Review your mistakes</h3>' + R.wrong.map(function(q, n) { return '<div class="correction-item"><p><strong>Q:</strong> ' + (q.svg || '') + escapeHtml(q.q) + '</p><p>Correct answer: <strong style="color:#2d9c5c">' + escapeHtml(q.options[q.answer]) + '</strong></p><p class="explain">' + escapeHtml(q.explain) + '</p></div>'; }).join('') : '') +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="primary-btn" onclick="learnTopic(\'' + learnCur.topic.id + '\')">Back to lesson</button><button type="button" class="secondary-btn" onclick="learnStart()">Practise again</button></div>';
         renderMathIn(el);
         return;
     }
-    var q = R.qs[R.i];
-    el.innerHTML = '<div class="helper-text">Question ' + (R.i + 1) + ' of ' + R.qs.length + ' · Score ' + R.score + '</div><div class="cm-flash">' + q.svg + '<p style="font-size:17px;margin:8px 0 12px;">' + escapeHtml(q.q) + '</p>' +
-        q.options.map(function(o, ix) { return '<button type="button" class="secondary-btn learn-opt" style="display:block;width:100%;text-align:left;margin:6px 0;" onclick="learnAnswer(' + ix + ')">' + String.fromCharCode(65 + ix) + '. ' + escapeHtml(o) + '</button>'; }).join('') + '<div id="lnFeed"></div></div>' +
+    var q = R.qs[R.i], letters = ['A', 'B', 'C', 'D'];
+    el.innerHTML = '<div class="learn-top"><span id="learnProgressTxt">Question ' + (R.i + 1) + ' of ' + R.qs.length + '</span><span>Score: ' + R.score + '</span></div>' +
+        '<div class="learn-bar"><i style="width:' + Math.round(R.i / R.qs.length * 100) + '%"></i></div>' +
+        '<div id="learnQuestionBox"><div id="learnQuestionText">' + (q.svg || '') + escapeHtml(q.q) + '</div><div id="learnOptions">' +
+        q.options.map(function(o, ix) { return '<div class="option" role="button" tabindex="0" onclick="learnAnswer(' + ix + ')">' + letters[ix] + '. ' + escapeHtml(o) + '</div>'; }).join('') + '</div><div id="lnFeed"></div></div>' +
         '<button type="button" class="secondary-btn" onclick="learnTopic(\'' + learnCur.topic.id + '\')">Stop practice</button>';
     renderMathIn(el);
 }
 function learnAnswer(ix) {
-    var R = learnRun, q = R.qs[R.i], ok = ix === q.answer;
-    document.querySelectorAll('.learn-opt').forEach(function(b, i) { b.disabled = true; if (i === q.answer) b.style.cssText += ';background:#e6f7ec;border-color:#2d9c5c;'; else if (i === ix) b.style.cssText += ';background:#fdecec;border-color:#dc3545;'; });
+    var R = learnRun, q = R.qs[R.i];
+    if (R.answered) return; R.answered = true;
+    var ok = ix === q.answer;
+    document.querySelectorAll('#learnOptions .option').forEach(function(b, i) { b.style.pointerEvents = 'none'; if (i === q.answer) b.classList.add('correct'); else if (i === ix) b.classList.add('wrong'); });
     if (ok) R.score++; else R.wrong.push(q);
-    document.getElementById('lnFeed').innerHTML = '<p style="color:' + (ok ? '#2d9c5c' : '#dc3545') + ';font-weight:700;">' + (ok ? 'Correct!' : 'Not correct.') + '</p><div class="explain">' + escapeHtml(q.explain) + '</div><button type="button" class="primary-btn" style="margin-top:10px;" onclick="learnRun.i++;learnShow()">' + (R.i + 1 >= R.qs.length ? 'See results' : 'Next question') + '</button>';
+    document.getElementById('lnFeed').innerHTML = '<p class="learn-verdict" style="color:' + (ok ? '#2d9c5c' : '#dc3545') + ';">' + (ok ? 'Correct!' : 'Not correct.') + '</p><div class="explain">' + escapeHtml(q.explain) + '</div><button type="button" class="primary-btn" style="margin-top:10px;" onclick="learnRun.answered=false;learnRun.i++;learnShow()">' + (R.i + 1 >= R.qs.length ? 'See results' : 'Next question') + '</button>';
     renderMathIn(document.getElementById('lnFeed'));
-    document.querySelectorAll('.learn-opt').forEach(function(b) { renderMathIn(b); });
 }

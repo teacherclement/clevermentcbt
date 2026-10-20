@@ -2720,3 +2720,19 @@ body.school-link #landingAdminBtn { display: none !important; }
 .cm-lesson h3 { margin:14px 0 6px; color:#1a1a2e; font-size:17px; }
 .cm-lesson svg { display:block; margin:8px 0; }
 .learn-opt { cursor:pointer; }
+
+/* ===== My Learning Space: search, scrolling lists, assessment-style practice ===== */
+.learn-search { width:100%; box-sizing:border-box; margin:8px 0 10px; }
+.learn-scroll { max-height:62vh; overflow-y:auto; padding-right:6px; -webkit-overflow-scrolling:touch; scrollbar-width:thin; }
+.learn-scroll::-webkit-scrollbar { width:8px; } .learn-scroll::-webkit-scrollbar-thumb { background:#b9c4d6; border-radius:6px; }
+.learn-strand { margin:14px 0 6px; color:#2d6cdf; font-size:16px; }
+.learn-top { display:flex; justify-content:space-between; font-size:13px; font-weight:700; color:#4a5a6e; margin-bottom:6px; }
+.learn-bar { height:8px; background:#e8edf5; border-radius:6px; overflow:hidden; margin-bottom:12px; } .learn-bar i { display:block; height:100%; background:#2d6cdf; transition:width .3s; }
+#learnQuestionBox { background:#f8fafc; padding:22px 20px; border-radius:16px; margin:8px 0 12px; border:1.5px solid #eef2f6; }
+#learnQuestionText { font-size:19px; font-weight:600; margin-bottom:18px; color:#1a1a2e; line-height:1.6; }
+#learnQuestionText svg { display:block; margin:0 auto 10px; max-width:100%; height:auto; }
+#learnOptions .option { display:block; padding:14px 20px; margin:8px 0; background:white; border:1.5px solid #dce1e8; border-radius:10px; cursor:pointer; transition:all .2s ease; font-size:16px; font-weight:500; color:#1a1a2e; }
+#learnOptions .option:hover { border-color:#2d6cdf; background:#f0f6ff; }
+#learnOptions .option.correct { background:#e6f7ec; border-color:#2d9c5c; }
+#learnOptions .option.wrong { background:#fdecec; border-color:#dc3545; }
+.learn-verdict { font-weight:700; margin:12px 0 6px; }
