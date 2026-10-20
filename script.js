@@ -12198,13 +12198,23 @@ async function insightsMessage(adm) {
 // ============================================================
 var learnIndex = null, learnCur = {}, learnRun = null;
 function learnEl() { return document.getElementById('saPanelLearn'); }
-function learnLoadGen() {
+function learnLoadScript(src) {
     return new Promise(function(resolve, reject) {
-        if (window.CMLearnGen) return resolve();
-        var sc = document.createElement('script'); sc.src = 'learning/generators.js?v=1';
-        sc.onload = resolve; sc.onerror = function() { reject(new Error('Could not load the practice questions.')); };
+        var sc = document.createElement('script'); sc.src = src; sc.onload = resolve;
+        sc.onerror = function() { reject(new Error('missing-file:' + src)); };
         document.head.appendChild(sc);
     });
+}
+async function learnLoadGen() {
+    if (window.CMLearnGen && window.CMLearnGen.list().length > 50) return;
+    await learnLoadScript('learning-generators.js?v=4');
+    window.CMLearnGen.topics = window.CMLearnGen.list();
+}
+function learnFail(e) {
+    var m = String((e && e.message) || e || '');
+    if (m.indexOf('missing-file') === 0 || m.indexOf('JSON') >= 0 || m.indexOf('Unexpected token') >= 0)
+        return 'The learning files were not found on the website. The two files learning-index.json and learning-generators.js must be uploaded to the frontend GitHub repository (next to index.html), then redeployed.';
+    return 'Could not load. Check your connection and try again.';
 }
 function learnProgress() { try { return JSON.parse(localStorage.getItem('cm_learn_progress') || '{}'); } catch (e) { return {}; } }
 function learnSaveProgress(id, score, total) {
@@ -12215,13 +12225,13 @@ function learnSaveProgress(id, score, total) {
 async function learnHome() {
     var el = learnEl(); el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text">Loading...</p>';
     try {
-        if (!learnIndex) { var r = await fetch('learning/index.json'); learnIndex = await r.json(); }
+        if (!learnIndex) { var r = await fetch('learning-index.json?v=4'); if (!r.ok) throw new Error('missing-file:index'); learnIndex = await r.json(); }
         el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text">Choose your class. Each topic has a lesson and a practice test where you choose how many questions to answer.</p>' +
             learnIndex.classes.map(function(c) {
                 var ready = c.subjects && c.subjects.length;
                 return '<div class="sa-card sa-card-click" onclick="learnClass(\'' + c.key + '\')"><div><b>' + escapeHtml(c.name) + '</b><div class="helper-text">' + escapeHtml((c.tracks || []).join(' · ') || c.level) + '</div></div><span class="sa-badge">' + (ready ? 'Open' : 'Coming soon') + '</span></div>';
             }).join('');
-    } catch (e) { el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text" style="color:#dc3545;">Could not load. Check your connection.</p>'; }
+    } catch (e) { el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text" style="color:#dc3545;">' + escapeHtml(learnFail(e)) + '</p><button type="button" class="secondary-btn" onclick="learnIndex=null;learnHome()">Try again</button>'; }
 }
 function learnClass(key) {
     var c = learnIndex.classes.filter(function(x) { return x.key === key; })[0]; learnCur = { cls: c };
@@ -12233,26 +12243,37 @@ function learnClass(key) {
     }).join('');
 }
 function learnSubject(key) {
-    var c = learnCur.cls, s = c.subjects.filter(function(x) { return x.key === key; })[0]; learnCur.sub = s;
-    var prog = learnProgress();
-    learnEl().innerHTML = '<button type="button" class="secondary-btn" onclick="learnClass(\'' + c.key + '\')">&larr; ' + escapeHtml(c.name) + '</button><h2>' + escapeHtml(s.name) + '</h2>' + s.topics.map(function(t) {
+    var c = learnCur.cls, sub = c.subjects.filter(function(x) { return x.key === key; })[0]; learnCur.sub = sub;
+    var prog = learnProgress(), last = '';
+    var ready = sub.topics.filter(function(t) { return t.status === 'ready'; }).length;
+    learnEl().innerHTML = '<button type="button" class="secondary-btn" onclick="learnClass(\'' + c.key + '\')">&larr; ' + escapeHtml(c.name) + '</button><h2>' + escapeHtml(sub.name) + '</h2><p class="helper-text">' + ready + ' of ' + sub.topics.length + ' topics are ready to practise.</p>' + sub.topics.map(function(t) {
+        var head = '';
+        if (t.strand && t.strand !== last) { last = t.strand; head = '<h3 style="margin:16px 0 6px;color:#2d6cdf;">' + escapeHtml(t.strand) + '</h3>'; }
         var p = prog[t.id];
-        if (t.status !== 'ready') return '<div class="sa-card"><div><b>' + escapeHtml(t.title) + '</b></div><span class="sa-badge">Coming soon</span></div>';
-        return '<div class="sa-card sa-card-click" onclick="learnTopic(\'' + t.id + '\')"><div><b>' + escapeHtml(t.title) + '</b><div class="helper-text">' + (p ? 'Best score: ' + p.best + '% · ' + p.attempts + ' practice(s)' : 'Not practised yet') + '</div></div><span class="sa-badge">Open</span></div>';
+        if (t.status !== 'ready') return head + '<div class="sa-card"><div><b>' + escapeHtml(t.title) + '</b></div><span class="sa-badge">Coming soon</span></div>';
+        return head + '<div class="sa-card sa-card-click" onclick="learnTopic(\'' + t.id + '\')"><div><b>' + escapeHtml(t.title) + '</b><div class="helper-text">' + (p ? 'Best score: ' + p.best + '% · ' + p.attempts + ' practice(s)' : 'Not practised yet') + '</div></div><span class="sa-badge">Open</span></div>';
     }).join('');
 }
 async function learnTopic(id) {
     var t = learnCur.sub.topics.filter(function(x) { return x.id === id; })[0]; learnCur.topic = t;
     var el = learnEl(); el.innerHTML = '<p class="helper-text">Loading lesson...</p>';
     try {
-        var r = await fetch(t.file); var d = await r.json(); await learnLoadGen();
-        el.innerHTML = '<button type="button" class="secondary-btn" onclick="learnSubject(\'' + learnCur.sub.key + '\')">&larr; ' + escapeHtml(learnCur.sub.name) + '</button><h2>' + escapeHtml(d.title) + '</h2><p class="helper-text">' + escapeHtml(d.summary) + '</p>' +
-            '<div class="cm-flash"><b>By the end you can:</b><ul>' + d.objectives.map(function(o) { return '<li>' + escapeHtml(o) + '</li>'; }).join('') + '</ul></div>' +
+        await learnLoadGen();
+        var d;
+        if (t.lesson) { d = t.lesson; }
+        else {
+            var ex = window.CMLearnGen.get(t.id, 0);
+            d = { title: t.title, summary: t.strand || '', objectives: [],
+                html: '<h3>Key idea</h3><p>' + escapeHtml(t.note || '') + '</p>' + (ex ? '<h3>Worked example</h3>' + (ex.svg || '') + '<p>' + escapeHtml(ex.q) + '</p><p><b>Answer: ' + escapeHtml(ex.options[ex.answer]) + '</b></p><div class="explain">' + escapeHtml(ex.explain) + '</div>' : '') + '<div class="cm-tip">A full illustrated lesson for this topic is being added. Practise below to learn by doing.</div>' };
+        }
+        el.innerHTML = '<button type="button" class="secondary-btn" onclick="learnSubject(\'' + learnCur.sub.key + '\')">&larr; ' + escapeHtml(learnCur.sub.name) + '</button><h2>' + escapeHtml(d.title) + '</h2><p class="helper-text">' + escapeHtml(d.summary || '') + '</p>' +
+            (d.objectives && d.objectives.length ? '<div class="cm-flash"><b>By the end you can:</b><ul>' + d.objectives.map(function(o) { return '<li>' + escapeHtml(o) + '</li>'; }).join('') + '</ul></div>' : '') +
             '<div class="cm-lesson">' + d.html + '</div>' +
-            '<div class="cm-flash"><h3 style="margin:0 0 6px;">Practise this topic</h3><p class="helper-text">Pool: ' + window.CMLearnGen.POOL + ' questions. How many do you want to answer?</p>' +
+            '<div class="cm-flash"><h3 style="margin:0 0 6px;">Practise this topic</h3><p class="helper-text">Question pool: ' + window.CMLearnGen.POOL + '. How many do you want to answer?</p>' +
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' + [10, 20, 30, 50, 100].map(function(n) { return '<button type="button" class="secondary-btn" onclick="document.getElementById(\'lnCount\').value=' + n + '">' + n + '</button>'; }).join('') + '</div>' +
             '<input id="lnCount" type="number" class="form-input" min="1" max="' + window.CMLearnGen.POOL + '" value="20" style="max-width:140px;"> <button type="button" class="primary-btn" onclick="learnStart()">Start practice</button></div>';
-    } catch (e) { el.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load this lesson.') + '</p>'; }
+        renderMathIn(el);
+    } catch (e) { el.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(learnFail(e)) + '</p>'; }
 }
 function learnStart() {
     var G = window.CMLearnGen, n = Math.max(1, Math.min(G.POOL, parseInt(document.getElementById('lnCount').value, 10) || 20));
@@ -12271,16 +12292,20 @@ function learnShow() {
             '<p>' + (pc >= 80 ? 'Excellent work!' : (pc >= 50 ? 'Good effort. Practise again to improve.' : 'Read the lesson again, then try once more.')) + '</p>' +
             (R.wrong.length ? '<h3>Review your mistakes</h3>' + R.wrong.map(function(q) { return '<div class="cm-flash" style="padding:12px;">' + q.svg + '<p>' + escapeHtml(q.q) + '</p><p>Correct answer: <b style="color:#2d9c5c;">' + escapeHtml(q.options[q.answer]) + '</b></p><div class="explain">' + escapeHtml(q.explain) + '</div></div>'; }).join('') : '') +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button type="button" class="primary-btn" onclick="learnTopic(\'' + learnCur.topic.id + '\')">Back to lesson</button><button type="button" class="secondary-btn" onclick="learnStart()">Practise again</button></div>';
+        renderMathIn(el);
         return;
     }
     var q = R.qs[R.i];
     el.innerHTML = '<div class="helper-text">Question ' + (R.i + 1) + ' of ' + R.qs.length + ' · Score ' + R.score + '</div><div class="cm-flash">' + q.svg + '<p style="font-size:17px;margin:8px 0 12px;">' + escapeHtml(q.q) + '</p>' +
         q.options.map(function(o, ix) { return '<button type="button" class="secondary-btn learn-opt" style="display:block;width:100%;text-align:left;margin:6px 0;" onclick="learnAnswer(' + ix + ')">' + String.fromCharCode(65 + ix) + '. ' + escapeHtml(o) + '</button>'; }).join('') + '<div id="lnFeed"></div></div>' +
         '<button type="button" class="secondary-btn" onclick="learnTopic(\'' + learnCur.topic.id + '\')">Stop practice</button>';
+    renderMathIn(el);
 }
 function learnAnswer(ix) {
     var R = learnRun, q = R.qs[R.i], ok = ix === q.answer;
     document.querySelectorAll('.learn-opt').forEach(function(b, i) { b.disabled = true; if (i === q.answer) b.style.cssText += ';background:#e6f7ec;border-color:#2d9c5c;'; else if (i === ix) b.style.cssText += ';background:#fdecec;border-color:#dc3545;'; });
     if (ok) R.score++; else R.wrong.push(q);
     document.getElementById('lnFeed').innerHTML = '<p style="color:' + (ok ? '#2d9c5c' : '#dc3545') + ';font-weight:700;">' + (ok ? 'Correct!' : 'Not correct.') + '</p><div class="explain">' + escapeHtml(q.explain) + '</div><button type="button" class="primary-btn" style="margin-top:10px;" onclick="learnRun.i++;learnShow()">' + (R.i + 1 >= R.qs.length ? 'See results' : 'Next question') + '</button>';
+    renderMathIn(document.getElementById('lnFeed'));
+    document.querySelectorAll('.learn-opt').forEach(function(b) { renderMathIn(b); });
 }
