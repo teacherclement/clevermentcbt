@@ -1,0 +1,160 @@
+{
+ "note": "Topic lists must be checked against the official NERDC / exam-body files before each subject is filled in.",
+ "classes": [
+  {
+   "key": "primary-1",
+   "name": "Primary 1",
+   "level": "Primary"
+  },
+  {
+   "key": "primary-2",
+   "name": "Primary 2",
+   "level": "Primary"
+  },
+  {
+   "key": "primary-3",
+   "name": "Primary 3",
+   "level": "Primary"
+  },
+  {
+   "key": "primary-4",
+   "name": "Primary 4",
+   "level": "Primary"
+  },
+  {
+   "key": "primary-5",
+   "name": "Primary 5",
+   "level": "Primary"
+  },
+  {
+   "key": "primary-6",
+   "name": "Primary 6",
+   "level": "Primary",
+   "tracks": [
+    "Common Entrance"
+   ],
+   "subjects": [
+    {
+     "key": "mathematics",
+     "name": "Mathematics",
+     "tracks": [
+      "Common Entrance"
+     ],
+     "topics": [
+      {
+       "id": "p6-maths-whole-numbers",
+       "title": "Whole Numbers and Place Value",
+       "status": "ready",
+       "pool": 2000,
+       "file": "learning/primary-6/mathematics/p6-maths-whole-numbers.json"
+      },
+      {
+       "id": "p6-maths-fractions",
+       "title": "Fractions",
+       "status": "ready",
+       "pool": 2000,
+       "file": "learning/primary-6/mathematics/p6-maths-fractions.json"
+      },
+      {
+       "id": "p6-maths-percentages",
+       "title": "Percentages",
+       "status": "ready",
+       "pool": 2000,
+       "file": "learning/primary-6/mathematics/p6-maths-percentages.json"
+      },
+      {
+       "id": "p6-maths-perimeter-area",
+       "title": "Perimeter and Area",
+       "status": "ready",
+       "pool": 2000,
+       "file": "learning/primary-6/mathematics/p6-maths-perimeter-area.json"
+      },
+      {
+       "id": "p6-maths-hcf-and-lcm",
+       "title": "HCF and LCM",
+       "status": "soon"
+      },
+      {
+       "id": "p6-maths-decimals",
+       "title": "Decimals",
+       "status": "soon"
+      },
+      {
+       "id": "p6-maths-ratio-and-proportion",
+       "title": "Ratio and Proportion",
+       "status": "soon"
+      },
+      {
+       "id": "p6-maths-simple-equations",
+       "title": "Simple Equations",
+       "status": "soon"
+      },
+      {
+       "id": "p6-maths-angles",
+       "title": "Angles",
+       "status": "soon"
+      },
+      {
+       "id": "p6-maths-volume-and-capacity",
+       "title": "Volume and Capacity",
+       "status": "soon"
+      },
+      {
+       "id": "p6-maths-time-money-and-measurement",
+       "title": "Time, Money and Measurement",
+       "status": "soon"
+      },
+      {
+       "id": "p6-maths-average-and-statistics",
+       "title": "Average and Statistics",
+       "status": "soon"
+      },
+      {
+       "id": "p6-maths-simple-interest",
+       "title": "Simple Interest",
+       "status": "soon"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "key": "jss-1",
+   "name": "JSS 1",
+   "level": "Junior Secondary"
+  },
+  {
+   "key": "jss-2",
+   "name": "JSS 2",
+   "level": "Junior Secondary"
+  },
+  {
+   "key": "jss-3",
+   "name": "JSS 3",
+   "level": "Junior Secondary",
+   "tracks": [
+    "BECE"
+   ]
+  },
+  {
+   "key": "ss-1",
+   "name": "SS 1",
+   "level": "Senior Secondary"
+  },
+  {
+   "key": "ss-2",
+   "name": "SS 2",
+   "level": "Senior Secondary"
+  },
+  {
+   "key": "ss-3",
+   "name": "SS 3",
+   "level": "Senior Secondary",
+   "tracks": [
+    "WAEC",
+    "NECO",
+    "JAMB"
+   ]
+  }
+ ]
+}

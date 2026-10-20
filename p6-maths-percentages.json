@@ -1,0 +1,11 @@
+{
+ "title": "Percentages",
+ "summary": "Percent of an amount, converting, increase and decrease, discount, profit and loss.",
+ "objectives": [
+  "Convert between fractions and percentages",
+  "Find a percentage of an amount",
+  "Increase and decrease an amount by a percentage",
+  "Calculate discount and profit percent"
+ ],
+ "html": "<h3>1. Meaning of percent</h3><p><b>Percent</b> means \"out of 100\". 25% = 25/100 = 1/4.</p><svg viewBox=\"0 0 220 50\" style=\"width:100%;max-width:240px;\" role=\"img\" aria-label=\"1 out of 4 parts shaded\"><rect x=\"10.0\" y=\"8\" width=\"50.0\" height=\"32\" fill=\"#2d6cdf\" stroke=\"#1a1a2e\" stroke-width=\"1.5\"/><rect x=\"60.0\" y=\"8\" width=\"50.0\" height=\"32\" fill=\"#fff\" stroke=\"#1a1a2e\" stroke-width=\"1.5\"/><rect x=\"110.0\" y=\"8\" width=\"50.0\" height=\"32\" fill=\"#fff\" stroke=\"#1a1a2e\" stroke-width=\"1.5\"/><rect x=\"160.0\" y=\"8\" width=\"50.0\" height=\"32\" fill=\"#fff\" stroke=\"#1a1a2e\" stroke-width=\"1.5\"/></svg>\n<h3>2. Converting</h3><ul><li><b>Fraction &rarr; percent:</b> multiply by 100%. 3/5 &times; 100% = <b>60%</b>.</li><li><b>Percent &rarr; fraction:</b> write over 100 and simplify. 40% = 40/100 = <b>2/5</b>.</li></ul>\n<h3>3. Percentage of an amount</h3><p>Write the percent as a fraction over 100 and multiply. 20% of &#8358;1,500 = 20/100 &times; 1,500 = <b>&#8358;300</b>.</p>\n<h3>4. Increase and decrease</h3><p>Find the percentage, then add (increase) or subtract (decrease). Price &#8358;800 increased by 25%: 25% of 800 = 200, new price = 800 + 200 = <b>&#8358;1,000</b>.</p>\n<h3>5. Discount</h3><p>Discount is the amount taken off the price. A &#8358;2,000 shirt with 10% discount: discount = &#8358;200, you pay &#8358;2,000 &minus; &#8358;200 = <b>&#8358;1,800</b>.</p>\n<h3>6. Profit and loss percent</h3><p>Profit = Selling price &minus; Cost price.<br><b>Profit % = (Profit &divide; Cost price) &times; 100%</b>.<br>Bought for &#8358;4,000 and sold for &#8358;5,000: profit = &#8358;1,000, profit % = 1,000/4,000 &times; 100% = <b>25%</b>.</p>\n<div class=\"cm-tip\"><b>Common Entrance tip:</b> Profit and loss percent are always worked on the <b>cost price</b>.</div>"
+}
