@@ -365,17 +365,16 @@
             if (rs.correct) sndCorrect(); else sndWrong();
             var banner = rs.choice === null ? '<div class="lc-result none">Time\'s up!<small>You did not answer</small></div>' :
                 (rs.correct ? '<div class="lc-result ok">Correct!<small>+' + rs.points + ' points</small></div>' : '<div class="lc-result bad">Wrong<small>No points this time</small></div>');
-            var h2 = netBanner() + banner + '<div class="lc-yourrank">Your rank: <b>' + me.rank + '</b> of ' + me.total + ' &middot; <b>' + me.score + '</b> pts</div>' +
-                '<p class="lc-small center">The correct answer was <b>' + OPT_SHAPES[s.reveal.correct] + '. ' + esc(lc.q.options[s.reveal.correct]) + '</b></p><h3 class="lc-h">Top 10</h3>' + board(s.board, me.name) + fastestLine(s.board, s.reveal.fastest) +
-                '<p class="lc-nextin" id="lcNextIn"></p>';
+            var h2 = netBanner() + banner + '<div class="lc-yourrank">Your score: <b>' + me.score + '</b> pts</div>' +
+                '<p class="lc-small center">The correct answer was <b>' + OPT_SHAPES[s.reveal.correct] + '. ' + esc(lc.q.options[s.reveal.correct]) + '</b></p><p class="lc-nextin" id="lcNextIn"></p>';
             shell(h2, top);
             math($('lcBody'));
         } else if (s.status === 'final') {
             var rows = s.finalRows || [];
             sndFinal();
-            var h3 = netBanner() + '<h2 class="lc-title">' + (me.rank === 1 ? 'You won! 🏆' : 'Game over') + '</h2><div class="lc-yourrank big">Rank <b>' + me.rank + '</b> of ' + me.total + '</div>' +
+            var h3 = netBanner() + '<h2 class="lc-title">Game over</h2><p class="lc-small center">Well done, ' + esc(me.name) + '! Your teacher will show the results.</p>' +
                 '<div class="lc-stats"><div><b>' + me.score + '</b><span>Points</span></div><div><b>' + me.correct + '/' + s.total + '</b><span>Correct</span></div><div><b>' + (me.avgSeconds || 0) + 's</b><span>Avg speed</span></div></div>' +
-                podium(rows) + board(rows.slice(0, 10), me.name) + '<div class="lc-actions"><button class="lc-btn" id="lcDoneBtn">Close</button></div>';
+                '<div class="lc-actions"><button class="lc-btn" id="lcDoneBtn">Close</button></div>';
             shell(h3, '');
             $('lcDoneBtn').onclick = closeOverlay;
         }
