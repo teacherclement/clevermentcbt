@@ -478,34 +478,61 @@
             fr.readAsDataURL(file);
         });
     }
-    async function uploadQuestionImage(i, file) {
-        var note = $('lcQNote');
-        if (!/^image\//i.test(file.type)) { alert('Please choose a picture (JPG, PNG, WEBP or GIF).'); return; }
-        if (note) note.textContent = 'Uploading picture for question ' + (i + 1) + '...';
-        try {
-            var dataUrl = await readImageFile(file);
-            var r = await api('POST', '/api/teacher/assessment-images', { dataUrl: dataUrl }, teacherToken());
-            if (!r.ok) { alert(r.data.error || 'Could not upload the picture.'); if (note) note.textContent = ''; return; }
-            lcQuestions[i].image = r.data.url;
-            renderQEditor();
-        } catch (e) { alert(e.message || 'Could not upload the picture.'); if (note) note.textContent = ''; }
-    }
+    var lcEditing = false;
     function renderQEditor() {
         var box = $('lcQEditor'); if (!box) return;
         if (!lcQuestions.length) { box.innerHTML = ''; return; }
         var withImg = lcQuestions.filter(function(q) { return q.image; }).length;
-        var h = '<label class="live-msg-label">Your questions (' + lcQuestions.length + ') &mdash; add pictures or diagrams</label><p class="helper-text" id="lcQNote">' + withImg + ' with a picture. Tap "Add picture" under a question to attach a diagram.</p><div class="lc-qlist">';
-        lcQuestions.forEach(function(q, i) {
-            h += '<div class="lc-qrow"><div class="lc-qtxt"><b>' + (i + 1) + '.</b> ' + esc(q.question.length > 110 ? q.question.slice(0, 110) + '...' : q.question) + '</div>' +
-                (q.image ? '<img class="lc-qthumb" src="' + esc(q.image) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
-                '<div class="lc-qbtns"><button type="button" class="secondary-btn" data-addimg="' + i + '">&#128247; ' + (q.image ? 'Change picture' : 'Add picture') + '</button>' +
-                (q.image ? '<button type="button" class="secondary-btn" data-rmimg="' + i + '" style="color:#dc3545;">Remove</button>' : '') + '</div></div>';
-        });
-        box.innerHTML = h + '</div><input type="file" id="lcImgFile" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none">';
-        var fi = $('lcImgFile');
-        fi.onchange = function() { var f = fi.files[0]; fi.value = ''; if (f && lcImgIndex >= 0) uploadQuestionImage(lcImgIndex, f); };
-        box.querySelectorAll('[data-addimg]').forEach(function(b) { b.onclick = function() { lcImgIndex = parseInt(b.getAttribute('data-addimg'), 10); fi.click(); }; });
-        box.querySelectorAll('[data-rmimg]').forEach(function(b) { b.onclick = function() { lcQuestions[parseInt(b.getAttribute('data-rmimg'), 10)].image = ''; renderQEditor(); }; });
+        box.innerHTML = '<p class="helper-text" id="lcQNote">' + lcQuestions.length + ' questions ready &middot; ' + withImg + ' with a picture.</p>' +
+            '<button type="button" id="lcReviewBtn" class="secondary-btn" style="background:#eef6ff; color:#1d5fbf; border-color:#cfe1ff; margin-bottom:10px;">&#128444;&#65039; Review Questions &amp; Add Images</button>';
+        $('lcReviewBtn').onclick = openLcEditor;
+    }
+    // Opens CleverMent's own "Review Questions & Add Images" window for the competition questions.
+    function openLcEditor() {
+        if (!lcQuestions.length) { alert('Load questions first.'); return; }
+        if (typeof renderAssessmentEditor !== 'function') { alert('The question editor is not available.'); return; }
+        lcEditing = true;
+        assessmentEditorDraftMode = true;
+        var box = $('assessmentEditorSettings'); if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+        currentAssessmentBeingEdited = { id: null, code: '', subject: 'Live Competition', className: '', teacherEmail: '', questions: JSON.parse(JSON.stringify(lcQuestions)) };
+        renderAssessmentEditor();
+        var modal = $('assessmentEditorModal');
+        if (modal) { modal.style.display = 'flex'; document.body.style.overflow = 'hidden'; }
+    }
+    var origRenderEditor = window.renderAssessmentEditor;
+    if (typeof origRenderEditor === 'function') {
+        window.renderAssessmentEditor = function() {
+            var out = origRenderEditor.apply(this, arguments);
+            if (lcEditing) {
+                var sub = $('assessmentEditorSubtitle'); if (sub) sub.textContent = 'These are the questions for your live competition. Edit, delete or add questions and upload images; then click Save Questions.';
+                var sb = $('assessmentEditorSaveBtn'); if (sb) sb.textContent = 'Save Questions';
+            }
+            return out;
+        };
+    }
+    var origSaveEditor = window.saveAssessmentEditorChanges;
+    if (typeof origSaveEditor === 'function') {
+        window.saveAssessmentEditorChanges = function() {
+            if (!lcEditing) return origSaveEditor.apply(this, arguments);
+            syncAssessmentEditorFromDOM();
+            var qs = (currentAssessmentBeingEdited && currentAssessmentBeingEdited.questions) || [];
+            if (!qs.length) { alert('A competition must contain at least one question.'); return; }
+            for (var i = 0; i < qs.length; i++) {
+                var q = qs[i];
+                if (!String(q.question || '').trim()) { alert('Question ' + (i + 1) + ' is empty.'); return; }
+                if (!Array.isArray(q.options) || q.options.length < 4 || q.options.some(function(o) { return !String(o || '').trim(); })) { alert('Question ' + (i + 1) + ' must have all four options (A-D).'); return; }
+                if (!/^[ABCD]$/.test(String(q.correctAnswer || '').toUpperCase())) { alert('Question ' + (i + 1) + ' must have a correct answer of A, B, C or D.'); return; }
+                q.correctAnswer = String(q.correctAnswer).toUpperCase();
+            }
+            lcQuestions = JSON.parse(JSON.stringify(qs));
+            closeAssessmentEditor();
+            renderQEditor();
+            alert('Questions saved for this competition.');
+        };
+    }
+    var origCloseEditor = window.closeAssessmentEditor;
+    if (typeof origCloseEditor === 'function') {
+        window.closeAssessmentEditor = function() { lcEditing = false; return origCloseEditor.apply(this, arguments); };
     }
     async function loadAssessmentQuestions() {
         var code = $('lcAssess') ? $('lcAssess').value : '';
