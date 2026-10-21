@@ -17,6 +17,12 @@ services:
       - path: /style.css
         name: Cache-Control
         value: no-cache, no-store, must-revalidate
+      - path: /competition-ui.js
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
+      - path: /competition.css
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
       - path: /sw.js
         name: Cache-Control
         value: no-cache, no-store, must-revalidate
