@@ -1,6 +1,6 @@
 /* ===== CleverMent Live Competition ===== */
 body.lc-open { overflow: hidden; }
-.lc-overlay { position: fixed; inset: 0; z-index: 100000; display: none; align-items: stretch; justify-content: center; background: rgba(10, 18, 40, .90); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #f8fafc; font-family: inherit; }
+.lc-overlay { position: fixed; inset: 0; z-index: 100000; display: none; align-items: stretch; justify-content: center; background: rgba(10, 18, 40, .93); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #f8fafc; font-family: inherit; }
 .lc-box { width: 100%; max-width: 760px; display: flex; flex-direction: column; min-height: 0; }
 .lc-top { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.12); }
 .lc-brand { font-weight: 800; font-size: 16px; } .lc-brand span { color: #C9A84C; font-weight: 700; }
@@ -25,7 +25,10 @@ body.lc-open { overflow: hidden; }
 .lc-timebar-wrap { flex: 1; height: 12px; background: rgba(255,255,255,.15); border-radius: 999px; overflow: hidden; }
 .lc-timebar { height: 100%; border-radius: 999px; transition: width .12s linear, background .3s; }
 .lc-timenum { min-width: 34px; text-align: right; font-size: 24px; font-weight: 800; }
-.lc-countdown { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; font-size: 120px; font-weight: 900; background: rgba(10,18,40,.82); }
+.lc-countdown { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; font-size: 130px; font-weight: 900; background: #0a1228; text-align: center; }
+.lc-countdown small { display: block; font-size: 26px; color: #C9A84C; font-weight: 800; margin-bottom: 4px; }
+.lc-ready { text-align: center; padding-top: 12vh; } .lc-ready-t { font-size: 34px; font-weight: 900; color: #C9A84C; } .lc-ready-n { font-size: 140px; font-weight: 900; line-height: 1.1; }
+.lc-topr { display: flex; gap: 8px; align-items: center; }
 .lc-q { font-size: 22px; font-weight: 700; line-height: 1.35; margin: 6px 0 14px; text-align: center; }
 .lc-qimg { text-align: center; margin-bottom: 12px; } .lc-qimg img { max-width: 100%; max-height: 28vh; border-radius: 10px; background: #fff; }
 .lc-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -66,3 +69,22 @@ body.lc-open { overflow: hidden; }
 .lc-join-card { background: #fff; border: 1.5px solid #eef2f6; border-radius: 12px; padding: 14px; margin-bottom: 16px; }
 .lc-hitem { display: flex; justify-content: space-between; gap: 10px; background: #fff; border: 1.5px solid #eef2f6; border-radius: 10px; padding: 10px 12px; margin-top: 8px; } .lc-hright { text-align: right; }
 @media (max-width: 520px) { .lc-code { font-size: 46px; letter-spacing: 6px; } .lc-q { font-size: 19px; } .lc-opts { grid-template-columns: 1fr; } .lc-opt { min-height: 62px; } }
+
+/* host: question shrinks once answers start coming in */
+.lc-qblock.compact .lc-q { font-size: 14px; margin: 2px 0 6px; text-align: left; }
+.lc-qblock.compact .lc-qimg img { max-height: 11vh; }
+.lc-qblock.compact .lc-opts { grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.lc-qblock.compact .lc-opt { min-height: 34px; padding: 5px 6px; font-size: 11px; border-radius: 8px; gap: 5px; }
+.lc-qblock.compact .lc-opt b { width: 20px; height: 20px; font-size: 11px; } .lc-qblock.compact .lc-opt em { font-size: 14px; }
+.lc-namebox { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.lc-fastest { color: #fbbf24; font-weight: 800; font-size: 11px; letter-spacing: .5px; text-transform: uppercase; }
+.lc-tag { display: inline-block; min-width: 34px; text-align: center; border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 900; color: #1f2937; }
+.lc-tag.t1 { background: #C9A84C; } .lc-tag.t2 { background: #cbd5e1; } .lc-tag.t3 { background: #d08a55; }
+.lc-rank { min-width: 40px; } .lc-done { color: #4ade80; font-weight: 900; } .lc-pending { color: #94a3b8; }
+.lc-nextin { text-align: center; font-size: 22px; font-weight: 800; color: #C9A84C; min-height: 30px; margin-top: 12px; }
+.lc-btn.small { padding: 8px 18px; font-size: 14px; min-width: 0; }
+/* teacher question list */
+.lc-qlist { max-height: 46vh; overflow-y: auto; border: 1.5px solid #eef2f6; border-radius: 10px; background: #fff; padding: 6px; margin-bottom: 10px; }
+.lc-qrow { border-bottom: 1px solid #eef2f6; padding: 8px 4px; } .lc-qrow:last-child { border-bottom: 0; }
+.lc-qtxt { font-size: 14px; margin-bottom: 6px; } .lc-qthumb { display: block; max-height: 90px; max-width: 100%; border-radius: 8px; margin-bottom: 6px; border: 1px solid #eef2f6; }
+.lc-qbtns { display: flex; gap: 8px; flex-wrap: wrap; } .lc-qbtns .secondary-btn { padding: 6px 12px; font-size: 13px; }

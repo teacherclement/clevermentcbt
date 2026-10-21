@@ -31,6 +31,35 @@
         return { ok: res.ok, status: res.status, data: data };
     }
 
+    // ---------- sound effects (made in the browser, no files needed) ----------
+    var audioCtx = null;
+    function audio() {
+        try {
+            if (!audioCtx) { var AC = window.AudioContext || window.webkitAudioContext; if (AC) audioCtx = new AC(); }
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        } catch (e) {}
+        return audioCtx;
+    }
+    function isMuted() { try { return localStorage.getItem('lc_muted') === '1'; } catch (e) { return false; } }
+    function tone(freq, dur, type, vol, delay) {
+        if (isMuted()) return;
+        var c = audio(); if (!c) return;
+        try {
+            var t = c.currentTime + (delay || 0), o = c.createOscillator(), g = c.createGain();
+            o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+            g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || 0.2, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.03);
+        } catch (e) {}
+    }
+    function sndTick() { tone(880, 0.09, 'square', 0.07); }
+    function sndLow() { tone(1100, 0.05, 'square', 0.04); }
+    function sndGo() { tone(660, 0.12, 'triangle', 0.2); tone(990, 0.3, 'triangle', 0.22, 0.12); }
+    function sndClick() { tone(520, 0.07, 'triangle', 0.2); }
+    function sndCorrect() { tone(523, 0.14, 'triangle', 0.22); tone(659, 0.14, 'triangle', 0.22, 0.13); tone(784, 0.3, 'triangle', 0.24, 0.26); }
+    function sndWrong() { tone(220, 0.25, 'sawtooth', 0.12); tone(160, 0.35, 'sawtooth', 0.12, 0.22); }
+    function sndReveal() { tone(440, 0.15, 'sine', 0.18); tone(660, 0.25, 'sine', 0.18, 0.14); }
+    function sndFinal() { [523, 659, 784, 1047].forEach(function(f, i) { tone(f, 0.28, 'triangle', 0.24, i * 0.16); }); tone(1047, 0.7, 'triangle', 0.24, 0.7); }
+
     // ---------- overlay shell ----------
     function overlay() {
         var o = $('lcOverlay');
@@ -55,7 +84,10 @@
     }
     function shell(inner, topRight) {
         var o = overlay();
-        o.innerHTML = '<div class="lc-box"><div class="lc-top"><div class="lc-brand">CleverMent <span>Live Competition</span></div>' + (topRight || '') + '</div><div id="lcBody" class="lc-body">' + inner + '</div></div>';
+        o.innerHTML = '<div class="lc-box"><div class="lc-top"><div class="lc-brand">CleverMent <span>Live Competition</span></div><div class="lc-topr"><button class="lc-link" id="lcMute" aria-label="Sound on/off"></button>' + (topRight || '') + '</div></div><div id="lcBody" class="lc-body">' + inner + '</div></div>';
+        var mb = $('lcMute');
+        mb.textContent = isMuted() ? '🔇' : '🔊';
+        mb.onclick = function() { try { localStorage.setItem('lc_muted', isMuted() ? '0' : '1'); } catch (e) {} mb.textContent = isMuted() ? '🔇' : '🔊'; audio(); sndClick(); };
         return $('lcBody');
     }
 
@@ -106,11 +138,11 @@
     function handleState(s) {
         lc.state = s;
         if (s.question) { lc.q = s.question; lc.have = s.qIndex; }
-        var sig = s.status + '|' + s.qIndex + '|' + (lc.role === 'player' ? (s.me && s.me.choice) : '');
+        var sig = s.status + '|' + s.qIndex + '|' + (lc.have === s.qIndex ? 'q' : 'wait') + '|' + (lc.role === 'player' ? (s.me && s.me.choice) : '');
         if (lc.role === 'host' && s.status === 'lobby') sig += '|' + (s.players || []).map(function(p) { return p.id; }).join(',');
         var rebuilt = sig !== lc.sig;
         if (rebuilt) {
-            lc.sig = sig;
+            lc.sig = sig; lc.lastLabel = ''; lc.lastNext = null;
             if (lc.role === 'host') renderHost(s); else renderPlayer(s);
         }
         updateLive(s);
@@ -123,26 +155,50 @@
     }
     function updateTimer() {
         if (!lc || !lc.state) return;
-        var s = lc.state;
-        if (s.status !== 'question') return;
-        var now = Date.now() + lc.offset;
-        var pre = (s.startsAt - now) / 1000;
-        var cd = $('lcCountdown');
-        if (pre > 0) { if (cd) { cd.style.display = 'flex'; cd.textContent = Math.ceil(pre); } return; }
-        if (cd) cd.style.display = 'none';
-        var left = remainingSec(s);
-        var t = $('lcTimeNum'), bar = $('lcTimeBar');
-        if (t) t.textContent = Math.ceil(left);
-        if (bar) {
-            var pct = Math.max(0, Math.min(100, left / s.timeLimit * 100));
-            bar.style.width = pct + '%';
-            bar.style.background = pct > 50 ? '#22c55e' : (pct > 25 ? '#eab308' : '#ef4444');
+        var s = lc.state, now = Date.now() + lc.offset;
+        if (s.status === 'question') {
+            var pre = (s.startsAt - now) / 1000;
+            var rn = $('lcReadyNum'), cd = $('lcCountdown');
+            if (pre > 0) {
+                var label = pre >= 1 ? String(Math.floor(pre)) : 'Go!';
+                if (label !== lc.lastLabel) { lc.lastLabel = label; if (label === 'Go!') sndGo(); else sndTick(); }
+                if (rn) rn.textContent = label;
+                if (cd) { cd.style.display = 'flex'; cd.innerHTML = '<div><small>' + (s.qIndex === 0 ? 'Get ready!' : 'Next question') + '</small>' + label + '</div>'; }
+                return;
+            }
+            if (cd) cd.style.display = 'none';
+            var left = remainingSec(s);
+            var t = $('lcTimeNum'), bar = $('lcTimeBar');
+            if (t) t.textContent = Math.ceil(left);
+            if (bar) {
+                var pct = Math.max(0, Math.min(100, left / s.timeLimit * 100));
+                bar.style.width = pct + '%';
+                bar.style.background = pct > 50 ? '#22c55e' : (pct > 25 ? '#eab308' : '#ef4444');
+            }
+            var sec = Math.ceil(left);
+            if (sec <= 5 && sec > 0 && lc.lastSec !== s.qIndex + ':' + sec) { lc.lastSec = s.qIndex + ':' + sec; sndLow(); }
+        } else if (s.status === 'reveal') {
+            var el = $('lcNextIn'); if (!el) return;
+            var rl = (s.revealEndsAt - now) / 1000;
+            if (rl <= 3 && rl > 0) {
+                var n = Math.ceil(rl);
+                el.textContent = (s.isLast ? 'Final results in ' : 'Next in ') + n + '...';
+                if (lc.lastNext !== n) { lc.lastNext = n; sndTick(); }
+            } else { el.textContent = ''; }
         }
     }
     function updateLive(s) {
         if (lc.role === 'host') {
             var a = $('lcAnswered'); if (a) a.textContent = s.answeredCount + ' of ' + s.playerCount + ' answered';
             var pc = $('lcPlayerCount'); if (pc) pc.textContent = s.playerCount;
+            var qb = $('lcQBlock'), lv = $('lcLive');
+            if (s.status === 'question' && qb && lv && s.answeredCount > 0) {
+                qb.classList.add('compact');
+                lv.style.display = 'block';
+                var inBoard = (s.live || []).some(function(r) { return r.fastest; });
+                lv.innerHTML = '<h3 class="lc-h">Live leaderboard</h3>' + board(s.live, '', { tags: false, answered: true }) +
+                    (!inBoard && s.liveFastest ? '<p class="lc-small center">Fastest so far: <b>' + esc(s.liveFastest.name) + '</b> (' + s.liveFastest.seconds + 's)</p>' : '');
+            }
         } else {
             var pc2 = $('lcPlayerCount'); if (pc2) pc2.textContent = s.playerCount;
         }
@@ -163,14 +219,27 @@
     function timerBlock(s) {
         return '<div class="lc-timer"><div class="lc-timebar-wrap"><div id="lcTimeBar" class="lc-timebar" style="width:100%"></div></div><div class="lc-timenum" id="lcTimeNum">' + s.timeLimit + '</div></div><div id="lcCountdown" class="lc-countdown" style="display:none"></div>';
     }
-    function board(rows, meName) {
+    function board(rows, meName, opts) {
+        opts = opts || {};
         if (!rows || !rows.length) return '';
+        var tagNames = { 1: '1st', 2: '2nd', 3: '3rd' };
         var h = '<div class="lc-board">';
         rows.forEach(function(r) {
-            h += '<div class="lc-row' + (meName && r.name === meName ? ' me' : '') + '"><span class="lc-rank">' + r.rank + '</span><span class="lc-dot" style="background:' + esc(r.color) + '"></span><span class="lc-name">' + esc(r.name) + '</span>' +
+            var rank = (opts.tags !== false && tagNames[r.rank]) ? '<span class="lc-tag t' + r.rank + '">' + tagNames[r.rank] + '</span>' : String(r.rank);
+            h += '<div class="lc-row' + (meName && r.name === meName ? ' me' : '') + '"><span class="lc-rank">' + rank + '</span><span class="lc-dot" style="background:' + esc(r.color) + '"></span>' +
+                '<span class="lc-namebox"><span class="lc-name">' + esc(r.name) + '</span>' + (r.fastest ? '<small class="lc-fastest">Fastest' + (r.seconds !== null && r.seconds !== undefined ? ' &middot; ' + r.seconds + 's' : '') + '</small>' : '') + '</span>' +
+                (opts.answered ? (r.answered ? '<span class="lc-done">&#10003;</span>' : '<span class="lc-pending">...</span>') : '') +
                 (r.gained ? '<span class="lc-gain">+' + r.gained + '</span>' : '') + '<span class="lc-score">' + r.score + '</span></div>';
         });
         return h + '</div>';
+    }
+    function fastestLine(rows, fastest) {
+        if (!fastest) return '';
+        if ((rows || []).some(function(r) { return r.fastest; })) return '';
+        return '<p class="lc-small center">Fastest correct answer: <b>' + esc(fastest.name) + '</b> (' + fastest.seconds + 's)</p>';
+    }
+    function readyScreen(s) {
+        return netBanner() + '<div class="lc-ready"><div class="lc-ready-t">' + (s.qIndex === 0 ? 'Get ready!' : 'Next question') + '</div><div class="lc-ready-n" id="lcReadyNum"></div><p class="lc-small">Question ' + (s.qIndex + 1) + ' of ' + s.total + '</p></div>';
     }
     function podium(rows) {
         var top = rows.slice(0, 3);
@@ -203,24 +272,30 @@
             $('lcStartBtn').onclick = hostStart;
             document.querySelectorAll('[data-kick]').forEach(function(b) { b.onclick = function() { api('POST', '/api/teacher/competition/rooms/' + lc.code + '/kick', { pid: b.getAttribute('data-kick') }, teacherToken()); }; });
         } else if (s.status === 'question') {
-            var q = lc.q;
-            shell(netBanner() + '<div class="lc-qhead"><span>Question ' + (s.qIndex + 1) + ' / ' + s.total + '</span><span id="lcAnswered"></span></div>' + timerBlock(s) + questionBlock(q, 'show') +
-                '<div class="lc-actions"><button class="lc-btn alt" id="lcSkipBtn">Show answer now</button></div>', top);
-            $('lcSkipBtn').onclick = hostNext;
-            math($('lcBody'));
+            if (lc.have !== s.qIndex) { shell(readyScreen(s), top); }
+            else {
+                shell(netBanner() + '<div class="lc-qhead"><span>Question ' + (s.qIndex + 1) + ' / ' + s.total + '</span><span id="lcAnswered"></span></div>' + timerBlock(s) +
+                    '<div id="lcQBlock" class="lc-qblock">' + questionBlock(lc.q, 'show') + '</div><div id="lcLive" style="display:none"></div>' +
+                    '<div class="lc-actions"><button class="lc-btn alt" id="lcSkipBtn">Show answer now</button></div>', top);
+                $('lcSkipBtn').onclick = hostNext;
+                math($('lcBody'));
+            }
         } else if (s.status === 'reveal') {
-            var q2 = lc.q, rv = s.reveal, last = s.qIndex >= s.total - 1;
-            var h2 = netBanner() + '<div class="lc-qhead"><span>Question ' + (s.qIndex + 1) + ' / ' + s.total + '</span><span>Answer</span></div><div class="lc-q">' + esc(q2.question) + '</div><div class="lc-opts">';
+            var q2 = lc.q, rv = s.reveal;
+            sndReveal();
+            var h2 = netBanner() + '<div class="lc-qhead"><span>Question ' + (s.qIndex + 1) + ' / ' + s.total + '</span><span>Answer</span></div><div class="lc-qblock compact"><div class="lc-q">' + esc(q2.question) + '</div>' +
+                (q2.image ? '<div class="lc-qimg"><img src="' + esc(q2.image) + '" alt="Question image" onerror="this.style.display=\'none\'"></div>' : '') + '<div class="lc-opts">';
             q2.options.forEach(function(o, i) {
                 h2 += '<div class="lc-opt ' + (i === rv.correct ? 'right' : 'dim') + '" style="background:' + OPT_COLORS[i] + ';"><b>' + OPT_SHAPES[i] + '</b><span>' + esc(o) + '</span><em>' + rv.counts[i] + '</em></div>';
             });
-            h2 += '</div><p class="lc-small center">' + rv.noAnswer + ' did not answer</p><h3 class="lc-h">Leaderboard</h3>' + board(s.board) +
-                '<div class="lc-actions"><button class="lc-btn" id="lcNextBtn">' + (last ? 'Show final results' : 'Next question') + '</button></div>';
+            h2 += '</div></div><p class="lc-small center">' + rv.noAnswer + ' did not answer</p><h3 class="lc-h">Top 10</h3>' + board(s.board) + fastestLine(s.board, rv.fastest) +
+                '<p class="lc-nextin" id="lcNextIn"></p><div class="lc-actions"><button class="lc-btn alt small" id="lcNextBtn">Skip wait</button></div>';
             shell(h2, top);
             $('lcNextBtn').onclick = hostNext;
             math($('lcBody'));
         } else if (s.status === 'final') {
             var rows = s.finalRows || [];
+            sndFinal();
             var h3 = netBanner() + '<h2 class="lc-title">Final results</h2>' + podium(rows) + '<div class="lc-board">';
             rows.forEach(function(r) { h3 += '<div class="lc-row"><span class="lc-rank">' + r.rank + '</span><span class="lc-dot" style="background:' + esc(r.color) + '"></span><span class="lc-name">' + esc(r.name) + '</span><span class="lc-small">' + r.correct + '/' + s.total + ' &middot; ' + r.avgSeconds + 's</span><span class="lc-score">' + r.score + '</span></div>'; });
             h3 += '</div><p class="lc-small center" id="lcSaveNote">' + (s.saved ? 'Results saved. Students can see their points in My Progress.' : (s.saveError ? 'Results could NOT be saved: ' + esc(s.saveError) + ' (Run supabase_competition.sql in Supabase.)' : 'Saving results...')) + '</p>' +
@@ -234,6 +309,7 @@
         try { sessionStorage.setItem('lc_host', lc.code); } catch (e) {}
     }
     async function hostStart() {
+        audio(); sndClick();
         var b = $('lcStartBtn'); if (b) b.disabled = true;
         var r = await api('POST', '/api/teacher/competition/rooms/' + lc.code + '/start', {}, teacherToken());
         if (!r.ok) { alert(r.data.error || 'Could not start.'); if (b) b.disabled = false; }
@@ -274,23 +350,29 @@
         if (s.status === 'lobby') {
             shell(netBanner() + '<div class="lc-center"><h2>You\'re in, ' + esc(me.name) + '!</h2><p class="lc-small">' + esc(s.title) + '</p><p class="lc-count"><span id="lcPlayerCount">' + s.playerCount + '</span> joined</p><p class="lc-wait">Waiting for the teacher to start...</p></div>', top);
         } else if (s.status === 'question') {
-            var answered = me.choice !== null && me.choice !== undefined;
-            var h = netBanner() + '<div class="lc-qhead"><span>Question ' + (s.qIndex + 1) + ' / ' + s.total + '</span><span>' + me.score + ' pts</span></div>' + timerBlock(s) + questionBlock(lc.q, answered ? 'show' : 'play');
-            if (answered) h += '<p class="lc-locked">Answer locked in. Waiting for the others...</p>';
-            shell(h, top);
-            if (answered) { var sel = document.querySelector('.lc-opt[data-i="' + me.choice + '"]'); if (sel) sel.classList.add('picked'); }
-            else document.querySelectorAll('.lc-opt').forEach(function(b) { b.onclick = function() { playerAnswer(parseInt(b.getAttribute('data-i'), 10)); }; });
-            math($('lcBody'));
+            if (lc.have !== s.qIndex) { shell(readyScreen(s), top); }
+            else {
+                var answered = me.choice !== null && me.choice !== undefined;
+                var h = netBanner() + '<div class="lc-qhead"><span>Question ' + (s.qIndex + 1) + ' / ' + s.total + '</span><span>' + me.score + ' pts</span></div>' + timerBlock(s) + questionBlock(lc.q, answered ? 'show' : 'play');
+                if (answered) h += '<p class="lc-locked">Answer locked in. Waiting for the others...</p>';
+                shell(h, top);
+                if (answered) { var sel = document.querySelector('.lc-opt[data-i="' + me.choice + '"]'); if (sel) sel.classList.add('picked'); }
+                else document.querySelectorAll('.lc-opt').forEach(function(b) { b.onclick = function() { playerAnswer(parseInt(b.getAttribute('data-i'), 10)); }; });
+                math($('lcBody'));
+            }
         } else if (s.status === 'reveal') {
             var rs = me.result || { correct: false, points: 0, choice: null };
+            if (rs.correct) sndCorrect(); else sndWrong();
             var banner = rs.choice === null ? '<div class="lc-result none">Time\'s up!<small>You did not answer</small></div>' :
                 (rs.correct ? '<div class="lc-result ok">Correct!<small>+' + rs.points + ' points</small></div>' : '<div class="lc-result bad">Wrong<small>No points this time</small></div>');
             var h2 = netBanner() + banner + '<div class="lc-yourrank">Your rank: <b>' + me.rank + '</b> of ' + me.total + ' &middot; <b>' + me.score + '</b> pts</div>' +
-                '<p class="lc-small center">The correct answer was <b>' + OPT_SHAPES[s.reveal.correct] + '. ' + esc(lc.q.options[s.reveal.correct]) + '</b></p><h3 class="lc-h">Top 5</h3>' + board(s.board, me.name) + '<p class="lc-wait">Waiting for the next question...</p>';
+                '<p class="lc-small center">The correct answer was <b>' + OPT_SHAPES[s.reveal.correct] + '. ' + esc(lc.q.options[s.reveal.correct]) + '</b></p><h3 class="lc-h">Top 10</h3>' + board(s.board, me.name) + fastestLine(s.board, s.reveal.fastest) +
+                '<p class="lc-nextin" id="lcNextIn"></p>';
             shell(h2, top);
             math($('lcBody'));
         } else if (s.status === 'final') {
             var rows = s.finalRows || [];
+            sndFinal();
             var h3 = netBanner() + '<h2 class="lc-title">' + (me.rank === 1 ? 'You won! 🏆' : 'Game over') + '</h2><div class="lc-yourrank big">Rank <b>' + me.rank + '</b> of ' + me.total + '</div>' +
                 '<div class="lc-stats"><div><b>' + me.score + '</b><span>Points</span></div><div><b>' + me.correct + '/' + s.total + '</b><span>Correct</span></div><div><b>' + (me.avgSeconds || 0) + 's</b><span>Avg speed</span></div></div>' +
                 podium(rows) + board(rows.slice(0, 10), me.name) + '<div class="lc-actions"><button class="lc-btn" id="lcDoneBtn">Close</button></div>';
@@ -302,6 +384,7 @@
     }
     async function playerAnswer(i) {
         if (!lc || !lc.state) return;
+        sndClick();
         var qi = lc.state.qIndex;
         document.querySelectorAll('.lc-opt').forEach(function(b) { b.disabled = true; b.onclick = null; });
         var pick = document.querySelector('.lc-opt[data-i="' + i + '"]'); if (pick) pick.classList.add('picked');
@@ -335,6 +418,7 @@
         var code = ($('lcJoinCode').value || '').trim(), name = ($('lcJoinName').value || '').trim(), msg = $('lcJoinMsg');
         msg.textContent = '';
         if (!/^\d{6}$/.test(code)) { msg.textContent = 'The code has 6 digits.'; return; }
+        audio();
         var btn = $('lcJoinBtn'); btn.disabled = true; btn.textContent = 'Joining...';
         var r = await api('POST', '/api/competition/join', { code: code, name: name }, studentToken());
         btn.disabled = false; btn.textContent = 'Join';
@@ -362,33 +446,97 @@
     }
     function csvToQuestions(text) {
         var rows = parseCsv(text), out = [];
-        rows.forEach(function(r, idx) {
+        rows.forEach(function(r) {
             if (r.length < 6) return;
-            var letter = String(r[5]).trim().toUpperCase().charAt(0);
-            if (['A', 'B', 'C', 'D'].indexOf(letter) < 0) return;   // header row or bad row
+            // The answer cell must be exactly A, B, C or D (this also skips the header row "Correct Answer").
+            var m = String(r[5]).trim().match(/^\(?([A-Da-d])\)?[.):]?$/);
+            if (!m) return;
             var opts = [r[1], r[2], r[3], r[4]].map(function(x) { return String(x || '').trim(); });
-            out.push({ question: String(r[0]).trim(), options: opts.filter(Boolean), correctAnswer: letter, image: r.length > 6 ? String(r[6]).trim() : '' });
+            out.push({ question: String(r[0]).trim(), options: opts.filter(Boolean), correctAnswer: m[1].toUpperCase(), image: r.length > 6 ? String(r[6]).trim().replace(/^"|"$/g, '') : '' });
         });
         return out;
+    }
+
+    // ---- question list with picture upload (same idea as the normal CleverMent publishing page) ----
+    var lcQuestions = [], lcSubject = '', lcImgIndex = -1;
+    function readImageFile(file) {
+        return new Promise(function(resolve, reject) {
+            var fr = new FileReader();
+            fr.onerror = function() { reject(new Error('Could not read that file.')); };
+            fr.onload = function() {
+                var img = new Image();
+                img.onerror = function() { reject(new Error('That file is not a picture.')); };
+                img.onload = function() {
+                    var max = 1000, w = img.width, h = img.height;
+                    if (Math.max(w, h) > max) { var k = max / Math.max(w, h); w = Math.round(w * k); h = Math.round(h * k); }
+                    var c = document.createElement('canvas'); c.width = w; c.height = h;
+                    var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h);
+                    resolve(c.toDataURL('image/jpeg', 0.85));
+                };
+                img.src = fr.result;
+            };
+            fr.readAsDataURL(file);
+        });
+    }
+    async function uploadQuestionImage(i, file) {
+        var note = $('lcQNote');
+        if (!/^image\//i.test(file.type)) { alert('Please choose a picture (JPG, PNG, WEBP or GIF).'); return; }
+        if (note) note.textContent = 'Uploading picture for question ' + (i + 1) + '...';
+        try {
+            var dataUrl = await readImageFile(file);
+            var r = await api('POST', '/api/teacher/assessment-images', { dataUrl: dataUrl }, teacherToken());
+            if (!r.ok) { alert(r.data.error || 'Could not upload the picture.'); if (note) note.textContent = ''; return; }
+            lcQuestions[i].image = r.data.url;
+            renderQEditor();
+        } catch (e) { alert(e.message || 'Could not upload the picture.'); if (note) note.textContent = ''; }
+    }
+    function renderQEditor() {
+        var box = $('lcQEditor'); if (!box) return;
+        if (!lcQuestions.length) { box.innerHTML = ''; return; }
+        var withImg = lcQuestions.filter(function(q) { return q.image; }).length;
+        var h = '<label class="live-msg-label">Your questions (' + lcQuestions.length + ') &mdash; add pictures or diagrams</label><p class="helper-text" id="lcQNote">' + withImg + ' with a picture. Tap "Add picture" under a question to attach a diagram.</p><div class="lc-qlist">';
+        lcQuestions.forEach(function(q, i) {
+            h += '<div class="lc-qrow"><div class="lc-qtxt"><b>' + (i + 1) + '.</b> ' + esc(q.question.length > 110 ? q.question.slice(0, 110) + '...' : q.question) + '</div>' +
+                (q.image ? '<img class="lc-qthumb" src="' + esc(q.image) + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+                '<div class="lc-qbtns"><button type="button" class="secondary-btn" data-addimg="' + i + '">&#128247; ' + (q.image ? 'Change picture' : 'Add picture') + '</button>' +
+                (q.image ? '<button type="button" class="secondary-btn" data-rmimg="' + i + '" style="color:#dc3545;">Remove</button>' : '') + '</div></div>';
+        });
+        box.innerHTML = h + '</div><input type="file" id="lcImgFile" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none">';
+        var fi = $('lcImgFile');
+        fi.onchange = function() { var f = fi.files[0]; fi.value = ''; if (f && lcImgIndex >= 0) uploadQuestionImage(lcImgIndex, f); };
+        box.querySelectorAll('[data-addimg]').forEach(function(b) { b.onclick = function() { lcImgIndex = parseInt(b.getAttribute('data-addimg'), 10); fi.click(); }; });
+        box.querySelectorAll('[data-rmimg]').forEach(function(b) { b.onclick = function() { lcQuestions[parseInt(b.getAttribute('data-rmimg'), 10)].image = ''; renderQEditor(); }; });
+    }
+    async function loadAssessmentQuestions() {
+        var code = $('lcAssess') ? $('lcAssess').value : '';
+        lcQuestions = []; renderQEditor();
+        if (!code) return;
+        var box = $('lcQEditor'); if (box) box.innerHTML = '<p class="helper-text">Loading questions...</p>';
+        var r = await api('GET', '/api/teacher/competition/assessment/' + encodeURIComponent(code), null, teacherToken());
+        if (!r.ok) { if (box) box.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + esc(r.data.error || 'Could not load the questions.') + '</p>'; return; }
+        lcQuestions = r.data.questions || []; lcSubject = r.data.subject || '';
+        renderQEditor();
     }
 
     async function teacherInit() {
         var el = $('competitionSection');
         if (!el) return;
-        el.innerHTML = '<h3 style="margin:0 0 6px;">Live Competition</h3><p class="helper-text">Host a live, timed quiz. Students join with a 6-digit code and score more points for answering faster.</p><p class="helper-text" id="lcLoading">Loading...</p>';
+        el.innerHTML = '<h3 style="margin:0 0 6px;">Live Competition</h3><p class="helper-text">Loading...</p>';
         var resume = '';
         try { var hc = sessionStorage.getItem('lc_host'); if (hc) resume = hc; } catch (e) {}
         var s = await api('GET', '/api/teacher/competition/setup', null, teacherToken());
         if (!s.ok) { el.innerHTML += '<p class="helper-text" style="color:#dc3545;">' + esc(s.data.error || 'Could not load.') + '</p>'; return; }
         var setup = s.data;
-        var h = '<h3 style="margin:0 0 6px;">Live Competition</h3><p class="helper-text">Host a live, timed quiz. Students join with a 6-digit code and score more points for answering faster.</p>';
+        lcQuestions = []; lcSubject = '';
+        var h = '<h3 style="margin:0 0 6px;">Live Competition</h3><p class="helper-text">Host a live, timed quiz. Students join with a 6-digit code and score more points for answering faster. Questions move on by themselves.</p>';
         if (resume) h += '<div class="lc-resume">You have a game running (code <b>' + esc(resume) + '</b>). <button type="button" class="primary-btn" id="lcResumeBtn" style="padding:6px 14px;">Return to it</button></div>';
         h += '<div class="lc-form">' +
             '<label class="live-msg-label">Competition title</label><input id="lcTitle" class="form-input" maxlength="80" placeholder="e.g. Friday Maths Challenge">' +
             '<label class="live-msg-label">Questions from</label>' +
             '<select id="lcSource" class="form-input"><option value="assessment">One of my assessments</option><option value="csv">Upload a CSV just for this competition</option></select>' +
             '<div id="lcSrcAssess"><select id="lcAssess" class="form-input">' + (setup.assessments.length ? setup.assessments.map(function(a) { return '<option value="' + esc(a.code) + '">' + esc(a.subject) + ' - ' + esc(a.className) + ' (' + a.questionCount + ' questions, ' + esc(a.code) + ')</option>'; }).join('') : '<option value="">No assessments yet</option>') + '</select></div>' +
-            '<div id="lcSrcCsv" style="display:none;"><input type="file" id="lcCsvFile" accept=".csv,text/csv" class="form-input"><input id="lcCsvSubject" class="form-input" maxlength="60" placeholder="Subject (optional)" style="margin-top:6px;"><p class="helper-text" id="lcCsvInfo">CSV columns: Question, Option A, Option B, Option C, Option D, Correct Answer (A-D), Image URL (optional). Same as your normal CleverMent CSV.</p></div>' +
+            '<div id="lcSrcCsv" style="display:none;"><input type="file" id="lcCsvFile" accept=".csv,text/csv" class="form-input"><input id="lcCsvSubject" class="form-input" maxlength="60" placeholder="Subject (optional)" style="margin-top:6px;"><p class="helper-text" id="lcCsvInfo">CSV columns: Question, Option A, Option B, Option C, Option D, Correct Answer (A-D), Image URL (optional). Same as your normal CleverMent CSV. You can add pictures after loading it.</p></div>' +
+            '<div id="lcQEditor"></div>' +
             '<div class="lc-grid"><div><label class="live-msg-label">Number of questions</label><select id="lcCount" class="form-input"><option value="0">All</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>50</option></select></div>' +
             '<div><label class="live-msg-label">Seconds per question</label><select id="lcSecs" class="form-input"><option>10</option><option selected>15</option><option>20</option><option>30</option><option>45</option><option>60</option></select></div></div>' +
             '<label class="live-msg-label">Who can join</label><select id="lcAccess" class="form-input"><option value="open">Anyone with the code (types a name)</option><option value="roster">Only my roster students (must log in)</option></select>' +
@@ -397,24 +545,35 @@
             '<p id="lcFormMsg" class="helper-text" style="color:#dc3545;min-height:18px;"></p><button type="button" class="primary-btn" id="lcCreateBtn" style="width:100%;">Create room</button></div>' +
             '<h3 style="margin:22px 0 6px;">Past competitions</h3><div id="lcHistory"><p class="helper-text">Loading...</p></div>';
         el.innerHTML = h;
-        $('lcSource').onchange = function() { var c = this.value === 'csv'; $('lcSrcAssess').style.display = c ? 'none' : 'block'; $('lcSrcCsv').style.display = c ? 'block' : 'none'; };
+        $('lcSource').onchange = function() {
+            var c = this.value === 'csv';
+            $('lcSrcAssess').style.display = c ? 'none' : 'block'; $('lcSrcCsv').style.display = c ? 'block' : 'none';
+            lcQuestions = []; lcSubject = ''; renderQEditor();
+            if (!c) loadAssessmentQuestions();
+        };
+        $('lcAssess').onchange = loadAssessmentQuestions;
         $('lcAccess').onchange = function() { $('lcClassWrap').style.display = this.value === 'roster' ? 'block' : 'none'; };
         $('lcCsvFile').onchange = function() {
             var f = this.files[0]; if (!f) return;
             var rd = new FileReader();
-            rd.onload = function() { csvQuestions = csvToQuestions(rd.result); $('lcCsvInfo').textContent = csvQuestions.length ? csvQuestions.length + ' questions loaded from ' + f.name + '.' : 'No valid questions found. Check the column order and that the Correct Answer column has A, B, C or D.'; };
+            rd.onload = function() {
+                lcQuestions = csvToQuestions(rd.result);
+                $('lcCsvInfo').textContent = lcQuestions.length ? lcQuestions.length + ' questions loaded from ' + f.name + '. Add pictures below if you need them.' : 'No valid questions found. Check the column order and that the Correct Answer column has A, B, C or D.';
+                renderQEditor();
+            };
             rd.readAsText(f);
         };
         $('lcCreateBtn').onclick = teacherCreate;
-        var rb = $('lcResumeBtn'); if (rb) rb.onclick = function() { openHost(resume); };
+        var rb = $('lcResumeBtn'); if (rb) rb.onclick = function() { audio(); openHost(resume); };
+        if (setup.assessments.length) loadAssessmentQuestions();
         loadHistory();
     }
     async function teacherCreate() {
         var msg = $('lcFormMsg'); msg.textContent = '';
-        var src = $('lcSource').value;
-        var body = { title: $('lcTitle').value, source: src, count: parseInt($('lcCount').value, 10) || 0, timeLimit: parseInt($('lcSecs').value, 10), access: $('lcAccess').value, className: $('lcAccess').value === 'roster' ? $('lcClass').value : '' };
-        if (src === 'assessment') { body.assessmentCode = $('lcAssess').value; if (!body.assessmentCode) { msg.textContent = 'Choose an assessment first.'; return; } }
-        else { if (!csvQuestions.length) { msg.textContent = 'Upload a CSV with questions first.'; return; } body.questions = csvQuestions; body.subject = $('lcCsvSubject').value; }
+        audio();
+        if (!lcQuestions.length) { msg.textContent = $('lcSource').value === 'csv' ? 'Upload a CSV with questions first.' : 'Choose an assessment first.'; return; }
+        var subject = $('lcSource').value === 'csv' ? $('lcCsvSubject').value : lcSubject;
+        var body = { title: $('lcTitle').value, source: 'custom', questions: lcQuestions, subject: subject, count: parseInt($('lcCount').value, 10) || 0, timeLimit: parseInt($('lcSecs').value, 10), access: $('lcAccess').value, className: $('lcAccess').value === 'roster' ? $('lcClass').value : '' };
         var btn = $('lcCreateBtn'); btn.disabled = true; btn.textContent = 'Creating...';
         var r = await api('POST', '/api/teacher/competition/rooms', body, teacherToken());
         btn.disabled = false; btn.textContent = 'Create room';
@@ -454,6 +613,7 @@
         $('lcPanelJoin').onclick = async function() {
             var code = ($('lcPanelCode').value || '').trim(), msg = $('lcPanelMsg'); msg.textContent = '';
             if (!/^\d{6}$/.test(code)) { msg.textContent = 'The code has 6 digits.'; return; }
+            audio();
             var r = await api('POST', '/api/competition/join', { code: code }, studentToken());
             if (!r.ok) { msg.textContent = r.data.error || 'Could not join.'; return; }
             openPlayer(code, r.data.pid, r.data.key);
