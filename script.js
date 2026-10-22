@@ -9893,12 +9893,16 @@ function studentShowOnly(id) {
 }
 async function studentLoginLoadClasses() {
     var sel = document.getElementById('slClass');
-    if (!sel || sel.options.length > 1) return;
-    try {
-        var r = await fetch(BACKEND_URL + '/api/student/classes');
-        var d = await r.json();
-        (d.classes || []).forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
-    } catch (e) {}
+    if (!sel) return;
+    var seen = {}, list = [];
+    function add(c) { c = String(c || '').trim(); if (c && c !== 'Other' && c.indexOf('--') !== 0 && !seen[c.toLowerCase()]) { seen[c.toLowerCase()] = 1; list.push(c); } }
+    var src = document.getElementById('teacherClassSelect') || document.getElementById('rosterClassSelect');
+    if (src) Array.prototype.forEach.call(src.options, function(o) { add(o.value); });
+    (cmCustomOptions && cmCustomOptions.classes || []).forEach(add);
+    try { var r = await fetch(BACKEND_URL + '/api/student/classes'); var d = await r.json(); (d.classes || []).forEach(add); } catch (e) {}
+    var keep = sel.value;
+    sel.innerHTML = '<option value="">-- Select your class --</option>' + list.map(function(c) { return '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>'; }).join('');
+    sel.value = keep;
 }
 function studentLoginClassChanged() {
     slChosen = null;
