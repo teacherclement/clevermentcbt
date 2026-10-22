@@ -12284,13 +12284,23 @@ function learnSubject(key) {
             return head + learnCard(t.title, p ? 'Best score: ' + p.best + '% \u00B7 ' + p.attempts + ' practice(s)' : 'Not practised yet', "learnTopic('" + t.id + "')", false);
         }).join('') + '</div><p id="learnEmpty" class="helper-text" style="display:none;">Nothing found.</p>';
 }
+function learnLessonHtml(L) {
+    var e = escapeHtml, h = '<h3>What is it?</h3><p>' + e(L.i) + '</p>' + (L.d || '') +
+        '<div class="cm-tip" style="border-left-color:#2d9c5c;"><b>In real life:</b> ' + e(L.r) + '</div>' +
+        '<h3>Key points</h3><ul>' + L.k.map(function(x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ul>';
+    if (L.e) h += '<h3>Worked example</h3><div class="cm-flash" style="padding:12px;"><p><b>' + e(L.e[0]) + '</b></p><ol>' + L.e[1].map(function(x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ol><p>Answer: <b style="color:#2d9c5c;">' + e(L.e[2]) + '</b></p></div>';
+    return h;
+}
 async function learnTopic(id) {
     var t = learnCur.sub.topics.filter(function(x) { return x.id === id; })[0]; learnCur.topic = t;
     var el = learnEl(); el.innerHTML = '<p class="helper-text">Loading lesson...</p>';
     try {
         await learnLoadGen();
         var d;
-        if (t.lesson) { d = t.lesson; }
+        if (!window.learnLessons) { try { var rl = await fetch('learning-lessons.json?v=1'); window.learnLessons = rl.ok ? await rl.json() : {}; } catch (e0) { window.learnLessons = {}; } }
+        var NL = window.learnLessons[t.id];
+        if (NL) { d = { title: t.title, summary: t.strand || '', objectives: [], html: learnLessonHtml(NL) }; }
+        else if (t.lesson) { d = t.lesson; }
         else {
             d = { title: t.title, summary: t.strand || '', objectives: [], html: '<h3>Key idea</h3><p>' + escapeHtml(t.note || '') + '</p>' };
         }
