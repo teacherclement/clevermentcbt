@@ -88,16 +88,17 @@
     <!-- ===== STUDENT ACCESS ===== -->
     <div id="studentAccess" style="display:none;">
         <button onclick="backToLanding()" class="secondary-btn" style="font-size:13px; padding:6px 16px; margin-bottom:16px;">← Back</button>
-        <h2>Enter Assessment Code</h2>
-        <p style="color:#6b7a8f; margin-bottom:16px;">Enter the code your teacher gave you to access your assessment.</p>
+        <h2>Student Access</h2>
+        <p style="color:#6b7a8f; margin-bottom:16px;">Log in, join a live competition, or enter the code your teacher gave you.</p>
+        <div class="student-login-alternative"><span>Already have a student account?</span><button type="button" onclick="openStudentLogin()" class="secondary-btn student-login-access-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0M19 8h3m-1.5-1.5v3"/></svg> Login as Student</button></div>
+        <button type="button" class="secondary-btn lc-join-live-btn" onclick="lcOpenJoin()" style="width:100%;margin:0 0 20px;background:#0d9488;color:#fff;border:none;font-weight:700;">Join a Live Competition</button>
+        <h3 style="margin:0 0 6px;">Have an assessment code?</h3>
         <div class="form-group">
             <label for="assessmentCode">Assessment Code</label>
             <input type="text" id="assessmentCode" placeholder="e.g., MAT-PRI-865" class="form-input" maxlength="11" style="text-transform:uppercase; letter-spacing:2px; font-weight:600;">
         </div>
         <button onclick="verifyAssessmentCode()" class="primary-btn full-width student-access-code-btn">Enter Assessment Code</button>
         <p class="helper-text" style="margin-top:8px;">Ask your teacher for the assessment code</p>
-        <button type="button" class="secondary-btn lc-join-live-btn" onclick="lcOpenJoin()" style="width:100%;margin-top:10px;">&#127942; Join a Live Competition</button>
-        <div class="student-login-alternative"><span>Already have a student account?</span><button type="button" onclick="openStudentLogin()" class="secondary-btn student-login-access-btn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0M19 8h3m-1.5-1.5v3"/></svg> Login as Student</button></div>
     </div>
 
     <!-- ===== STUDENT ASSESSMENT VIEW ===== -->

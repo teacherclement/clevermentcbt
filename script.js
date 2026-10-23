@@ -905,7 +905,6 @@ function showStudentAccess() {
     }
     document.getElementById('studentAccess').style.display = 'block';
     document.getElementById('assessmentCode').value = '';
-    document.getElementById('assessmentCode').focus();
     updateURL('student');
 }
 
@@ -12211,9 +12210,11 @@ function learnLoadScript(src) {
     });
 }
 async function learnLoadGen() {
-    if (window.CMLearnGen && window.CMLearnGen.list().length > 50) return;
-    await learnLoadScript('learning-generators.js?v=4');
-    window.CMLearnGen.topics = window.CMLearnGen.list();
+    if (!(window.CMLearnGen && window.CMLearnGen.list().length > 50)) {
+        await learnLoadScript('learning-generators.js?v=4');
+        window.CMLearnGen.topics = window.CMLearnGen.list();
+    }
+    if (!window.CMLearnEn) { try { await learnLoadScript('learning-english.js?v=1'); } catch (eEn) {} }
 }
 function learnFail(e) {
     var m = String((e && e.message) || e || '');
@@ -12302,7 +12303,7 @@ async function learnTopic(id) {
         await learnLoadGen();
         var d;
         if (!window.learnLessons) { try { var rl = await fetch('learning-lessons.json?v=1'); window.learnLessons = rl.ok ? await rl.json() : {}; } catch (e0) { window.learnLessons = {}; } }
-        var NL = window.learnLessons[t.id];
+        var NL = window.learnLessons[t.id] || (window.CMLearnEn && window.CMLearnEn.lessons[t.id]);
         if (NL) { d = { title: t.title, summary: t.strand || '', objectives: [], html: learnLessonHtml(NL) }; }
         else if (t.lesson) { d = t.lesson; }
         else {
@@ -12320,20 +12321,20 @@ async function learnTopic(id) {
             return '<div class="cm-flash" style="padding:12px;"><b>Example ' + (i + 1) + '</b>' + (ex.svg || '') + '<p>' + escapeHtml(ex.q) + '</p><p>Answer: <b style="color:#2d9c5c;">' + escapeHtml(ex.options[ex.answer]) + '</b></p><div class="explain"><b>Working:</b> ' + escapeHtml(ex.explain) + '</div></div>';
         }).join('');
         if (t.mistake) extra += '<div class="cm-tip" style="border-left-color:#dc3545;"><b>Common mistake:</b> ' + escapeHtml(t.mistake) + '</div>';
-        extra += '<div class="cm-tip"><b>Remember:</b> read the question carefully, write your working, and check your answer by estimating or doing the opposite operation.</div>';
+        extra += '<div class="cm-tip"><b>Remember:</b> ' + (String(t.id).indexOf('p6-eng-') === 0 ? 'read the whole sentence or passage carefully, say each answer in your head, and choose the one that sounds and reads right.' : 'read the question carefully, write your working, and check your answer by estimating or doing the opposite operation.') + '</div>';
         d.html += extra;
         el.innerHTML = '<button type="button" class="secondary-btn" onclick="learnSubject(\'' + learnCur.sub.key + '\')">&larr; ' + escapeHtml(learnCur.sub.name) + '</button><h2>' + escapeHtml(d.title) + '</h2><p class="helper-text">' + escapeHtml(d.summary || '') + '</p>' +
             (d.objectives && d.objectives.length ? '<div class="cm-flash"><b>By the end you can:</b><ul>' + d.objectives.map(function(o) { return '<li>' + escapeHtml(o) + '</li>'; }).join('') + '</ul></div>' : '') +
             '<div class="cm-lesson">' + d.html + '</div>' +
-            '<div class="cm-flash"><h3 style="margin:0 0 6px;">Practise this topic</h3><p class="helper-text">Question pool: ' + window.CMLearnGen.POOL + '. How many do you want to answer?</p>' +
+            '<div class="cm-flash"><h3 style="margin:0 0 6px;">Practise this topic</h3><p class="helper-text">Question pool: ' + (window.CMLearnGen.poolOf ? window.CMLearnGen.poolOf(t.id) : window.CMLearnGen.POOL) + '. How many do you want to answer?</p>' +
             '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">' + [10, 20, 30, 50, 100].map(function(n) { return '<button type="button" class="secondary-btn" onclick="document.getElementById(\'lnCount\').value=' + n + '">' + n + '</button>'; }).join('') + '</div>' +
-            '<input id="lnCount" type="number" class="form-input" min="1" max="' + window.CMLearnGen.POOL + '" value="20" style="max-width:140px;"> <button type="button" class="primary-btn" onclick="learnStart()">Start practice</button></div>';
+            '<input id="lnCount" type="number" class="form-input" min="1" max="' + (window.CMLearnGen.poolOf ? window.CMLearnGen.poolOf(t.id) : window.CMLearnGen.POOL) + '" value="20" style="max-width:140px;"> <button type="button" class="primary-btn" onclick="learnStart()">Start practice</button></div>';
         renderMathIn(el);
     } catch (e) { el.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(learnFail(e)) + '</p>'; }
 }
 function learnStart() {
-    var G = window.CMLearnGen, n = Math.max(1, Math.min(G.POOL, parseInt(document.getElementById('lnCount').value, 10) || 20));
-    var idx = []; for (var i = 0; i < G.POOL; i++) idx.push(i);
+    var G = window.CMLearnGen, PL = G.poolOf ? G.poolOf(learnCur.topic.id) : G.POOL, n = Math.max(1, Math.min(PL, parseInt(document.getElementById('lnCount').value, 10) || 20));
+    var idx = []; for (var i = 0; i < PL; i++) idx.push(i);
     for (var j = idx.length - 1; j > 0; j--) { var k = Math.floor(Math.random() * (j + 1)); var tmp = idx[j]; idx[j] = idx[k]; idx[k] = tmp; }
     var qs = [], seen = {};
     for (var m = 0; m < idx.length && qs.length < n; m++) { var q = G.get(learnCur.topic.id, idx[m]); if (q && !seen[q.q + q.options.join()]) { seen[q.q + q.options.join()] = 1; qs.push(q); } }
