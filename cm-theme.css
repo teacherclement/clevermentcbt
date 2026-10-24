@@ -1,0 +1,129 @@
+/* CleverMent design layer v1 - loaded after style.css. Delete the <link> to cm-theme.css to go back to the old look. */
+:root{--t-bg:#fff;--t-canvas:#f6f8fa;--t-border:#d0d7de;--t-soft:#e6eaef;--t-text:#1f2328;--t-muted:#59636e;--t-accent:#1f6feb;--t-accent-h:#1a5fd0;--t-ring:rgba(31,111,235,.28);--t-r:8px;--t-r-sm:6px;--t-green:#1a7f37;--t-red:#cf222e}
+html,body{background:var(--t-canvas)!important}
+body{display:block!important;padding:0!important;font-size:14px;line-height:1.5;color:var(--t-text)!important;font-family:Inter,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+.container{max-width:none!important;width:100%!important;margin:0!important;padding:0 0 28px!important;background:transparent!important;border-radius:0!important;box-shadow:none!important;min-height:100vh}
+.container>*:not(#mainHeader):not(.footer):not(.help-float-btn):not(.whatsapp-float-btn):not(.student-menu-open):not(script){margin-left:auto!important;margin-right:auto!important;width:100%;max-width:1280px;padding-left:16px!important;padding-right:16px!important}
+@media(min-width:900px){.container>*:not(#mainHeader):not(.footer):not(.help-float-btn):not(.whatsapp-float-btn):not(.student-menu-open):not(script){padding-left:32px!important;padding-right:32px!important}}
+.container>#studentAccess,.container>#teacherAuth,.container>#adminAuth{max-width:1280px!important}
+/* top bar */
+#mainHeader{display:flex!important;align-items:center;justify-content:flex-start;gap:12px;text-align:left!important;margin:0 0 20px!important;padding:10px 16px!important;background:var(--t-bg);border-bottom:1px solid var(--t-border);position:sticky;top:0;z-index:30;flex-wrap:nowrap!important}
+@media(min-width:900px){#mainHeader{padding:10px max(32px,calc((100vw - 1280px)/2 + 32px))!important}}
+#mainHeader .logo-image{height:28px!important;width:auto!important;max-width:none!important}
+#mainHeader .header-divider{height:20px!important;width:1px!important;background:var(--t-border)!important}
+#mainHeader .tagline{font-size:12px!important;color:var(--t-muted)!important;letter-spacing:0!important}
+@media(max-width:560px){#mainHeader .tagline,#mainHeader .header-divider{display:none}}
+#mainHeader .school-header-logo{height:28px!important;width:auto;max-width:110px}
+/* type */
+h1,h2,h3,h4{color:var(--t-text);letter-spacing:-.01em;line-height:1.3}
+h2{font-size:20px!important;font-weight:700}
+h3{font-size:16px!important;font-weight:650}
+.helper-text,p.helper-text{font-size:12.5px!important;color:var(--t-muted)!important;font-style:normal!important}
+/* buttons */
+.primary-btn,.secondary-btn,button.full-width{font-family:inherit;font-size:14px!important;font-weight:600!important;line-height:20px;min-height:40px;padding:8px 16px!important;border-radius:var(--t-r-sm)!important;border:1px solid var(--t-border);cursor:pointer;transition:background .12s,border-color .12s,box-shadow .12s;box-shadow:none!important;text-transform:none!important}
+.primary-btn{background:var(--t-accent)!important;color:#fff!important;border-color:rgba(31,35,40,.15)!important}
+.primary-btn:hover{background:var(--t-accent-h)!important}
+.secondary-btn{background:var(--t-canvas)!important;color:var(--t-text)!important}
+.secondary-btn:hover{background:#eaeef2!important;border-color:#afb8c1}
+.primary-btn:focus-visible,.secondary-btn:focus-visible,.form-input:focus-visible,.cm-role:focus-visible{outline:none;box-shadow:0 0 0 3px var(--t-ring)!important}
+.primary-btn:disabled,.secondary-btn:disabled{opacity:.55;cursor:not-allowed}
+/* inputs */
+.form-group{margin-bottom:14px!important}
+.form-group label,label{font-size:13px;font-weight:600;color:var(--t-text);display:block;margin-bottom:6px}
+.form-input,select.form-input,textarea.form-input,input.form-input{width:100%;min-height:40px;padding:8px 12px!important;font-family:inherit;font-size:16px!important;color:var(--t-text);background:var(--t-bg)!important;border:1px solid var(--t-border)!important;border-radius:var(--t-r-sm)!important;box-shadow:none!important;transition:border-color .12s,box-shadow .12s;text-align:left!important;letter-spacing:normal!important}
+@media(min-width:900px){.form-input{font-size:14px!important}}
+.form-input:focus{border-color:var(--t-accent)!important;box-shadow:0 0 0 3px var(--t-ring)!important;outline:none}
+.form-input::placeholder{color:#8c959f!important}
+/* cards and panels */
+.dash-panel,.sa-panel,.scrollable-panel,.stat-card,.student-login-alternative{background:var(--t-bg)!important;border:1px solid var(--t-border)!important;border-radius:var(--t-r)!important;box-shadow:none!important}
+.dash-panel,.sa-panel{padding:16px!important}
+@media(min-width:900px){.dash-panel,.sa-panel{padding:20px!important}}
+.stats-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+@media(min-width:900px){.stats-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}}
+.stat-card{padding:12px 14px!important;text-align:left!important;display:block}
+.stat-card h3{font-size:11.5px!important;font-weight:600!important;color:var(--t-muted)!important;text-transform:uppercase;letter-spacing:.04em!important;margin:0 0 6px!important;line-height:1.3}
+.stat-card p{font-size:26px!important;font-weight:700!important;color:var(--t-text)!important;line-height:1.1;letter-spacing:-.02em;margin:0!important}
+/* tables */
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:13.5px}
+th{background:var(--t-canvas);color:var(--t-muted);font-weight:600;font-size:12px;text-align:left;padding:8px 12px;border-bottom:1px solid var(--t-border);text-transform:none}
+td{padding:9px 12px;border-bottom:1px solid var(--t-soft)}
+tr:hover td{background:#fafbfc}
+/* menu button + sidebar */
+.sidebar-toggle,.dashboard-menu-top{width:36px!important;height:36px!important;min-width:36px!important;border-radius:var(--t-r-sm)!important;background:var(--t-bg)!important;color:var(--t-text)!important;border:1px solid var(--t-border)!important;box-shadow:none!important;padding:0!important;display:inline-flex!important;align-items:center;justify-content:center;margin:0 0 12px!important}
+.sidebar-toggle svg{width:18px;height:18px}
+.dash-sidebar{background:var(--t-bg)!important;border:1px solid var(--t-border)!important;box-shadow:none}
+.dash-nav-item{font-family:inherit;font-size:14px!important;font-weight:500!important;color:var(--t-text)!important;border-radius:var(--t-r-sm)!important;padding:8px 12px!important;background:transparent!important;border:0!important;text-align:left}
+.dash-nav-item:hover{background:var(--t-canvas)!important}
+.dash-nav-item.active{background:#ddf4ff!important;color:#0550ae!important;font-weight:600!important;box-shadow:inset 3px 0 0 var(--t-accent)}
+.dash-layout{gap:16px!important}
+/* floating buttons: smaller and out of the way */
+#whatsappFloatBtn.whatsapp-float-btn,#needHelpBtn.help-float-btn{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;left:auto!important;right:15px!important;padding:0!important;box-shadow:0 1px 3px rgba(31,35,40,.25)!important}
+#whatsappFloatBtn.whatsapp-float-btn svg,#needHelpBtn.help-float-btn svg{width:20px!important;height:20px!important}
+#whatsappFloatBtn.whatsapp-float-btn{bottom:122px!important}
+#needHelpBtn.help-float-btn{bottom:70px!important}
+.container{padding-bottom:150px!important}
+#cleverBotFloat{width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;max-width:44px!important;max-height:44px!important;right:12px!important;bottom:14px!important;box-shadow:0 1px 3px rgba(31,35,40,.3)!important}
+/* footer */
+.footer{margin:28px 0 0!important;padding:16px 16px 0!important;max-width:1280px;margin-left:auto!important;margin-right:auto!important;border-top:1px solid var(--t-border)!important;text-align:left!important;font-size:12px!important;color:var(--t-muted)!important}
+.footer p{margin:0!important;font-size:12px!important}
+.footer-sub{opacity:.85}
+/* landing */
+#landingPage{text-align:left!important;padding:0!important}
+#landingPage button.cm-role{min-width:0!important;padding:16px!important;font-size:inherit!important}
+.cm-hero{padding:8px 0 16px}
+.cm-hero h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+.cm-hero p{color:var(--t-muted);font-size:15px;margin:0}
+.cm-roles{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:760px){.cm-roles{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}}
+.cm-role{display:flex;align-items:center;gap:14px;width:100%;text-align:left;font-family:inherit;color:var(--t-text);background:var(--t-bg);border:1px solid var(--t-border);border-radius:var(--t-r);padding:16px;cursor:pointer;transition:border-color .12s,box-shadow .12s,transform .12s}
+.cm-role:hover{border-color:var(--t-accent);box-shadow:0 1px 6px rgba(31,111,235,.12)}
+.cm-role:active{transform:scale(.995)}
+.cm-role-ic{flex:0 0 40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#ddf4ff;color:#0550ae}
+.cm-role.t .cm-role-ic{background:#dafbe1;color:#1a7f37}.cm-role.a .cm-role-ic{background:#fbefff;color:#8250df}
+.cm-role b{display:block;font-size:15px;font-weight:700}
+.cm-role small{display:block;font-size:12.5px;color:var(--t-muted);margin-top:2px;line-height:1.35}
+.cm-role-go{margin-left:auto;color:#8c959f}
+/* entry and login screens */
+#studentAccess,#teacherAuth,#adminAuth{padding-top:4px}
+#studentAccess,#teacherAuth,#adminAuth{margin-left:auto;margin-right:auto}
+#studentAccess>*,#teacherAuth>*,#adminAuth>*{max-width:520px}
+#assessmentCode{text-align:left!important;letter-spacing:1.5px!important;font-size:16px!important}
+#teacherAuth h2{text-align:left!important}
+#studentAccess h2,#teacherAuth h2,#adminAuth h2{margin:0 0 4px}
+.student-login-alternative{padding:14px!important;margin:0 0 16px!important;text-align:left!important}
+.student-login-alternative p{margin:0 0 10px!important;font-size:13px;color:var(--t-muted)}
+.student-login-alternative button{width:100%!important}
+.lc-join-live-btn{width:100%!important}
+/* entry buttons */
+.lc-join-live-btn{background:#0d9488!important;color:#fff!important;border-color:#0b7f74!important}
+.lc-join-live-btn:hover{background:#0b7f74!important}
+.student-login-access-btn{background:#1f2328!important;color:#fff!important;border-color:#1f2328!important}
+.student-login-access-btn:hover{background:#32383f!important}
+.student-login-access-btn svg{stroke:#fff}
+
+#teacherDashboardExitButton,#studentAccess>.secondary-btn:first-child{min-height:32px!important;padding:4px 12px!important;font-size:13px!important}
+/* student portal */
+#studentMenuOpen.student-menu-open{position:static!important;width:36px!important;height:36px!important;min-width:36px!important;padding:0!important;border-radius:var(--t-r-sm)!important;background:var(--t-bg)!important;border:1px solid var(--t-border)!important;box-shadow:none!important;display:inline-flex!important;align-items:center;justify-content:center;margin:0 0 12px!important}
+#studentMenuOpen.student-menu-open svg{width:18px;height:18px;stroke:var(--t-text);fill:none;stroke-width:2;stroke-linecap:round}
+.sa-summary-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+@media(min-width:900px){.sa-summary-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}}
+.sa-summary-card{display:flex!important;flex-direction:column;gap:2px;padding:12px 14px!important;background:var(--t-bg)!important;border:1px solid var(--t-border)!important;border-radius:var(--t-r)!important;box-shadow:none!important;text-align:left!important}
+.sa-summary-card>span{font-size:11.5px!important;font-weight:600;color:var(--t-muted)!important;text-transform:uppercase;letter-spacing:.04em;line-height:1.3}
+.sa-summary-card>strong{font-size:26px!important;font-weight:700;line-height:1.15;color:var(--t-text)!important;letter-spacing:-.02em}
+.sa-summary-card .secondary-btn{margin-top:8px;min-height:32px!important;padding:4px 10px!important;font-size:13px!important;width:100%}
+.sa-summary-card .helper-text{margin:4px 0 0!important}
+.sa-quick-actions{display:flex!important;flex-wrap:wrap;gap:8px!important}
+.sa-quick-actions button{flex:1 1 150px}
+.sa-profile{display:flex!important;align-items:center;gap:14px;padding:14px 16px!important;background:var(--t-bg)!important;border:1px solid var(--t-border)!important;border-radius:var(--t-r)!important;box-shadow:none!important;margin-bottom:14px!important}
+.sa-name{font-size:16px!important;font-weight:700}
+.student-avatar{width:48px!important;height:48px!important;min-width:48px!important;font-size:16px!important}
+.sa-card{display:flex!important;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px!important;background:var(--t-bg)!important;border:1px solid var(--t-border)!important;border-radius:var(--t-r)!important;box-shadow:none!important;margin-bottom:8px}
+.sa-badge{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--t-border);color:var(--t-muted);background:var(--t-canvas)}
+#studentMenuOpen.student-menu-open svg{width:18px!important;height:18px!important;display:block}
+#studentMenuOpen.student-menu-open svg path{stroke:#1f2328!important;stroke-width:2!important;fill:none!important}
+.sa-panel .sa-profile{border:0!important;padding:0!important;margin:0 0 12px!important;background:transparent!important}
+.sa-summary-card>strong[style]{font-size:18px!important;line-height:1.3}
+
+#saProfile,.sa-profile{border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important}
+#studentMenuOpen.student-menu-open{margin:12px 16px 4px!important}
+@media(min-width:900px){#studentMenuOpen.student-menu-open{margin:12px max(32px,calc((100vw - 1280px)/2 + 32px)) 4px!important}}
