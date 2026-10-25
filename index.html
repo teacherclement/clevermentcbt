@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="competition.css">
     <link rel="stylesheet" href="cm-theme.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap">
-    <link rel="stylesheet" href="cm-redesign.css?v=3">
+    <link rel="stylesheet" href="cm-redesign.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
@@ -470,16 +470,13 @@
 
     <!-- ===== TEACHER DASHBOARD ===== -->
     <div id="teacherDashboard" style="display:none;">
-        <button type="button" class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('teacherDashboard')" aria-label="Open teacher menu" title="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+        <div class="cm-topbar" id="teacherTopbar"><button type="button" class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('teacherDashboard')" aria-label="Open teacher menu" title="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><span class="cm-tb-spacer"></span><button type="button" class="cm-bell" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></button><div class="cm-user"><b class="cm-user-name">Teacher</b><small>Teacher</small></div><span class="cm-avatar" aria-hidden="true">T</span><button id="teacherDashboardExitButton" onclick="teacherLogout()" class="cm-logout">Logout</button></div>
         <div id="teacherAnnounce"></div>
         <div id="teacherNewMsgBar" class="cm-msgbar" style="display:none;" role="button" tabindex="0" onclick="teacherOpenMessages()">&#128276; <span>You have a new message from a student. Tap to read.</span></div>
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
-            <div>
+        <div class="cm-pagehead"><div>
                 <h2 id="teacherDashboardName">Teacher Dashboard</h2>
                 <p id="teacherDashboardEmail" style="color:#6b7a8f; font-size:14px;"></p>
-            </div>
-            <button id="teacherDashboardExitButton" onclick="teacherLogout()" class="secondary-btn" style="font-size:13px; padding:6px 16px;">Logout</button>
-        </div>
+            </div></div>
 
         <div class="dash-layout">
             <aside class="dash-sidebar">
@@ -554,6 +551,7 @@
 
                 <div class="dash-panel" id="uploadSection">
             <h3>Create & Publish Assessment</h3>
+<div class="cm-steps" id="cmSteps"><button type="button" class="on" data-k="settings"><i>1</i><span>Settings</span></button><button type="button" data-k="class"><i>2</i><span>Assign Class</span></button><button type="button" data-k="questions"><i>3</i><span>Questions</span></button><button type="button" data-k="publish"><i>4</i><span>Publish</span></button></div>
             <div class="form-group">
                 <label for="teacherSubjectSelect">Subject</label>
                 <div class="subject-wrapper">
@@ -1019,11 +1017,8 @@
     </div>
 
     <div id="adminDashboard" style="display:none;">
-        <button type="button" class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('adminDashboard')" aria-label="Open admin menu" title="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;">
-            <h2>Admin Dashboard</h2>
-            <button onclick="adminLogout()" class="secondary-btn" style="font-size:13px; padding:6px 16px;">Logout</button>
-        </div>
+        <div class="cm-topbar" id="adminTopbar"><button type="button" class="sidebar-toggle dashboard-menu-top" onclick="toggleDashSidebar('adminDashboard')" aria-label="Open admin menu" title="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><span class="cm-tb-spacer"></span><button type="button" class="cm-bell" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></button><div class="cm-user"><b class="cm-user-name">Admin</b><small>Admin</small></div><span class="cm-avatar" aria-hidden="true">A</span><button onclick="adminLogout()" class="cm-logout">Logout</button></div>
+        <div class="cm-pagehead"><h2>Admin Dashboard</h2><p style="color:#6b7a8f;font-size:14px;">Platform overview and management tools</p></div>
 
         <div class="dash-layout">
             <aside class="dash-sidebar">
@@ -1273,6 +1268,7 @@
             <div class="sa-nav-spacer"></div><button type="button" onclick="studentLogout()"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5m5 5H3m9-9h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg><span>Log out</span></button>
         </nav>
         <div class="sa-top">
+            <button type="button" class="cm-bell" aria-label="Notifications" title="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
             <div id="saProfile" class="sa-profile"></div>
             <button type="button" class="secondary-btn sa-mobile-logout" onclick="studentLogout()">Log out</button>
         </div>
@@ -1534,5 +1530,6 @@
     </div>
 
     <script src="cm-theme.js?v=1"></script>
+    <script src="cm-redesign.js?v=1"></script>
 </body>
 </html>

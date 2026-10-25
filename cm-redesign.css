@@ -254,10 +254,6 @@ td img,.roster-photo,.student-avatar img{border-radius:50%!important;object-fit:
 .dash-panel>h3:first-child{display:flex;align-items:center;gap:8px;font-size:17px!important;font-weight:700;margin:0 0 14px!important;color:var(--r-text)}
 /* --- 4. assessment creation: two-column form on desktop --- */
 #uploadSection{display:block}
-@media(min-width:960px){
-  #uploadSection{display:grid!important;grid-template-columns:1fr 1fr;column-gap:26px;align-items:start}
-  #uploadSection>h3:first-child,#uploadSection>.helper-text,#uploadSection>button,#uploadSection>.primary-btn,#uploadSection>[id*="Status"],#uploadSection>[id*="status"],#uploadSection>div:not(.form-group){grid-column:1/-1}
-}
 #uploadSection select.form-input,#uploadSection input.form-input,#uploadSection textarea.form-input{background:var(--r-surface)!important}
 #uploadSection label{font-size:13px;font-weight:600;color:var(--r-text)}
 #uploadSection>.primary-btn,#uploadSection button.primary-btn{min-width:150px}
@@ -315,3 +311,106 @@ td .pill,td .badge,td .tag{border-radius:999px;padding:2px 10px;font-weight:600;
   #teacherDashboard>div[style*="justify-content:space-between"]{padding:12px 14px!important}
   .sa-summary-grid{grid-template-columns:1fr!important}
 }
+
+/* =====================================================================
+   v4: fix Publish panel leak, top bars with bell/user/avatar, sidebar,
+   steppers, student home, generic old-section restyle
+   ===================================================================== */
+/* 1. Publish Assessment must only show when selected (my v3 rules broke this) */
+#uploadSection{display:none}
+#uploadSection.active{display:block}
+@media(min-width:960px){#uploadSection.active{display:block!important}}
+.dash-panel{display:none}
+.dash-panel.active{display:block}
+
+/* 2. top bar: menu, bell, name/role, avatar, logout */
+.cm-topbar{display:flex;align-items:center;gap:12px;background:var(--r-surface);border:1px solid var(--r-line);border-radius:12px;padding:8px 14px;box-shadow:var(--r-shadow);margin:0 0 16px}
+.cm-topbar .dashboard-menu-top{margin:0!important}
+.cm-tb-spacer{flex:1}
+.cm-bell{width:38px;height:38px;border-radius:10px;border:0;background:transparent;color:var(--r-text);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+.cm-bell:hover{background:var(--r-primary-soft);color:var(--r-primary)}
+.cm-user{display:flex;flex-direction:column;line-height:1.2;text-align:right}
+.cm-user b{font-size:13.5px;color:var(--r-text);font-weight:700}
+.cm-user small{font-size:11.5px;color:var(--r-muted)}
+.cm-avatar{width:36px;height:36px;border-radius:50%;background:var(--r-primary);color:#fff;font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 36px}
+.cm-logout{font-family:inherit;font-size:12.5px;font-weight:600;border:1.5px solid var(--r-line);background:var(--r-surface);color:var(--r-text);border-radius:999px;padding:6px 14px;cursor:pointer}
+.cm-logout:hover{border-color:var(--r-primary);color:var(--r-primary)}
+.cm-pagehead{margin:0 0 16px}
+.cm-pagehead h2{font-size:26px!important;font-weight:800;margin:0}
+.cm-pagehead p{margin:4px 0 0;color:var(--r-muted)!important;font-size:14px}
+@media(max-width:560px){.cm-user{display:none}.cm-logout{padding:6px 10px}}
+
+/* 3. sidebar: logo block on top, icons, full-height on desktop, collapsible rail */
+.dash-sidebar{background:linear-gradient(180deg,#0b1d52,#081338)!important}
+.dash-branding{display:flex!important;flex-direction:column;align-items:flex-start}
+.dash-nav-item{padding:11px 12px!important;font-size:14px!important}
+.dash-nav-item span{flex:1;text-align:left}
+@media(min-width:1000px){
+  #teacherDashboard .dash-layout,#adminDashboard .dash-layout{display:flex!important;gap:20px;align-items:flex-start}
+  #teacherDashboard .dash-layout .dash-sidebar,#adminDashboard .dash-layout .dash-sidebar{position:sticky!important;top:12px!important;transform:none!important;height:calc(100vh - 24px)!important;width:244px!important;flex:0 0 244px;border-radius:14px!important;z-index:2!important;box-shadow:var(--r-shadow)}
+  #teacherDashboard .dash-layout .dash-main,#adminDashboard .dash-layout .dash-main{flex:1;min-width:0}
+  .dash-layout .sidebar-close-btn,.dash-layout .sidebar-backdrop{display:none!important}
+  .dash-layout.cm-rail .dash-sidebar{width:74px!important;flex-basis:74px!important;padding-left:10px!important;padding-right:10px!important}
+  .dash-layout.cm-rail .dash-nav-item span,.dash-layout.cm-rail .dash-tagline{display:none!important}
+  .dash-layout.cm-rail .dash-nav-item{justify-content:center!important}
+  .dash-layout.cm-rail .dash-branding .dash-logo-image{max-width:44px;object-fit:cover;object-position:left}
+}
+
+/* 4. assessment creation: stepper + card */
+.cm-steps{display:flex;align-items:center;gap:6px;margin:4px 0 20px;padding-bottom:16px;border-bottom:1px solid var(--r-line);overflow-x:auto}
+.cm-steps button{display:flex;align-items:center;gap:8px;background:transparent;border:0;font-family:inherit;font-size:13px;font-weight:600;color:var(--r-muted);cursor:pointer;flex:1;white-space:nowrap;position:relative}
+.cm-steps button+button::before{content:"";position:absolute;left:-6px;right:100%;top:50%;height:1px;background:var(--r-line)}
+.cm-steps i{font-style:normal;width:30px;height:30px;border-radius:50%;border:1.5px solid var(--r-line);display:inline-flex;align-items:center;justify-content:center;font-size:13px;background:var(--r-surface);flex:0 0 30px}
+.cm-steps button.on{color:var(--r-text)}
+.cm-steps button.on i{background:var(--r-primary);border-color:var(--r-primary);color:#fff}
+#uploadSection.active{max-width:820px}
+#uploadSection .form-group{margin-bottom:16px!important}
+#uploadSection label{font-weight:600;font-size:13px}
+
+/* 5. status pills (any table cell) */
+.cm-pill{display:inline-block;padding:3px 12px;border-radius:999px;font-size:12px;font-weight:700;text-transform:capitalize}
+.cm-pill.ok{background:var(--r-success-soft);color:#047857}
+.cm-pill.warn{background:var(--r-warn-soft);color:#b45309}
+.cm-pill.bad{background:var(--r-danger-soft);color:#b91c1c}
+table{border-radius:12px}
+th{padding:11px 14px!important}
+td{padding:13px 14px!important;font-size:13.5px}
+.dash-main table td:first-child{font-weight:600}
+
+/* 6. student dashboard like the board */
+#studentAreaPage .sa-top{display:flex!important;align-items:center;gap:12px;background:var(--r-surface)!important;color:var(--r-text)!important;border:1px solid var(--r-line)!important;padding:8px 14px!important}
+#studentAreaPage .sa-top .sa-profile{margin-left:auto;flex-direction:row-reverse;gap:10px}
+#studentAreaPage .sa-top .sa-name,#studentAreaPage .sa-top .helper-text{color:var(--r-text)!important;text-align:right}
+#studentAreaPage .sa-top .sa-name{font-size:13.5px!important;font-weight:700}
+#studentAreaPage .sa-top .helper-text{color:var(--r-muted)!important;font-size:11.5px!important;margin:0}
+#studentAreaPage .sa-top .sa-profile>div:last-child>div:nth-child(n+3){display:none}
+#studentAreaPage .sa-top .sa-avatar{width:38px!important;height:38px!important;border:0}
+#studentAreaPage .sa-top .sa-mobile-logout{order:5}
+#studentAreaPage .sa-top .cm-bell{order:0;margin-left:auto}
+#studentAreaPage .sa-top .cm-bell+.sa-profile{margin-left:0}
+#studentAreaPage .sa-brand{background:linear-gradient(100deg,#0b3a9a,#1a4fe8)!important;border-radius:0!important;margin:-14px -8px 14px!important;padding:14px!important}
+#studentAreaPage .sa-brand img{background:#fff;border-radius:8px;padding:3px}
+#studentAreaPage .sa-brand span{color:#fff!important;font-weight:800}
+.sa-hello h2{font-size:26px!important;font-weight:800;margin:8px 0 2px;color:var(--r-text)!important}
+.sa-hello p{margin:0 0 16px;color:var(--r-muted)}
+.sa-listbox{background:var(--r-surface);border:1px solid var(--r-line);border-radius:12px;box-shadow:var(--r-shadow);padding:14px 16px;margin-top:16px}
+.sa-listhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.sa-listhead h3{margin:0!important;font-size:16px!important}
+.sa-viewall{background:none;border:0;color:var(--r-primary);font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit}
+.sa-listbox .sa-card{box-shadow:none!important;border:0!important;border-bottom:1px solid var(--r-line)!important;border-radius:0!important;margin:0!important}
+.sa-listbox .sa-card:last-of-type{border-bottom:0!important}
+#studentAreaPage .sa-card .primary-btn{min-width:74px}
+.sa-summary-card .secondary-btn{position:absolute;right:16px;bottom:12px}
+.sa-summary-card{min-height:104px}
+
+/* 7. old sections everywhere: pull legacy inline-styled boxes into the new card look */
+.dash-main [style*="#eef2f6"],.dash-main [style*="#e2e8f0"],.dash-main [style*="#e3e9f4"]{border-color:var(--r-line)!important;border-radius:12px!important}
+.dash-main [style*="background:#f8fafc"],.dash-main [style*="background: #f8fafc"],.dash-main [style*="background:#fff"]:not(button){background:var(--r-surface)!important}
+.dash-main button.secondary-btn,.dash-main button.primary-btn{min-height:36px}
+.dash-main select,.dash-main input[type=text],.dash-main input[type=email],.dash-main input[type=number],.dash-main input[type=password],.dash-main input[type=date],.dash-main input[type=datetime-local],.dash-main input[type=search],.dash-main textarea{border-radius:10px;border:1.5px solid var(--r-line);background:var(--r-surface);color:var(--r-text)}
+.dash-main h3{font-family:Poppins,Inter,sans-serif}
+.cm-host{margin-top:14px}
+.flag-box,.live-item,.cm-trow,.pos-chip{border-radius:10px}
+.live-item{background:var(--r-surface);border:1px solid var(--r-line);box-shadow:var(--r-shadow)}
+.cm-bell{width:38px!important;min-width:38px!important;height:38px!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important}
+.cm-bell svg{width:20px!important;height:20px!important;display:block;fill:none!important;stroke:currentColor!important;stroke-width:1.9}

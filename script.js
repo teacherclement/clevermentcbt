@@ -10121,15 +10121,20 @@ async function loadStudentAssessments() {
         cmShowAnnouncements('students', 'saAnnounce');
         renderStudentDone(saDone);
         document.getElementById('saPanelHome').innerHTML =
-            '<h2 style="margin:0 0 6px;color:#172033;">Your learning overview</h2>' +
-            '<p class="helper-text" style="margin:0 0 18px;">Keep track of assessments assigned to you and review your completed work.</p>' +
+            '<div class="sa-hello"><h2>My Dashboard</h2><p>Welcome back, ' + escapeHtml(String((saMe && saMe.name) || '').split(/\s+/)[0] || 'student') + '!</p></div>' +
             '<div class="sa-summary-grid">' +
-            '<div class="sa-summary-card"><span>Available assessments</span><strong>' + saTodo.length + '</strong><button type="button" class="secondary-btn" onclick="studentAreaShow(\'todo\')">View assessments</button></div>' +
-            '<div class=\"sa-summary-card\"><span>Closed assessments</span><strong>' + saClosed.length + '</strong><button type=\"button\" class=\"secondary-btn\" onclick=\"studentAreaShow(\'closed\')\">View closed</button></div>' +
-            '<div class="sa-summary-card"><span>Completed assessments</span><strong>' + saDone.length + '</strong><button type="button" class="secondary-btn" onclick="studentAreaShow(\'done\')">View history</button></div>' +
-            '<div class="sa-summary-card"><span>Learning tip</span><strong style="font-size:18px;">Be prepared</strong><p class="helper-text">Check the time limit and instructions before starting each assessment.</p></div>' +
-            '</div><h3 style="margin:22px 0 10px;">Quick actions</h3>' +
-            '<div class="sa-quick-actions"><button type="button" class="primary-btn" onclick="studentAreaShow(\'todo\')">Find an assessment</button><button type="button" class="secondary-btn" onclick="studentAreaShow(\'done\')">Review my results</button><button type="button" class="secondary-btn" onclick="loadStudentAssessments()">Refresh dashboard</button></div>';
+            '<div class="sa-summary-card"><span>Available Assessments</span><strong>' + saTodo.length + '</strong><button type="button" class="secondary-btn" onclick="studentAreaShow(\'todo\')">View all</button></div>' +
+            '<div class="sa-summary-card"><span>Completed Assessments</span><strong>' + saDone.length + '</strong><button type="button" class="secondary-btn" onclick="studentAreaShow(\'done\')">View results</button></div>' +
+            '<div class="sa-summary-card"><span>My Results</span><strong>' + saDone.length + '</strong><button type="button" class="secondary-btn" onclick="studentAreaShow(\'progress\')">View all</button></div>' +
+            '</div>' +
+            '<div class="sa-listbox"><div class="sa-listhead"><h3>Available Assessments</h3><button type="button" class="sa-viewall" onclick="studentAreaShow(\'todo\')">View all</button></div>' +
+            (saTodo.length ? saTodo.slice(0, 3).map(function(x) {
+                var meta = escapeHtml(x.className) + ' | ' + x.questionCount + ' questions' + (x.timeLimit ? ' | ' + cmFmtDuration(x.timeLimit) : '');
+                return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div></div>' +
+                    (x.status === 'open' ? '<button type="button" class="primary-btn" data-code="' + escapeHtml(x.code) + '" onclick="studentAreaStart(this.getAttribute(\'data-code\'))">Start</button>' : '<span class="sa-badge">' + (x.status === 'upcoming' ? 'Opens soon' : 'Closed') + '</span>') + '</div>';
+            }).join('') : '<p class="helper-text" style="padding:8px 4px;">You are all caught up. New assessments from your teacher will appear here.</p>') +
+            '</div>' +
+            '<div class="sa-quick-actions" style="margin-top:14px;"><button type="button" class="secondary-btn" onclick="loadStudentAssessments()">Refresh dashboard</button></div>';
     } catch (e) {
         document.getElementById('saPanelTodo').innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load.') + '</p>';
     }
