@@ -847,6 +847,25 @@ var currentAssessmentCode = '';
 var studentQuestions = [];
 var studentCurrentIndex = 0;
 var studentAnswers = [];
+// Consistent human-readable assessment duration and countdown formatting.
+function cmFormatDurationSeconds(totalSeconds, compact) {
+    var seconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
+    if (!seconds) return compact ? 'No limit' : 'No time limit';
+    var hours = Math.floor(seconds / 3600), minutes = Math.floor((seconds % 3600) / 60), secs = seconds % 60;
+    var parts = [];
+    if (hours) parts.push(hours + (compact ? ' hr' : (hours === 1 ? ' hour' : ' hours')));
+    if (minutes) parts.push(minutes + (compact ? ' min' : (minutes === 1 ? ' minute' : ' minutes')));
+    if (secs && !hours && !minutes) parts.push(secs + (compact ? ' sec' : (secs === 1 ? ' second' : ' seconds')));
+    return parts.join(' ');
+}
+function cmFormatCountdown(totalSeconds) {
+    var seconds = Math.max(0, Math.ceil(Number(totalSeconds) || 0));
+    var hours = Math.floor(seconds / 3600), minutes = Math.floor((seconds % 3600) / 60), secs = seconds % 60;
+    return hours > 0
+        ? String(hours) + ':' + String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0')
+        : String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+}
+
 var studentTimerInterval = null;
 var studentTimeRemaining = 0;
 var studentTimeLimit = 0;
@@ -1289,6 +1308,12 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================================
 
 document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+        var tForm = document.getElementById('teacherLoginForm');
+        if (tForm && tForm.contains(e.target) && document.getElementById('teacherAuth').style.display !== 'none') { e.preventDefault(); teacherLogin(); return; }
+        var sForm = document.getElementById('studentLoginPage');
+        if (sForm && sForm.contains(e.target) && sForm.style.display !== 'none') { e.preventDefault(); studentLoginSubmit(); return; }
+    }
     if (e.key === 'Enter') {
         if (document.getElementById('studentAccess').style.display === 'block') {
             verifyAssessmentCode();
@@ -2321,7 +2346,7 @@ async function renderTeacherPublishedList() {
         '<button type="button" id="publishedBulkDeleteBtn" onclick="publishedDeleteSelected()" class="secondary-btn" style="font-size:13px; padding:6px 14px; background:#dc3545; color:white; opacity:.5;" disabled>Delete selected</button></div>';
     for (var i = 0; i < filtered.length; i++) {
         var a = filtered[i];
-        var timeDisplay = a.timeLimit > 0 ? Math.floor(a.timeLimit / 60) + ' min' : 'No limit';
+        var timeDisplay = a.timeLimit > 0 ? cmFormatDurationSeconds(a.timeLimit, true) : 'No limit';
         var avail = getAvailabilityLabel(a);
         html += '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
             '<div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="published-pick" aria-label="Select this assessment" ' + (publishedSelectedIds[String(a.id)] ? 'checked ' : '') + 'onchange="publishedToggle(' + a.id + ', this.checked)" style="width:18px; height:18px; margin-top:3px; flex:0 0 auto;"><div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span>' + getMonitoringBadge(a) + '<br>' +
@@ -4124,9 +4149,7 @@ async function restoreQuizState() {
 
     var display = document.getElementById('studentTimerDisplay');
     if (studentTimeLimit > 0) {
-        var mins = Math.floor(studentTimeRemaining / 60);
-        var secs = studentTimeRemaining % 60;
-        display.textContent = String(Math.max(mins, 0)).padStart(2, '0') + ':' + String(Math.max(secs, 0)).padStart(2, '0');
+        display.textContent = cmFormatCountdown(studentTimeRemaining);
     } else {
         display.textContent = '∞';
     }
@@ -4592,6 +4615,10 @@ async function startStudentQuiz() {
             return;
         }
         setStudentPhoto(eligibility.photo || '');
+        if (eligibility.resumeState && eligibility.resumeState.currentAssessment && eligibility.resumeState.studentQuestions) {
+            try { localStorage.setItem('cleverment_quiz_state', JSON.stringify(eligibility.resumeState)); } catch (e) {}
+            if (await cmResumeSavedAttempt()) return;
+        }
     } catch (e) {
         reportStudentAccessNetworkError(currentAssessmentCode, studentName, studentAdmissionNumber, 'start_check');
         alert('Could not verify your assessment status. Please check your connection and try again.');
@@ -4935,7 +4962,31 @@ function syncStudentProgress(useKeepalive) {
                 answers: buildStudentAnswersPayload(),
                 tabSwitches: studentTabSwitchCount,
                 proctorViolations: studentProctorStrikes,
-                fastAnswerWarnings: studentFastAnswerWarnings
+                fastAnswerWarnings: studentFastAnswerWarnings,
+                clientState: {
+                    currentAssessment: currentAssessment,
+                    currentAssessmentCode: currentAssessmentCode,
+                    studentQuestions: studentQuestions,
+                    studentCurrentIndex: studentCurrentIndex,
+                    studentAnswers: studentAnswers,
+                    studentTimeRemaining: studentTimeRemaining,
+                    studentTimeLimit: studentTimeLimit,
+                    studentName: studentName,
+                    studentAdmissionNumber: studentAdmissionNumber,
+                    studentQuizStartedAt: studentQuizStartedAt,
+                    studentQuizEndsAt: studentQuizEndsAt,
+                    studentClass: studentClass,
+                    studentSubject: studentSubject,
+                    studentIsTimeUp: studentIsTimeUp,
+                    studentTabSwitchCount: studentTabSwitchCount,
+                    studentProctorStrikes: studentProctorStrikes,
+                    studentFastAnswerWarnings: studentFastAnswerWarnings,
+                    studentQuestionMs: studentQuestionMs,
+                    studentActiveOrigIndex: studentActiveOrigIndex,
+                    studentQuestionClockStart: studentQuestionClockStart,
+                    assessmentTeacherName: window.assessmentTeacherName || '',
+                    assessmentTeacherSignature: window.assessmentTeacherSignature || ''
+                }
             })
         }).catch(function() { /* offline - the next sync will catch up */ });
     } catch (e) { /* never let a background save disturb the quiz */ }
@@ -5133,11 +5184,9 @@ function studentStartTimer() {
     function tick() {
         var remaining = Math.max(0, Math.ceil((studentQuizEndsAt - Date.now()) / 1000));
         studentTimeRemaining = remaining;
-        var mins = Math.floor(remaining / 60);
-        var secs = remaining % 60;
         var display = document.getElementById('studentTimerDisplay');
         if (display) {
-            display.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+            display.textContent = cmFormatCountdown(remaining);
             // The colour now belongs to the ring; the digits just follow it.
             display.classList.remove('warning');
         }
@@ -6320,7 +6369,7 @@ function shareAssessmentOnWhatsApp(assessmentId) {
     lines.push('Assessment code: *' + a.code + '*');
     lines.push('Open this link (the code is filled in for you):');
     lines.push(link);
-    if (a.timeLimit) lines.push('\u23F1 Time: ' + Math.round(a.timeLimit / 60) + ' minutes');
+    if (a.timeLimit) lines.push('\u23F1 Time: ' + cmFormatDurationSeconds(a.timeLimit, false));
     if (a.availableFrom) lines.push('\uD83D\uDCC5 Opens: ' + when(a.availableFrom));
     if (a.availableUntil) lines.push('\uD83D\uDCC5 Closes: ' + when(a.availableUntil));
     lines.push('Good luck!');
@@ -6419,11 +6468,11 @@ async function teacherDownloadBackupZip() {
 
         zip.file('results.csv', backupResultsCsv(data.results));
 
-        var head = ['Code', 'Subject', 'Class', 'Questions', 'Time (minutes)', 'Pass mark %', 'Shuffle', 'Camera monitoring', 'Noise monitoring', 'Show results to student', 'Certificate name', 'Available from', 'Available until'];
+        var head = ['Code', 'Subject', 'Class', 'Questions', 'Time limit', 'Pass mark %', 'Shuffle', 'Camera monitoring', 'Noise monitoring', 'Show results to student', 'Certificate name', 'Available from', 'Available until'];
         var summary = [head.map(csvCell).join(',')];
         var used = {};
         data.assessments.forEach(function(a) {
-            summary.push([a.code, a.subject, a.className, (a.questions || []).length, a.timeLimit ? Math.round(a.timeLimit / 60) : 0, a.passMark, a.shuffle ? 'Yes' : 'No', a.cameraMonitoring ? 'Yes' : 'No', a.noiseMonitoring ? 'Yes' : 'No', a.showResults === false ? 'No' : 'Yes', a.teacherName || '', a.availableFrom || '', a.availableUntil || ''].map(csvCell).join(','));
+            summary.push([a.code, a.subject, a.className, (a.questions || []).length, a.timeLimit ? cmFormatDurationSeconds(a.timeLimit, false) : 'No time limit', a.passMark, a.shuffle ? 'Yes' : 'No', a.cameraMonitoring ? 'Yes' : 'No', a.noiseMonitoring ? 'Yes' : 'No', a.showResults === false ? 'No' : 'Yes', a.teacherName || '', a.availableFrom || '', a.availableUntil || ''].map(csvCell).join(','));
             var base = backupSafeName(a.subject + '-' + a.className + '-' + a.code);
             var name = 'questions/' + base + '.csv';
             var n = 2;
@@ -7194,7 +7243,7 @@ function applyAdminAssessmentFilter() {
     var html = '';
     for (var i = 0; i < filtered.length; i++) {
         var a = filtered[i];
-        var timeDisplay = a.timeLimit > 0 ? Math.floor(a.timeLimit / 60) + ' min' : 'No limit';
+        var timeDisplay = a.timeLimit > 0 ? cmFormatDurationSeconds(a.timeLimit, true) : 'No limit';
         var avail = getAvailabilityLabel(a);
         html += '<div style="background:white; padding:12px 16px; border-radius:8px; border:1.5px solid #eef2f6; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">' +
             '<div><strong>' + a.subject + '</strong> <span style="color:#6b7a8f; font-size:13px;">(' + a.className + ' | ' + a.questions.length + ' questions | ' + timeDisplay + ')</span>' + getMonitoringBadge(a) + '<br>' +
@@ -9981,6 +10030,7 @@ async function studentLoginSubmit() {
 }
 
 function studentLogout() {
+    if (localStorage.getItem('cleverment_teacher_viewing_student') === '1') { teacherExitStudentAccount(); return; }
     localStorage.removeItem('cleverment_student_token');
     localStorage.removeItem('cleverment_student_profile');
     saTodo = []; saClosed = []; saDone = [];
@@ -10085,7 +10135,7 @@ function renderStudentTodo(list) {
     if (!list.length) { el.innerHTML = '<h2>Available Assessments</h2><p class="helper-text">You are all caught up. New assessments from your teacher will appear here.</p><button type="button" class="secondary-btn" onclick="loadStudentAssessments()">Refresh list</button>'; return; }
     el.innerHTML = list.map(function(x) {
         var label = x.status === 'upcoming' ? 'Opens soon' : (x.status === 'closed' ? 'Closed' : 'Start');
-        var meta = escapeHtml(x.className) + ' · ' + x.questionCount + ' questions' + (x.timeLimit ? ' · ' + Math.round(x.timeLimit / 60) + ' min' : '') +
+        var meta = escapeHtml(x.className) + ' · ' + x.questionCount + ' questions' + (x.timeLimit ? ' · ' + cmFormatDurationSeconds(x.timeLimit, true) : '') +
             (x.until ? ' · closes ' + escapeHtml(new Date(x.until).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : '');
         return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div></div>' +
             (x.status === 'open' ? '<button type="button" class="primary-btn" data-code="' + escapeHtml(x.code) + '" onclick="studentAreaStart(this.getAttribute(\'data-code\'))">' + label + '</button>' : '<span class="sa-badge">' + label + '</span>') + '</div>';
@@ -10097,7 +10147,7 @@ function renderStudentClosed(list) {
     if (!el) return;
     if (!list.length) { el.innerHTML = '<h2>Closed Assessments</h2><p class="helper-text">Assessments whose time has ended and that you did not take will appear here.</p>'; return; }
     el.innerHTML = '<h2 style="margin:0 0 12px;">Closed Assessments</h2><p class="helper-text" style="margin:0 0 12px;">These assessments are no longer open. Ask your teacher if you missed one.</p>' + list.map(function(x) {
-        var meta = escapeHtml(x.className) + ' · ' + x.questionCount + ' questions' + (x.timeLimit ? ' · ' + Math.round(x.timeLimit / 60) + ' min' : '') +
+        var meta = escapeHtml(x.className) + ' · ' + x.questionCount + ' questions' + (x.timeLimit ? ' · ' + cmFormatDurationSeconds(x.timeLimit, true) : '') +
             (x.until ? ' · closed ' + escapeHtml(new Date(x.until).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : '');
         return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div></div><span class="sa-badge">Closed</span></div>';
     }).join('');
@@ -10236,7 +10286,18 @@ async function studentAreaStart(code) {
 // Logged-in students stay logged in on this phone until they tap Log out.
 setTimeout(function() {
     try {
-        if (localStorage.getItem('cleverment_student_token') && !getCodeFromURL()) openStudentArea();
+        if (localStorage.getItem('cleverment_student_token') && !getCodeFromURL()) {
+            openStudentArea().then(function() {
+                if (localStorage.getItem('cleverment_teacher_viewing_student') === '1') {
+                    var root = document.getElementById('studentAreaPage');
+                    if (root && !document.getElementById('cmTeacherStudentExit')) {
+                        var exit = document.createElement('button'); exit.id = 'cmTeacherStudentExit'; exit.type = 'button'; exit.className = 'secondary-btn';
+                        exit.textContent = 'Return to Teacher Dashboard'; exit.style.cssText = 'position:sticky;top:8px;z-index:20;margin:8px;';
+                        exit.onclick = teacherExitStudentAccount; root.insertBefore(exit, root.firstChild);
+                    }
+                }
+            });
+        }
     } catch (e) {}
 }, 900);
 
@@ -10262,13 +10323,61 @@ async function loadPinPanel(cls) {
         d.students.forEach(function(s) {
             var status = s.hasPin ? (s.locked ? '<span class="pos-remark fail">Locked</span>' : '<span class="pos-remark pass">Set</span>') : '<span class="pos-missing">Not set</span>';
             html += '<tr><td>' + escapeHtml(s.name) + '</td><td>' + escapeHtml(s.admissionNumber) + '</td><td>' + status + '</td><td>' +
-                '<button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;" data-adm="' + escapeHtml(s.admissionNumber) + '" onclick="resetStudentPin(this.getAttribute(\'data-adm\'))">' + (s.hasPin ? 'Reset PIN' : 'Set PIN') + '</button></td></tr>';
+                '<button type="button" class="secondary-btn" style="font-size:12px;padding:5px 10px;" data-adm="' + escapeHtml(s.admissionNumber) + '" onclick="resetStudentPin(this.getAttribute(\'data-adm\'))">' + (s.hasPin ? 'Reset PIN' : 'Set PIN') + '</button> ' +
+                '<button type="button" class="primary-btn" style="font-size:12px;padding:5px 10px;" data-adm="' + escapeHtml(s.admissionNumber) + '" onclick="teacherOpenStudentAccount(this.getAttribute(\'data-adm\'))">Open account</button></td></tr>';
         });
         body.innerHTML = html + '</tbody></table></div>';
         renderLastPins();
     } catch (e) {
         body.innerHTML = '<p class="helper-text" style="color:#dc3545;">' + escapeHtml(e.message || 'Could not load.') + '</p>';
     }
+}
+
+var cmTeacherAccountReturn = null;
+async function teacherOpenStudentAccount(admissionNumber) {
+    var cls = currentRosterEditClass;
+    if (!cls || !admissionNumber || !currentTeacher) { alert('Choose a class and student first.'); return; }
+    if (!confirm('Open this student account as the teacher? You will be able to view their student dashboard and assessment history.')) return;
+    try {
+        var r = await fetch(BACKEND_URL + '/api/teacher/student-access', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('cleverment_teacher_token') },
+            body: JSON.stringify({ className: cls, admissionNumber: admissionNumber })
+        });
+        var d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Could not open student account.');
+        cmTeacherAccountReturn = {
+            token: localStorage.getItem('cleverment_student_token'),
+            profile: localStorage.getItem('cleverment_student_profile'),
+            teacherToken: localStorage.getItem('cleverment_teacher_token')
+        };
+        try { sessionStorage.setItem('cm_teacher_student_return', JSON.stringify(cmTeacherAccountReturn)); } catch (e) {}
+        localStorage.setItem('cleverment_teacher_viewing_student', '1');
+        localStorage.setItem('cleverment_student_token', d.token);
+        localStorage.setItem('cleverment_student_profile', JSON.stringify(d.student));
+        await openStudentArea();
+        var root = document.getElementById('studentAreaPage');
+        if (root && !document.getElementById('cmTeacherStudentExit')) {
+            var exit = document.createElement('button'); exit.id = 'cmTeacherStudentExit'; exit.type = 'button'; exit.className = 'secondary-btn';
+            exit.textContent = 'Return to Teacher Dashboard'; exit.style.cssText = 'position:sticky;top:8px;z-index:20;margin:8px;';
+            exit.onclick = teacherExitStudentAccount; root.insertBefore(exit, root.firstChild);
+        }
+    } catch (e) { alert(e.message || 'Could not open student account.'); }
+}
+function teacherExitStudentAccount() {
+    var old = cmTeacherAccountReturn;
+    if (!old) { try { old = JSON.parse(sessionStorage.getItem('cm_teacher_student_return') || 'null'); } catch (e) {} }
+    if (old) {
+        if (old.token) localStorage.setItem('cleverment_student_token', old.token); else localStorage.removeItem('cleverment_student_token');
+        if (old.profile) localStorage.setItem('cleverment_student_profile', old.profile); else localStorage.removeItem('cleverment_student_profile');
+        if (old.teacherToken) localStorage.setItem('cleverment_teacher_token', old.teacherToken);
+    } else { localStorage.removeItem('cleverment_student_token'); localStorage.removeItem('cleverment_student_profile'); }
+    localStorage.removeItem('cleverment_teacher_viewing_student');
+    cmTeacherAccountReturn = null;
+    try { sessionStorage.removeItem('cm_teacher_student_return'); } catch (e) {}
+    var exit = document.getElementById('cmTeacherStudentExit'); if (exit) exit.remove();
+    studentShowOnly('landingPage');
+    if (typeof resumeSignedInDashboard === 'function') resumeSignedInDashboard();
 }
 
 async function cmPinRequest(body) {
@@ -11604,7 +11713,7 @@ function cleverBotCopyValue(raw) {
         } finally { clearTimeout(coldTimer); clearTimeout(hardTimer); clearInterval(watchdog); sendBtn.disabled=false; input.focus(); }
     }
     sendBtn.addEventListener('click',sendMessage);
-    input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
+    input.addEventListener('keydown',function(e){ if(e.key==='Enter' && (e.ctrlKey || e.metaKey)){e.preventDefault();sendMessage();} });
     input.addEventListener('input',function(){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,100)+'px'; });
 
     // Voice input uses the browser's built-in speech recognition (no server or AI key involved).
