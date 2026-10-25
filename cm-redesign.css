@@ -1,134 +1,127 @@
-/* CleverMent UI/UX redesign layer — presentation-only overrides; core workflows remain in script.js/server.js. */
+/* CleverMent UI/UX redesign layer. Loaded AFTER style.css and cm-theme.css.
+   To undo: delete the <link> to cm-redesign.css from index.html. Logos, words and logic are untouched. */
 :root{
- --cm-blue:#1457d9;--cm-blue-strong:#0d45b5;--cm-navy:#10264b;--cm-ink:#18253b;
- --cm-muted:#64748b;--cm-bg:#f4f7fb;--cm-surface:#fff;--cm-line:#dce4ef;
- --cm-soft:#edf4ff;--cm-teal:#0d9488;--cm-radius:14px;--cm-radius-sm:10px;
- --cm-shadow:0 8px 28px rgba(16,38,75,.07);--cm-focus:0 0 0 3px rgba(20,87,217,.18)
+  --r-navy:#0b1b4d;--r-navy2:#102a6b;--r-side:#0a1840;--r-side-h:#14275e;
+  --r-primary:#1a4fe8;--r-primary-h:#143fc0;--r-primary-soft:#e8efff;
+  --r-success:#10b981;--r-success-soft:#dcfce7;--r-warn:#f59e0b;--r-warn-soft:#fff1d6;
+  --r-danger:#ef4444;--r-danger-soft:#fde8e8;
+  --r-bg:#f4f7fc;--r-surface:#fff;--r-line:#e3e9f4;--r-text:#0f1f4a;--r-muted:#64748b;
+  --r-shadow:0 1px 2px rgba(15,31,74,.05),0 4px 14px rgba(15,31,74,.06);
+  --r-radius:12px;
 }
-html,body{background:var(--cm-bg)!important;color:var(--cm-ink)!important}
-body{font-size:14px;line-height:1.55}
-button,input,select,textarea{font-family:inherit}
-button{touch-action:manipulation}
-button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:0!important;box-shadow:var(--cm-focus)!important}
-.container>*:not(script){scroll-margin-top:84px}
-/* Global brand bar */
-#mainHeader{min-height:64px!important;background:rgba(255,255,255,.96)!important;border-bottom:1px solid var(--cm-line)!important;box-shadow:0 2px 12px rgba(16,38,75,.035)!important;backdrop-filter:blur(12px);padding-top:12px!important;padding-bottom:12px!important}
-#mainHeader .logo-image{max-height:34px!important}
-#mainHeader .tagline{font-size:12px!important;font-weight:500!important;color:#64748b!important}
-/* Landing page */
-#landingPage{max-width:1120px!important;margin:26px auto 0!important;padding:0 22px 28px!important}
-#landingPage .cm-hero{position:relative;overflow:hidden;padding:clamp(28px,5vw,58px)!important;border:1px solid #d9e6fa;border-radius:22px;background:linear-gradient(115deg,#10264b 0%,#153b7a 66%,#1769a8 100%);color:#fff;box-shadow:var(--cm-shadow);margin-bottom:18px}
-#landingPage .cm-hero:after{content:"";position:absolute;width:300px;height:300px;border:1px solid rgba(255,255,255,.14);border-radius:50%;right:-80px;top:-130px;box-shadow:0 0 0 36px rgba(255,255,255,.035),0 0 0 72px rgba(255,255,255,.025);pointer-events:none}
-#landingPage .cm-hero h1{position:relative;z-index:1;color:#fff!important;font-size:clamp(30px,4.3vw,48px)!important;max-width:700px;line-height:1.12!important;letter-spacing:-.035em!important;margin-bottom:12px!important}
-#landingPage .cm-hero p{position:relative;z-index:1;color:#dbeafe!important;font-size:clamp(15px,1.7vw,18px)!important;max-width:620px;line-height:1.7}
-.cm-roles{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important}
-.cm-role{min-height:112px;padding:20px!important;border-radius:16px!important;background:#fff!important;border-color:var(--cm-line)!important;box-shadow:0 3px 12px rgba(16,38,75,.035)!important;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease!important}
-.cm-role:hover{transform:translateY(-2px);border-color:#9bbcf6!important;box-shadow:var(--cm-shadow)!important}
-.cm-role b{font-size:16px!important;color:var(--cm-ink)}.cm-role small{font-size:12.5px!important;line-height:1.5!important;color:var(--cm-muted)!important}
-.cm-role-ic{width:44px!important;height:44px!important;border-radius:12px!important;background:#eaf1ff!important;color:var(--cm-blue)!important;display:inline-flex;align-items:center;justify-content:center}
-.cm-role.t .cm-role-ic{background:#e6f7f4!important;color:#0d8176!important}.cm-role.a .cm-role-ic{background:#f1ebff!important;color:#6b4cc4!important}
-/* Page headings and entry forms */
-#studentAccess,#teacherAuth,#adminAuth,#studentLoginPage,#studentAssessmentView{max-width:940px!important;margin:24px auto!important}
-#teacherAuth,#adminAuth,#studentLoginPage{background:var(--cm-surface);border:1px solid var(--cm-line);border-radius:20px;padding:clamp(18px,3.5vw,34px)!important;box-shadow:var(--cm-shadow)}
-#teacherAuth>h2,#adminAuth>h2,#studentLoginPage h2{font-size:26px!important;letter-spacing:-.03em!important;margin-bottom:8px!important}
-#teacherAuthTabs{max-width:520px;margin:0 auto 24px!important;padding:5px;background:#f0f4fa;border-radius:12px}
-#teacherAuthTabs button{border-radius:9px!important}
-#teacherLoginForm,#teacherSignupForm,#adminLoginForm{max-width:500px;margin:0 auto}
-#studentAccess>.cm-hero{text-align:center;margin:10px auto 24px!important;padding:22px 10px 12px!important}
-#studentAccess .cm-hero h1{font-size:30px!important;letter-spacing:-.03em!important}
-#studentAccess .cm-sa-grid{gap:16px!important}
-.cm-sa-card{border-radius:16px!important;padding:22px!important;box-shadow:0 4px 16px rgba(16,38,75,.045)!important;transition:transform .15s ease,border-color .15s ease}
-.cm-sa-card:hover{border-color:#a8c5f7!important;transform:translateY(-1px)}
-.cm-sa-card h3{font-size:17px!important}.cm-sa-card p{font-size:14px!important;line-height:1.65!important}
-.form-input,select.form-input,textarea.form-input,input.form-input{border-radius:10px!important;border-color:#cbd6e5!important;min-height:44px!important}
-textarea.form-input{min-height:unset!important}
-.primary-btn,.secondary-btn,button.full-width{min-height:42px!important;border-radius:10px!important;font-weight:650!important;transition:transform .12s ease,background .12s ease,border-color .12s ease!important}
-.primary-btn:active,.secondary-btn:active{transform:translateY(1px)}
-.primary-btn{background:var(--cm-blue)!important;border-color:var(--cm-blue)!important}.primary-btn:hover{background:var(--cm-blue-strong)!important}
-.secondary-btn{background:#fff!important;border-color:#cbd6e5!important;color:#24334a!important}
-/* Dashboard shell, cards, navigation */
-.dash-layout{gap:18px!important;align-items:stretch!important}
-.dash-sidebar{background:var(--cm-navy)!important;border:0!important;border-radius:16px!important;box-shadow:0 8px 24px rgba(16,38,75,.12)!important;padding:14px!important}
-.dash-sidebar .dash-branding{border-bottom:1px solid rgba(255,255,255,.12)!important;padding-bottom:18px!important;margin-bottom:14px!important}
-.dash-sidebar .dash-tagline{color:#a9bbd8!important}
-.dash-sidebar .dash-nav-item{color:#d5e0f2!important;border-radius:10px!important;padding:11px 12px!important;gap:12px!important;margin:2px 0!important}
-.dash-sidebar .dash-nav-item svg{width:18px!important;height:18px!important;flex-shrink:0}
-.dash-sidebar .dash-nav-item:hover{background:rgba(255,255,255,.09)!important;color:#fff!important}
-.dash-sidebar .dash-nav-item.active{background:#1d5ed7!important;color:#fff!important;box-shadow:none!important}
-.dash-main{min-width:0!important}
-.dash-main h2{font-size:25px!important;letter-spacing:-.03em!important}
-.dash-panel,.sa-panel,.scrollable-panel{border:1px solid var(--cm-line)!important;border-radius:16px!important;box-shadow:0 3px 12px rgba(16,38,75,.035)!important;background:#fff!important}
-.stats-grid{gap:14px!important}
-.stat-card{border-radius:14px!important;border:1px solid var(--cm-line)!important;padding:18px!important;box-shadow:none!important;position:relative;overflow:hidden}
-.stat-card h3{font-size:11px!important;letter-spacing:.055em!important;color:#64748b!important}
-.stat-card p{font-size:30px!important;color:var(--cm-navy)!important}
-/* Tables, roster and result lists */
-table{border-collapse:separate!important;border-spacing:0!important;border:1px solid var(--cm-line);border-radius:12px;overflow:hidden;background:#fff}
-th{background:#f4f7fb!important;color:#52637b!important;padding:12px 14px!important;font-size:11px!important;letter-spacing:.045em;text-transform:uppercase!important}
-td{padding:12px 14px!important;border-bottom:1px solid #edf1f6!important}
-tr:last-child td{border-bottom:0!important}tr:hover td{background:#f8fbff!important}
-/* Assessment creation/editor */
-#assessmentEditorModal>div{border-radius:18px!important;box-shadow:0 24px 70px rgba(5,20,45,.28)!important;border:1px solid var(--cm-line)!important;overflow:hidden}
-#assessmentEditorModal>div>div:first-child{background:#f8faff!important;border-bottom:1px solid var(--cm-line)!important}
-#assessmentEditorScroll{overscroll-behavior:contain}
-/* Examination view — keep the existing timer, question order and navigation behaviour */
-#studentQuizSection{max-width:900px!important}
-#studentQuizSection .quiz-header{border-radius:16px!important;box-shadow:0 4px 16px rgba(16,38,75,.05)!important;padding:12px 16px!important}
-#studentQuizSection .quiz-timer{width:70px!important;height:70px!important}
-#studentQuizSection #studentQuizTitle{font-size:16px!important}
-#studentQuestionContainer{border-radius:16px!important;padding:clamp(16px,3vw,28px)!important;box-shadow:0 4px 18px rgba(16,38,75,.035)!important}
-#studentQuestionText{font-size:clamp(17px,2vw,21px)!important;line-height:1.7!important}
-#studentOptionsContainer .option{border-radius:12px!important;min-height:58px!important;padding:14px 16px!important}
-#studentOptionsContainer .option.selected{background:#edf4ff!important}
-#studentQuestionBoxesContainer{box-shadow:0 -6px 22px rgba(16,38,75,.07)!important;padding-top:12px!important}
-#studentQuestionBoxes .q-box{border-radius:10px!important}
-/* Student dashboard and profile panels */
-#studentDashboard,#studentDashboardView{max-width:1280px!important}
-.sa-panel,.sa-summary-card{border-radius:16px!important}
-.sa-card{border-radius:12px!important;transition:border-color .12s ease,background .12s ease}
-.sa-card:hover{border-color:#a8c5f7!important;background:#fbfdff!important}
-/* Certificate: retain existing generated content and identifiers */
-#studentCertificate,#certificateContainer,.certificate-container{box-shadow:0 10px 32px rgba(16,38,75,.12)!important}
-/* floating utilities remain available but visually quiet */
-#whatsappFloatBtn.whatsapp-float-btn,#needHelpBtn.help-float-btn,#cleverBotFloat{box-shadow:0 5px 18px rgba(16,38,75,.16)!important}
-/* Responsive layouts */
-@media(max-width:900px){
- #landingPage{margin-top:14px!important;padding:0 16px 24px!important}
- .cm-roles{grid-template-columns:1fr!important}
- .cm-role{min-height:84px!important;padding:16px!important}
- .dash-layout{display:block!important}
- .dash-layout .dash-main{width:100%!important}
- .dash-sidebar{border-radius:0 16px 16px 0!important}
- .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+html[data-cm-dark]{--r-bg:#0f1530;--r-surface:#16204a;--r-line:#26335f;--r-text:#e8edff;--r-muted:#9aa8cf;--r-primary-soft:#1d2d66;--r-success-soft:#0f3d34;--r-warn-soft:#4a3410;--r-danger-soft:#4a1b24}
+html,body{background:var(--r-bg)!important;color:var(--r-text);font-family:Inter,Poppins,-apple-system,"Segoe UI",Roboto,Arial,sans-serif!important}
+h1,h2,h3,h4{color:var(--r-text);font-family:Poppins,Inter,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.01em}
+.helper-text,.tagline{color:var(--r-muted)!important}
+
+/* ---------- Top bar ---------- */
+#mainHeader{background:var(--r-surface)!important;border-bottom:1px solid var(--r-line)!important;box-shadow:0 1px 0 rgba(15,31,74,.03);padding-top:12px!important;padding-bottom:12px!important}
+#mainHeader .logo-image{height:34px!important}
+#mainHeader .tagline{color:var(--r-muted)!important;font-weight:500}
+
+/* ---------- Buttons ---------- */
+.primary-btn,.secondary-btn,button.full-width{border-radius:10px!important;min-height:44px;font-weight:600!important;letter-spacing:.01em}
+.primary-btn{background:var(--r-primary)!important;border-color:var(--r-primary)!important;color:#fff!important;box-shadow:0 2px 6px rgba(26,79,232,.25)!important}
+.primary-btn:hover{background:var(--r-primary-h)!important}
+.secondary-btn{background:var(--r-surface)!important;color:var(--r-primary)!important;border:1.5px solid var(--r-primary)!important}
+.secondary-btn:hover{background:var(--r-primary-soft)!important}
+.form-input,select.form-input,textarea.form-input,input.form-input{border-radius:10px!important;border:1.5px solid var(--r-line)!important;background:var(--r-surface)!important;color:var(--r-text)!important;min-height:44px}
+.form-input:focus{border-color:var(--r-primary)!important;box-shadow:0 0 0 3px rgba(26,79,232,.18)!important}
+
+/* ---------- 1. Landing (navy hero) ---------- */
+#landingPage .cm-hero{background:linear-gradient(135deg,var(--r-navy) 0%,var(--r-navy2) 60%,#1a4fe8 140%);color:#fff;border-radius:16px;padding:40px 24px 34px;margin:0 0 18px;position:relative;overflow:hidden}
+#landingPage .cm-hero:after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.07)}
+#landingPage .cm-hero h1{color:#fff;font-size:clamp(26px,5vw,40px);font-weight:800;line-height:1.15;max-width:560px}
+#landingPage .cm-hero p{color:#cfdcff;font-size:15px;max-width:520px;margin-top:10px}
+.cm-roles{gap:14px!important}
+.cm-role{background:var(--r-surface)!important;border:1px solid var(--r-line)!important;border-radius:14px!important;box-shadow:var(--r-shadow);padding:20px!important}
+.cm-role:hover{border-color:var(--r-primary)!important;box-shadow:0 6px 20px rgba(26,79,232,.16)!important;transform:translateY(-2px)}
+.cm-role-ic{background:var(--r-primary-soft)!important;color:var(--r-primary)!important;border-radius:12px!important;width:46px!important;height:46px!important;display:inline-flex;align-items:center;justify-content:center;flex:0 0 46px}
+.cm-role.t .cm-role-ic,.cm-sa-card.t .cm-role-ic{background:var(--r-success-soft)!important;color:#059669!important}
+.cm-role.a .cm-role-ic,.cm-sa-card.a .cm-role-ic{background:var(--r-warn-soft)!important;color:#d97706!important}
+
+/* ---------- 2. Student access / login (centred card) ---------- */
+#studentAccess,#studentLoginPage{background:transparent}
+.cm-sa-grid{gap:16px!important}
+.cm-sa-card,.student-login-page{background:var(--r-surface)!important;border:1px solid var(--r-line)!important;border-radius:16px!important;box-shadow:var(--r-shadow)!important;padding:22px!important}
+.student-login-page{max-width:460px;margin:12px auto!important;padding:26px!important}
+.cm-sa-card h3{font-weight:700}
+#studentAccess .cm-hero h1,#studentLoginPage h2{color:var(--r-text)}
+
+/* ---------- 3/9. Dashboards: navy sidebar, blue active item ---------- */
+.dash-sidebar{background:var(--r-side)!important;border:0!important;border-radius:14px!important;color:#cdd8f5;box-shadow:var(--r-shadow)}
+.dash-branding{border-bottom:1px solid rgba(255,255,255,.1)!important;padding-bottom:12px!important;margin-bottom:10px!important}
+.dash-branding .dash-logo-image{background:#fff;border-radius:10px;padding:6px 10px}
+.dash-tagline{color:#9fb3e8!important}
+.dash-nav-item{color:#cdd8f5!important;border-radius:8px!important;font-weight:500!important}
+.dash-nav-item svg{opacity:.9}
+.dash-nav-item:hover{background:var(--r-side-h)!important;color:#fff!important}
+.dash-nav-item.active{background:var(--r-primary)!important;color:#fff!important;box-shadow:none!important;font-weight:600!important}
+.sidebar-close-btn,.sidebar-collapse-toggle{background:rgba(255,255,255,.1)!important;color:#fff!important;border:0!important;border-radius:8px!important}
+.sidebar-toggle,.dashboard-menu-top{background:var(--r-surface)!important;border:1px solid var(--r-line)!important;color:var(--r-text)!important;border-radius:10px!important}
+.dash-panel,.sa-panel,.scrollable-panel{background:var(--r-surface)!important;border:1px solid var(--r-line)!important;border-radius:var(--r-radius)!important;box-shadow:var(--r-shadow)!important}
+.stat-card{background:var(--r-surface)!important;border:1px solid var(--r-line)!important;border-radius:var(--r-radius)!important;box-shadow:var(--r-shadow)!important;border-left:4px solid var(--r-primary)!important}
+.stat-card:nth-child(2){border-left-color:var(--r-success)!important}
+.stat-card:nth-child(3){border-left-color:var(--r-warn)!important}
+.stat-card:nth-child(4){border-left-color:#8b5cf6!important}
+.stat-card h3{color:var(--r-muted)!important}
+.stat-card p{color:var(--r-text)!important;font-family:Poppins,Inter,sans-serif}
+
+/* ---------- Tables, roster, status pills ---------- */
+table{background:var(--r-surface);border:1px solid var(--r-line);border-radius:10px;overflow:hidden}
+th{background:#f1f5fc!important;color:var(--r-muted)!important;font-size:11.5px!important;text-transform:uppercase!important;letter-spacing:.05em}
+html[data-cm-dark] th{background:#1d2a58!important}
+td{border-bottom:1px solid var(--r-line)!important;color:var(--r-text)}
+tr:hover td{background:var(--r-primary-soft)!important}
+td img,.roster-photo,.student-avatar img{border-radius:50%!important;object-fit:cover}
+.status-published,.badge-published,.pill-ok{background:var(--r-success-soft);color:#047857;border-radius:999px;padding:2px 10px;font-weight:600;font-size:12px}
+.status-draft,.badge-draft,.pill-warn{background:var(--r-warn-soft);color:#b45309;border-radius:999px;padding:2px 10px;font-weight:600;font-size:12px}
+.status-closed,.pill-bad{background:var(--r-danger-soft);color:#b91c1c;border-radius:999px;padding:2px 10px;font-weight:600;font-size:12px}
+
+/* ---------- 6. Student dashboard (navy nav, light cards) ---------- */
+#studentAreaPage .sa-nav,.sa-nav{background:var(--r-side)!important}
+#studentAreaPage .sa-nav button{color:#cdd8f5!important;border-radius:8px!important}
+#studentAreaPage .sa-nav button:hover{background:var(--r-side-h)!important;color:#fff!important}
+#studentAreaPage .sa-nav button.active{background:var(--r-primary)!important;box-shadow:none!important;color:#fff!important}
+.student-menu-open{background:var(--r-surface)!important;border:1px solid var(--r-line)!important;color:var(--r-text)!important;border-radius:10px!important}
+
+/* ---------- 7. Exam interface ---------- */
+#studentQuizSection .quiz-header{background:var(--r-surface);border:1px solid var(--r-line);border-radius:var(--r-radius);padding:14px 16px;box-shadow:var(--r-shadow)}
+#studentQuestionContainer{background:var(--r-surface);border:1px solid var(--r-line);border-radius:var(--r-radius);padding:18px;box-shadow:var(--r-shadow);margin-top:12px}
+#studentQuestionText{font-size:18px;font-weight:600;color:var(--r-text);line-height:1.5;margin:6px 0 14px}
+#studentOptionsContainer .option{display:flex;align-items:center;gap:12px;background:var(--r-surface)!important;border:1.5px solid var(--r-line)!important;border-radius:10px!important;padding:13px 14px!important;margin-bottom:10px;cursor:pointer;transition:border-color .12s,background .12s;color:var(--r-text)!important}
+#studentOptionsContainer .option:hover{border-color:var(--r-primary)!important;background:var(--r-primary-soft)!important}
+#studentOptionsContainer .option .opt-letter{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:2px solid #b7c3dc;font-size:12px;font-weight:700;flex:0 0 26px;color:var(--r-muted)}
+#studentOptionsContainer .option.selected{border-color:var(--r-primary)!important;background:var(--r-primary-soft)!important;box-shadow:inset 0 0 0 1px var(--r-primary)}
+#studentOptionsContainer .option.selected .opt-letter{background:var(--r-primary);border-color:var(--r-primary);color:#fff}
+.nav-buttons{display:flex;gap:10px;align-items:center;margin-top:14px}
+.nav-buttons .primary-btn#studentSubmitBtn,#studentSubmitBtn{background:var(--r-danger)!important;border-color:var(--r-danger)!important;box-shadow:0 2px 6px rgba(239,68,68,.3)!important}
+#studentNextBtn{background:var(--r-primary)!important;color:#fff!important;border-color:var(--r-primary)!important}
+#studentQuestionBoxes .q-box{border-radius:50%!important;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;font-weight:600;border:1.5px solid var(--r-line);background:var(--r-surface);color:var(--r-text)}
+#studentQuestionBoxes .q-box.answered{background:var(--r-primary-soft);border-color:var(--r-primary);color:var(--r-primary)}
+#studentQuestionBoxes .q-box.current{background:var(--r-primary)!important;border-color:var(--r-primary)!important;color:#fff!important}
+.quiz-timer .qt-track{stroke:var(--r-line)}
+.quiz-timer.ok .qt-arc{stroke:var(--r-success)}
+.quiz-timer.caution .qt-arc{stroke:var(--r-warn)}
+.quiz-timer.danger .qt-arc{stroke:var(--r-danger)}
+
+/* ---------- 8. Results and certificate ---------- */
+#studentResultsSection{background:transparent}
+#studentScoreDisplay{background:var(--r-surface);border:1px solid var(--r-line);border-radius:var(--r-radius);padding:18px;box-shadow:var(--r-shadow)}
+.result-icon-btn,.result-take-another{border-radius:10px!important}
+.result-take-another{background:var(--r-primary)!important;color:#fff!important}
+
+/* ---------- 4. Assessment creation ---------- */
+#uploadSection .dash-panel,#uploadSection{border-radius:var(--r-radius)}
+#uploadSection .form-group label{color:var(--r-text)}
+
+/* ---------- Footer and floating buttons ---------- */
+.footer{color:var(--r-muted)!important;border-top:1px solid var(--r-line)!important}
+
+/* ---------- 10. Mobile ---------- */
+@media(max-width:640px){
+  #landingPage .cm-hero{padding:30px 18px 26px;border-radius:14px}
+  .primary-btn,.secondary-btn{width:auto}
+  #studentQuestionText{font-size:16.5px}
+  .stat-card p{font-size:22px!important}
 }
-@media(max-width:600px){
- #mainHeader{min-height:56px!important;margin-bottom:12px!important;padding:10px 14px!important}
- #mainHeader .logo-image{max-height:30px!important}
- #landingPage .cm-hero{border-radius:16px!important;padding:30px 22px!important}
- #landingPage .cm-hero h1{font-size:31px!important}
- #studentAccess,#teacherAuth,#adminAuth,#studentLoginPage,#studentAssessmentView{margin:12px auto!important;padding-left:14px!important;padding-right:14px!important}
- #teacherAuth,#adminAuth,#studentLoginPage{border-radius:15px!important;padding:18px!important}
- #studentAccess .cm-sa-grid{grid-template-columns:1fr!important}
- .cm-sa-card{padding:18px!important}
- .dash-main h2{font-size:22px!important}
- .dash-panel,.sa-panel{padding:14px!important}
- .stat-card{padding:13px!important}.stat-card p{font-size:25px!important}
- table{font-size:12px!important}th,td{padding:9px 10px!important}
- #studentQuizSection{padding-bottom:94px!important}
- #studentQuizSection .quiz-header{top:54px!important;padding:9px 10px!important;gap:8px!important}
- #studentQuizSection .quiz-timer{width:60px!important;height:60px!important}
- #studentQuizSection .quiz-stats{gap:8px!important}
- #studentQuestionContainer{padding:14px!important}
- #studentQuestionText{font-size:17px!important}
- #studentOptionsContainer .option{font-size:15px!important;min-height:52px!important;padding:12px!important}
- #studentQuestionBoxesContainer{padding-left:8px!important;padding-right:8px!important}
- #studentQuestionBoxes{gap:6px!important}
- #studentQuestionBoxes .q-box{width:35px!important;height:35px!important;min-width:35px!important}
- .footer{padding-left:16px!important;padding-right:16px!important}
-}
-@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
-.cm-feature-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0 0}
-.cm-feature-strip>div{display:flex;flex-direction:column;gap:5px;padding:18px 20px;background:#fff;border:1px solid var(--cm-line);border-radius:14px}
-.cm-feature-strip strong{font-size:14px;color:var(--cm-navy)}
-.cm-feature-strip span{font-size:12.5px;color:var(--cm-muted);line-height:1.55}
-@media(max-width:760px){.cm-feature-strip{grid-template-columns:1fr;gap:10px}.cm-feature-strip>div{padding:14px 16px}}
