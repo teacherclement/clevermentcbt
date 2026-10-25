@@ -1,0 +1,134 @@
+/* CleverMent UI/UX redesign layer — presentation-only overrides; core workflows remain in script.js/server.js. */
+:root{
+ --cm-blue:#1457d9;--cm-blue-strong:#0d45b5;--cm-navy:#10264b;--cm-ink:#18253b;
+ --cm-muted:#64748b;--cm-bg:#f4f7fb;--cm-surface:#fff;--cm-line:#dce4ef;
+ --cm-soft:#edf4ff;--cm-teal:#0d9488;--cm-radius:14px;--cm-radius-sm:10px;
+ --cm-shadow:0 8px 28px rgba(16,38,75,.07);--cm-focus:0 0 0 3px rgba(20,87,217,.18)
+}
+html,body{background:var(--cm-bg)!important;color:var(--cm-ink)!important}
+body{font-size:14px;line-height:1.55}
+button,input,select,textarea{font-family:inherit}
+button{touch-action:manipulation}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:0!important;box-shadow:var(--cm-focus)!important}
+.container>*:not(script){scroll-margin-top:84px}
+/* Global brand bar */
+#mainHeader{min-height:64px!important;background:rgba(255,255,255,.96)!important;border-bottom:1px solid var(--cm-line)!important;box-shadow:0 2px 12px rgba(16,38,75,.035)!important;backdrop-filter:blur(12px);padding-top:12px!important;padding-bottom:12px!important}
+#mainHeader .logo-image{max-height:34px!important}
+#mainHeader .tagline{font-size:12px!important;font-weight:500!important;color:#64748b!important}
+/* Landing page */
+#landingPage{max-width:1120px!important;margin:26px auto 0!important;padding:0 22px 28px!important}
+#landingPage .cm-hero{position:relative;overflow:hidden;padding:clamp(28px,5vw,58px)!important;border:1px solid #d9e6fa;border-radius:22px;background:linear-gradient(115deg,#10264b 0%,#153b7a 66%,#1769a8 100%);color:#fff;box-shadow:var(--cm-shadow);margin-bottom:18px}
+#landingPage .cm-hero:after{content:"";position:absolute;width:300px;height:300px;border:1px solid rgba(255,255,255,.14);border-radius:50%;right:-80px;top:-130px;box-shadow:0 0 0 36px rgba(255,255,255,.035),0 0 0 72px rgba(255,255,255,.025);pointer-events:none}
+#landingPage .cm-hero h1{position:relative;z-index:1;color:#fff!important;font-size:clamp(30px,4.3vw,48px)!important;max-width:700px;line-height:1.12!important;letter-spacing:-.035em!important;margin-bottom:12px!important}
+#landingPage .cm-hero p{position:relative;z-index:1;color:#dbeafe!important;font-size:clamp(15px,1.7vw,18px)!important;max-width:620px;line-height:1.7}
+.cm-roles{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:14px!important}
+.cm-role{min-height:112px;padding:20px!important;border-radius:16px!important;background:#fff!important;border-color:var(--cm-line)!important;box-shadow:0 3px 12px rgba(16,38,75,.035)!important;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease!important}
+.cm-role:hover{transform:translateY(-2px);border-color:#9bbcf6!important;box-shadow:var(--cm-shadow)!important}
+.cm-role b{font-size:16px!important;color:var(--cm-ink)}.cm-role small{font-size:12.5px!important;line-height:1.5!important;color:var(--cm-muted)!important}
+.cm-role-ic{width:44px!important;height:44px!important;border-radius:12px!important;background:#eaf1ff!important;color:var(--cm-blue)!important;display:inline-flex;align-items:center;justify-content:center}
+.cm-role.t .cm-role-ic{background:#e6f7f4!important;color:#0d8176!important}.cm-role.a .cm-role-ic{background:#f1ebff!important;color:#6b4cc4!important}
+/* Page headings and entry forms */
+#studentAccess,#teacherAuth,#adminAuth,#studentLoginPage,#studentAssessmentView{max-width:940px!important;margin:24px auto!important}
+#teacherAuth,#adminAuth,#studentLoginPage{background:var(--cm-surface);border:1px solid var(--cm-line);border-radius:20px;padding:clamp(18px,3.5vw,34px)!important;box-shadow:var(--cm-shadow)}
+#teacherAuth>h2,#adminAuth>h2,#studentLoginPage h2{font-size:26px!important;letter-spacing:-.03em!important;margin-bottom:8px!important}
+#teacherAuthTabs{max-width:520px;margin:0 auto 24px!important;padding:5px;background:#f0f4fa;border-radius:12px}
+#teacherAuthTabs button{border-radius:9px!important}
+#teacherLoginForm,#teacherSignupForm,#adminLoginForm{max-width:500px;margin:0 auto}
+#studentAccess>.cm-hero{text-align:center;margin:10px auto 24px!important;padding:22px 10px 12px!important}
+#studentAccess .cm-hero h1{font-size:30px!important;letter-spacing:-.03em!important}
+#studentAccess .cm-sa-grid{gap:16px!important}
+.cm-sa-card{border-radius:16px!important;padding:22px!important;box-shadow:0 4px 16px rgba(16,38,75,.045)!important;transition:transform .15s ease,border-color .15s ease}
+.cm-sa-card:hover{border-color:#a8c5f7!important;transform:translateY(-1px)}
+.cm-sa-card h3{font-size:17px!important}.cm-sa-card p{font-size:14px!important;line-height:1.65!important}
+.form-input,select.form-input,textarea.form-input,input.form-input{border-radius:10px!important;border-color:#cbd6e5!important;min-height:44px!important}
+textarea.form-input{min-height:unset!important}
+.primary-btn,.secondary-btn,button.full-width{min-height:42px!important;border-radius:10px!important;font-weight:650!important;transition:transform .12s ease,background .12s ease,border-color .12s ease!important}
+.primary-btn:active,.secondary-btn:active{transform:translateY(1px)}
+.primary-btn{background:var(--cm-blue)!important;border-color:var(--cm-blue)!important}.primary-btn:hover{background:var(--cm-blue-strong)!important}
+.secondary-btn{background:#fff!important;border-color:#cbd6e5!important;color:#24334a!important}
+/* Dashboard shell, cards, navigation */
+.dash-layout{gap:18px!important;align-items:stretch!important}
+.dash-sidebar{background:var(--cm-navy)!important;border:0!important;border-radius:16px!important;box-shadow:0 8px 24px rgba(16,38,75,.12)!important;padding:14px!important}
+.dash-sidebar .dash-branding{border-bottom:1px solid rgba(255,255,255,.12)!important;padding-bottom:18px!important;margin-bottom:14px!important}
+.dash-sidebar .dash-tagline{color:#a9bbd8!important}
+.dash-sidebar .dash-nav-item{color:#d5e0f2!important;border-radius:10px!important;padding:11px 12px!important;gap:12px!important;margin:2px 0!important}
+.dash-sidebar .dash-nav-item svg{width:18px!important;height:18px!important;flex-shrink:0}
+.dash-sidebar .dash-nav-item:hover{background:rgba(255,255,255,.09)!important;color:#fff!important}
+.dash-sidebar .dash-nav-item.active{background:#1d5ed7!important;color:#fff!important;box-shadow:none!important}
+.dash-main{min-width:0!important}
+.dash-main h2{font-size:25px!important;letter-spacing:-.03em!important}
+.dash-panel,.sa-panel,.scrollable-panel{border:1px solid var(--cm-line)!important;border-radius:16px!important;box-shadow:0 3px 12px rgba(16,38,75,.035)!important;background:#fff!important}
+.stats-grid{gap:14px!important}
+.stat-card{border-radius:14px!important;border:1px solid var(--cm-line)!important;padding:18px!important;box-shadow:none!important;position:relative;overflow:hidden}
+.stat-card h3{font-size:11px!important;letter-spacing:.055em!important;color:#64748b!important}
+.stat-card p{font-size:30px!important;color:var(--cm-navy)!important}
+/* Tables, roster and result lists */
+table{border-collapse:separate!important;border-spacing:0!important;border:1px solid var(--cm-line);border-radius:12px;overflow:hidden;background:#fff}
+th{background:#f4f7fb!important;color:#52637b!important;padding:12px 14px!important;font-size:11px!important;letter-spacing:.045em;text-transform:uppercase!important}
+td{padding:12px 14px!important;border-bottom:1px solid #edf1f6!important}
+tr:last-child td{border-bottom:0!important}tr:hover td{background:#f8fbff!important}
+/* Assessment creation/editor */
+#assessmentEditorModal>div{border-radius:18px!important;box-shadow:0 24px 70px rgba(5,20,45,.28)!important;border:1px solid var(--cm-line)!important;overflow:hidden}
+#assessmentEditorModal>div>div:first-child{background:#f8faff!important;border-bottom:1px solid var(--cm-line)!important}
+#assessmentEditorScroll{overscroll-behavior:contain}
+/* Examination view — keep the existing timer, question order and navigation behaviour */
+#studentQuizSection{max-width:900px!important}
+#studentQuizSection .quiz-header{border-radius:16px!important;box-shadow:0 4px 16px rgba(16,38,75,.05)!important;padding:12px 16px!important}
+#studentQuizSection .quiz-timer{width:70px!important;height:70px!important}
+#studentQuizSection #studentQuizTitle{font-size:16px!important}
+#studentQuestionContainer{border-radius:16px!important;padding:clamp(16px,3vw,28px)!important;box-shadow:0 4px 18px rgba(16,38,75,.035)!important}
+#studentQuestionText{font-size:clamp(17px,2vw,21px)!important;line-height:1.7!important}
+#studentOptionsContainer .option{border-radius:12px!important;min-height:58px!important;padding:14px 16px!important}
+#studentOptionsContainer .option.selected{background:#edf4ff!important}
+#studentQuestionBoxesContainer{box-shadow:0 -6px 22px rgba(16,38,75,.07)!important;padding-top:12px!important}
+#studentQuestionBoxes .q-box{border-radius:10px!important}
+/* Student dashboard and profile panels */
+#studentDashboard,#studentDashboardView{max-width:1280px!important}
+.sa-panel,.sa-summary-card{border-radius:16px!important}
+.sa-card{border-radius:12px!important;transition:border-color .12s ease,background .12s ease}
+.sa-card:hover{border-color:#a8c5f7!important;background:#fbfdff!important}
+/* Certificate: retain existing generated content and identifiers */
+#studentCertificate,#certificateContainer,.certificate-container{box-shadow:0 10px 32px rgba(16,38,75,.12)!important}
+/* floating utilities remain available but visually quiet */
+#whatsappFloatBtn.whatsapp-float-btn,#needHelpBtn.help-float-btn,#cleverBotFloat{box-shadow:0 5px 18px rgba(16,38,75,.16)!important}
+/* Responsive layouts */
+@media(max-width:900px){
+ #landingPage{margin-top:14px!important;padding:0 16px 24px!important}
+ .cm-roles{grid-template-columns:1fr!important}
+ .cm-role{min-height:84px!important;padding:16px!important}
+ .dash-layout{display:block!important}
+ .dash-layout .dash-main{width:100%!important}
+ .dash-sidebar{border-radius:0 16px 16px 0!important}
+ .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:600px){
+ #mainHeader{min-height:56px!important;margin-bottom:12px!important;padding:10px 14px!important}
+ #mainHeader .logo-image{max-height:30px!important}
+ #landingPage .cm-hero{border-radius:16px!important;padding:30px 22px!important}
+ #landingPage .cm-hero h1{font-size:31px!important}
+ #studentAccess,#teacherAuth,#adminAuth,#studentLoginPage,#studentAssessmentView{margin:12px auto!important;padding-left:14px!important;padding-right:14px!important}
+ #teacherAuth,#adminAuth,#studentLoginPage{border-radius:15px!important;padding:18px!important}
+ #studentAccess .cm-sa-grid{grid-template-columns:1fr!important}
+ .cm-sa-card{padding:18px!important}
+ .dash-main h2{font-size:22px!important}
+ .dash-panel,.sa-panel{padding:14px!important}
+ .stat-card{padding:13px!important}.stat-card p{font-size:25px!important}
+ table{font-size:12px!important}th,td{padding:9px 10px!important}
+ #studentQuizSection{padding-bottom:94px!important}
+ #studentQuizSection .quiz-header{top:54px!important;padding:9px 10px!important;gap:8px!important}
+ #studentQuizSection .quiz-timer{width:60px!important;height:60px!important}
+ #studentQuizSection .quiz-stats{gap:8px!important}
+ #studentQuestionContainer{padding:14px!important}
+ #studentQuestionText{font-size:17px!important}
+ #studentOptionsContainer .option{font-size:15px!important;min-height:52px!important;padding:12px!important}
+ #studentQuestionBoxesContainer{padding-left:8px!important;padding-right:8px!important}
+ #studentQuestionBoxes{gap:6px!important}
+ #studentQuestionBoxes .q-box{width:35px!important;height:35px!important;min-width:35px!important}
+ .footer{padding-left:16px!important;padding-right:16px!important}
+}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+.cm-feature-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0 0}
+.cm-feature-strip>div{display:flex;flex-direction:column;gap:5px;padding:18px 20px;background:#fff;border:1px solid var(--cm-line);border-radius:14px}
+.cm-feature-strip strong{font-size:14px;color:var(--cm-navy)}
+.cm-feature-strip span{font-size:12.5px;color:var(--cm-muted);line-height:1.55}
+@media(max-width:760px){.cm-feature-strip{grid-template-columns:1fr;gap:10px}.cm-feature-strip>div{padding:14px 16px}}

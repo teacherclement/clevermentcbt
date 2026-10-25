@@ -1,0 +1,30 @@
+CleverMent UI/UX Redesign Notes
+
+Scope
+- Presentation-only redesign layered through cm-redesign.css, loaded after the existing style.css, competition.css and cm-theme.css.
+- Updated index.html to load the new stylesheet and added a short feature summary to the public landing page.
+- Existing JavaScript, API routes, authentication, database scripts, assessment logic, question navigation, timer logic, publishing workflow, result logic and certificate generation were not rewritten.
+
+Visual areas addressed
+- Public landing page hero, role entry cards and feature summary.
+- Student access cards and centered teacher/admin/student login surfaces.
+- Shared typography, spacing, colour tokens, buttons, inputs, focus states and panels.
+- Teacher/admin/student dashboard shell, side navigation, statistic cards and tables.
+- Assessment editor modal, roster tables, examination header, timer, question options and bottom question navigator.
+- Responsive layouts for mobile and tablet; reduced-motion support.
+
+Assumptions
+- Existing IDs, inline styles, script-driven visibility and current workflows are intentional and should be preserved.
+- The current CleverMent logo and current screen flows remain authoritative; no new navigation routes or backend features were added.
+- Dark mode is retained through the existing theme script. Check both light and dark themes in browser QA because the existing implementation uses a page-level inversion technique.
+
+Validation performed
+- node --check passed for script.js, server.js, cm-theme.js, competition.js and competition-ui.js.
+- index.html parsed successfully with Python HTMLParser.
+- This is a code-level validation only; no live browser, database, authentication or end-to-end test was run in this environment.
+
+Deployment
+- Deploy the complete updated project folder, including cm-redesign.css and index.html.
+- If deploying only changed files, upload index.html and the new cm-redesign.css together.
+- After deployment, verify public landing, teacher login, student login, admin login, teacher/student/admin dashboards, roster, assessment editor/publishing, active quiz, results/certificates, mobile layouts and light/dark appearance.
+- Rollback: remove the cm-redesign.css link from index.html and redeploy to restore the previous visual layer. The landing feature strip markup can also be removed if desired.
