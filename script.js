@@ -4852,7 +4852,9 @@ function studentDisplayQuestion() {
     for (var i = 0; i < q.options.length; i++) {
         var div = document.createElement('div');
         div.className = 'option';
-        div.textContent = letters[i] + '. ' + q.options[i];
+        var oL = document.createElement('span'); oL.className = 'opt-letter'; oL.textContent = letters[i];
+        var oT = document.createElement('span'); oT.className = 'opt-text'; oT.textContent = q.options[i];
+        div.appendChild(oL); div.appendChild(oT);
         div.dataset.index = i;
 
         if (studentAnswers[studentCurrentIndex] === letters[i]) {

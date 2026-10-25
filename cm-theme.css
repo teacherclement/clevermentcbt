@@ -160,3 +160,44 @@ html[data-cm-dark] img:not(.logo-image),html[data-cm-dark] video,html[data-cm-da
 html[data-cm-dark] .cm-theme-menu{box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .cm-sa-card .cm-role-ic{align-self:flex-start;flex:0 0 auto;width:40px;height:40px}
 @media(min-width:900px){.footer{padding-left:32px!important;padding-right:32px!important}}
+
+/* ===== Examination interface ===== */
+#studentQuizSection{max-width:820px;margin:0 auto;padding-bottom:92px}
+#studentQuizSection .quiz-header{position:sticky;top:53px;z-index:20;display:flex!important;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap!important;background:var(--t-bg);border:1px solid var(--t-border);border-radius:var(--t-r);padding:10px 14px;margin:0 0 14px!important}
+#studentQuizSection .quiz-student{display:flex;align-items:center;gap:10px;min-width:0}
+#studentQuizSection .quiz-student .student-avatar{width:38px!important;height:38px!important;min-width:38px!important;font-size:13px!important}
+#studentQuizSection .quiz-student-text{min-width:0}
+#studentQuizSection #studentQuizTitle{font-size:15px!important;margin:0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#studentQuizSection #studentQuizDisplay{font-size:12px!important;margin:0!important;color:var(--t-muted)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#studentQuizSection .quiz-stats{background:none!important;padding:0!important;border-radius:0!important;display:flex;align-items:center;gap:12px;flex-direction:row-reverse}
+#studentQuizSection #studentProgress{font-size:12px;font-weight:600;color:var(--t-muted);white-space:nowrap}
+#studentQuizSection .quiz-timer{width:58px;height:58px;box-shadow:none;background:transparent;flex:0 0 auto}
+#studentQuizSection .quiz-timer .qt-track{stroke:var(--t-soft);stroke-width:8}
+#studentQuizSection .quiz-timer .qt-arc{stroke-width:8}
+#studentQuizSection .quiz-timer #studentTimerDisplay{font-size:12.5px;font-weight:700;letter-spacing:0}
+#studentQuizSection .quiz-timer #studentTimerDisplay.long{font-size:10.5px}
+#studentQuizSection .quiz-timer.danger{animation:cmPulse 1.2s ease-in-out infinite}
+@keyframes cmPulse{50%{transform:scale(1.06)}}
+#studentQuestionContainer{background:var(--t-bg)!important;border:1px solid var(--t-border)!important;border-radius:var(--t-r)!important;box-shadow:none!important;padding:18px!important}
+#studentQuestionContainer .q-flag-row{display:flex;justify-content:flex-end;gap:8px;margin:0 0 6px!important}
+#studentQuestionContainer .q-flag-btn{font-size:12px;min-height:30px;padding:4px 10px;border-radius:999px;background:var(--t-canvas);border:1px solid var(--t-border);color:var(--t-muted)}
+#studentQuestionText{font-size:18px!important;line-height:1.65;font-weight:600;color:var(--t-text)!important;margin:6px 0 16px!important}
+#studentOptionsContainer .option{display:flex!important;align-items:flex-start;gap:12px;min-height:54px;padding:12px 14px!important;margin:0 0 10px!important;background:var(--t-bg)!important;border:1.5px solid var(--t-border)!important;border-radius:10px!important;color:var(--t-text)!important;font-size:16px;line-height:1.5;cursor:pointer;transition:border-color .12s,background .12s}
+#studentOptionsContainer .option:hover{border-color:#8c959f!important}
+#studentOptionsContainer .option .opt-letter{flex:0 0 28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:1.5px solid var(--t-border);color:var(--t-muted);background:var(--t-canvas);margin-top:-1px}
+#studentOptionsContainer .option .opt-text{padding-top:2px;min-width:0;overflow-wrap:anywhere}
+#studentOptionsContainer .option.selected{border-color:var(--t-accent)!important;background:#ddf4ff!important}
+#studentOptionsContainer .option.selected .opt-letter{background:var(--t-accent);border-color:var(--t-accent);color:#fff}
+#studentQuestionContainer .nav-buttons{display:flex!important;gap:10px;margin-top:14px!important}
+#studentQuestionContainer .nav-buttons button{flex:1;min-height:46px;font-size:15px!important}
+#studentQuestionContainer .nav-buttons #studentSubmitBtn{flex:1.2}
+#studentQuestionContainer .kb-hint{font-size:12px;color:var(--t-muted);margin:10px 0 0;text-align:center}
+@media(pointer:coarse){#studentQuestionContainer .kb-hint{display:none}}
+/* bottom question navigator */
+#studentQuestionBoxesContainer{position:fixed!important;left:0;right:0;bottom:0;z-index:40;margin:0!important;border-radius:0!important;border:0!important;border-top:1px solid var(--t-border)!important;background:var(--t-bg)!important;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px))!important;box-shadow:0 -2px 10px rgba(31,35,40,.06)}
+#studentQuestionBoxesContainer .hint-text{display:none}
+#studentQuestionBoxes{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto;gap:8px!important;max-width:820px;margin:0 auto;padding:2px 2px 4px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+#studentQuestionBoxes .q-box{flex:0 0 auto;width:38px!important;height:38px!important;min-width:38px;border-radius:8px!important;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;background:var(--t-canvas)!important;border:1.5px solid var(--t-border)!important;color:var(--t-text)!important;cursor:pointer}
+#studentQuestionBoxes .q-box.answered{background:var(--t-accent)!important;border-color:var(--t-accent)!important;color:#fff!important}
+#studentQuestionBoxes .q-box.current{box-shadow:0 0 0 2px var(--t-bg),0 0 0 4px var(--t-text)!important}
+body:has(#studentQuizSection[style*="display: block"]) #cleverBotFloat{bottom:84px!important}
