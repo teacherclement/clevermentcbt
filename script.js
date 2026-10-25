@@ -5530,11 +5530,17 @@ async function studentSubmitQuiz() {
     var passMark = data.passMark;
 
     document.getElementById('studentScoreDisplay').innerHTML = `
-        <span class="grade">${grade}</span>
-        ${studentScore}% (${studentCorrect}/${studentTotal})<br>
-        <span style="display:inline-block; margin-top:6px; padding:4px 14px; border-radius:20px; font-weight:700; font-size:13px; background:${passed ? '#e6f7ec' : '#fdecec'}; color:${passed ? '#1f8a4c' : '#c0392b'};">${passed ? 'PASSED' : 'NOT PASSED'} (Pass mark: ${passMark}%)</span><br>
+        <div class="rs-wrap">
+            <div class="rs-ring" style="--p:${studentScore}"><div><b>${studentScore}%</b><small>Score</small></div></div>
+            <div class="rs-list">
+                <div class="rs-row"><span>Correct Answers</span><strong>${studentCorrect} / ${studentTotal}</strong></div>
+                <div class="rs-row"><span>Time Taken</span><strong>${studentTimeTaken}</strong></div>
+                <div class="rs-row"><span>Grade</span><strong class="grade">${grade}</strong></div>
+                <div class="rs-row"><span>Status</span><strong><span class="rs-pill ${passed ? 'ok' : 'bad'}">${passed ? 'PASSED' : 'NOT PASSED'}</span> <small>(Pass mark: ${passMark}%)</small></strong></div>
+            </div>
+        </div>
         <span class="result-details">
-            Class: ${studentClass} | Student: ${studentName} | Subject: ${studentSubject} | Time: ${studentTimeTaken}
+            Class: ${studentClass} | Student: ${studentName} | Subject: ${studentSubject}
         </span>
     `;
 
