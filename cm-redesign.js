@@ -21,6 +21,8 @@
         $$('td', root || document).forEach(function (td) {
             if (td.children.length || td.getAttribute('data-pill')) return;
             var k = (td.textContent || '').trim().toLowerCase();
+            var sm = /^(\d{1,3})%$/.exec(k);
+            if (sm && td.closest('#adminSection,#adminResultsSection')) { var v = +sm[1]; td.setAttribute('data-pill', '1'); td.innerHTML = '<span class="cm-score ' + (v >= 70 ? 'ok' : v >= 50 ? 'warn' : 'bad') + '">' + td.textContent.trim() + '</span>'; return; }
             if (PILL[k]) { td.setAttribute('data-pill', '1'); td.innerHTML = '<span class="cm-pill ' + PILL[k] + '">' + td.textContent.trim() + '</span>'; }
         });
     }

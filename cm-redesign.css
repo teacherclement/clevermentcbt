@@ -414,3 +414,37 @@ td{padding:13px 14px!important;font-size:13.5px}
 .live-item{background:var(--r-surface);border:1px solid var(--r-line);box-shadow:var(--r-shadow)}
 .cm-bell{width:38px!important;min-width:38px!important;height:38px!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important}
 .cm-bell svg{width:20px!important;height:20px!important;display:block;fill:none!important;stroke:currentColor!important;stroke-width:1.9}
+
+/* =====================================================================
+   v5: roster edit rows (photo, name, admission, parent phone) + results table
+   ===================================================================== */
+#rosterEditList .roster-edit-row{display:grid!important;grid-template-columns:62px minmax(0,1fr) 40px;grid-template-rows:auto auto auto;gap:8px 12px!important;align-items:center!important;background:var(--r-surface);border:1px solid var(--r-line);border-radius:12px;padding:12px;margin:0 0 10px!important;box-shadow:var(--r-shadow)}
+#rosterEditList .roster-photo-cell{grid-column:1;grid-row:1/4;align-self:center}
+#rosterEditList .roster-photo-btn{width:56px!important;height:56px!important;border-radius:50%!important;border:2px solid var(--r-primary-soft)!important;overflow:hidden;background:var(--r-primary-soft)}
+#rosterEditList .roster-photo-remove{width:22px!important;height:22px!important;top:-4px!important;right:-4px!important}
+#rosterEditList .roster-edit-name{grid-column:2;grid-row:1;min-width:0!important;font-weight:600}
+#rosterEditList .roster-edit-admission{grid-column:2;grid-row:2;min-width:0!important}
+#rosterEditList .roster-edit-parent{grid-column:2;grid-row:3;min-width:0!important}
+#rosterEditList .roster-edit-row .form-input{min-height:40px!important;font-size:14px!important;width:100%;box-sizing:border-box}
+#rosterEditList .roster-edit-row>button.secondary-btn{grid-column:3;grid-row:1;width:36px!important;height:36px!important;min-height:36px!important;padding:0!important;border-radius:10px!important;background:var(--r-danger-soft)!important;color:#b91c1c!important;border:0!important;font-size:15px;box-shadow:none!important}
+@media(min-width:900px){
+  #rosterEditList .roster-edit-row{grid-template-columns:62px minmax(0,2fr) minmax(0,1.2fr) minmax(0,1.2fr) 40px;grid-template-rows:auto}
+  #rosterEditList .roster-photo-cell{grid-row:1}
+  #rosterEditList .roster-edit-name{grid-column:2;grid-row:1}
+  #rosterEditList .roster-edit-admission{grid-column:3;grid-row:1}
+  #rosterEditList .roster-edit-parent{grid-column:4;grid-row:1}
+  #rosterEditList .roster-edit-row>button.secondary-btn{grid-column:5;grid-row:1}
+}
+.roster-photo-bulk{border-radius:12px!important;border:1px dashed var(--r-primary)!important;background:var(--r-primary-soft)!important}
+
+/* results dashboard: board-style table */
+#adminSection .scrollable-panel,#adminSection [class*="table"]{border-radius:12px}
+#adminSection table th{white-space:nowrap}
+#adminSection table td{white-space:nowrap}
+#adminSection table .primary-btn,#adminSection table .secondary-btn,#adminResultsSection table .primary-btn{background:var(--r-primary-soft)!important;color:var(--r-primary)!important;border:0!important;box-shadow:none!important;min-height:30px!important;padding:4px 12px!important;font-size:12px!important;border-radius:8px!important}
+#adminSection table .primary-btn:hover{background:var(--r-primary)!important;color:#fff!important}
+#adminSection>div:first-of-type select,#adminSection select.form-input{min-width:130px}
+.cm-score{display:inline-block;min-width:48px;text-align:center;padding:3px 10px;border-radius:999px;font-weight:700;font-size:12.5px}
+.cm-score.ok{background:var(--r-success-soft);color:#047857}
+.cm-score.warn{background:var(--r-warn-soft);color:#b45309}
+.cm-score.bad{background:var(--r-danger-soft);color:#b91c1c}
