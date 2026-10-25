@@ -4708,7 +4708,7 @@ function proceedToStartQuiz() {
     var freshSubmitBtn = document.getElementById('studentSubmitBtn');
     if (freshSubmitBtn) {
         freshSubmitBtn.disabled = false;
-        freshSubmitBtn.textContent = 'Submit';
+        freshSubmitBtn.textContent = 'Submit Assessment';
         freshSubmitBtn.removeAttribute('aria-busy');
     }
     studentTabSwitchCount = 0;
