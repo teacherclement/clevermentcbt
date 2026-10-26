@@ -543,3 +543,41 @@ html[data-cm-dark] #adminSection thead th{background:#1d2a58!important}
 .cm-rb-switch[aria-checked="true"] .cm-sw-track{background:var(--r-success)}
 .cm-rb-switch[aria-checked="true"] .cm-sw-track i{left:19px}
 .cm-readbar.cm-off .cm-rb-main,.cm-readbar.cm-off .cm-rb-sub,.cm-readbar.cm-off .cm-rb-gear,.cm-readbar.cm-off .cm-rb-panel{display:none!important}
+
+/* ---- profile dropdown (teacher, admin, student) ---- */
+.cm-um{position:relative;display:flex;align-items:center}
+.cm-um-trigger{display:flex;align-items:center;gap:10px;background:transparent;border:0;cursor:pointer;font-family:inherit;color:var(--r-text);padding:4px 6px;border-radius:12px}
+.cm-um-trigger:hover,.cm-um-prof:hover{background:var(--r-primary-soft)}
+.cm-um-caret{color:var(--r-muted);transition:transform .15s;flex:0 0 auto}
+.cm-um-trigger[aria-expanded="true"] .cm-um-caret,.cm-um-prof[aria-expanded="true"]::after{transform:rotate(180deg)}
+.cm-avatar{overflow:hidden}
+.cm-avatar img,.cm-modal-av img{width:100%;height:100%;object-fit:cover;display:block}
+.cm-um-menu{position:absolute;top:calc(100% + 8px);right:0;min-width:230px;background:var(--r-surface);border:1px solid var(--r-line);border-radius:12px;box-shadow:0 12px 32px rgba(15,31,74,.18);padding:6px;z-index:60}
+.cm-um-menu[hidden]{display:none}
+.cm-um-menu button{display:flex!important;align-items:center;gap:12px;width:100%;text-align:left;background:transparent!important;border:0!important;border-radius:8px!important;padding:11px 12px!important;font-family:inherit;font-size:14px!important;font-weight:600;color:var(--r-text)!important;cursor:pointer;min-height:0!important;box-shadow:none!important}
+.cm-um-menu button:hover,.cm-um-menu button:focus{background:var(--r-primary-soft)!important;outline:none}
+.cm-um-menu button svg{color:var(--r-muted);flex:0 0 18px}
+.cm-um-sep{height:1px;background:var(--r-line);margin:4px 6px}
+.cm-um-menu .cm-um-logout,.cm-um-menu .cm-um-logout svg{color:#b91c1c!important}
+.cm-um-menu .cm-um-logout:hover{background:var(--r-danger-soft)!important}
+.cm-topbar .cm-bell{margin-left:0}
+/* student */
+.cm-um-host{position:relative}
+.cm-um-prof{cursor:pointer;border-radius:12px;padding:4px 8px;align-items:center}
+.cm-um-prof::after{content:"";width:8px;height:8px;border-right:2px solid var(--r-muted);border-bottom:2px solid var(--r-muted);transform:rotate(45deg) translateY(-2px);margin:0 4px 0 2px;transition:transform .15s}
+.cm-um-prof[aria-expanded="true"]::after{transform:rotate(-135deg) translateY(-2px)}
+#studentAreaPage .sa-top .cm-um-menu{right:14px;top:calc(100% + 6px)}
+#studentAreaPage .sa-top .sa-mobile-logout.cm-um-logout{display:flex!important}
+/* profile pop-up */
+.cm-modal{position:fixed;inset:0;background:rgba(10,20,50,.55);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
+.cm-modal-card{position:relative;background:var(--r-surface);color:var(--r-text);border-radius:16px;padding:26px 22px 20px;width:100%;max-width:380px;box-shadow:0 20px 50px rgba(0,0,0,.35);text-align:center}
+.cm-modal-x{position:absolute;right:10px;top:8px;border:0;background:transparent;font-size:26px;line-height:1;color:var(--r-muted);cursor:pointer;width:36px;height:36px}
+.cm-modal-av{width:86px;height:86px;border-radius:50%;margin:0 auto 10px;background:var(--r-primary-soft);color:var(--r-primary);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;overflow:hidden}
+.cm-modal-card h3{margin:0 0 2px;font-size:20px}
+.cm-modal-role{margin:0 0 14px;color:var(--r-muted);font-size:13px}
+.cm-modal-card .cm-trow{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--r-line);text-align:left;font-size:14px}
+.cm-modal-actions{display:flex;gap:10px;margin-top:16px}
+.cm-modal-actions button{flex:1}
+@media(max-width:560px){.cm-topbar .cm-um-trigger .cm-user{display:none}.cm-um-menu{min-width:220px}}
+.cm-um-menu{min-width:255px}
+.cm-um-menu button span{white-space:nowrap}

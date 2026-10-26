@@ -11,7 +11,7 @@
         var t = (h.textContent || '').replace(/^Admin Workspace\s*[\u2014-]\s*/, '').replace(/^Welcome,?\s*/i, '').replace(/!$/, '').trim();
         if (!t || /^Teacher Dashboard$/i.test(t)) return;
         var n = $('.cm-user-name', bar), a = $('.cm-avatar', bar);
-        if (n && n.textContent !== t) { n.textContent = t; a.textContent = initials(t); }
+        if (n && n.textContent !== t) { n.textContent = t; if (a && !a.classList.contains('has-photo')) { a.textContent = initials(t); a.removeAttribute('data-ph'); } }
     }
     /* student top bar: class under the name is already shown by the profile block */
 
