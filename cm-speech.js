@@ -249,8 +249,8 @@
     /* ---------------- UI + speaking ---------------- */
     var synth = root.speechSynthesis;
     var KEY = 'cm_speech_prefs';
-    var prefs = { rate: 1, voice: '', gender: 'f', auto: true };
-    try { var sv = JSON.parse(localStorage.getItem(KEY) || '{}'); if (sv.rate) prefs.rate = sv.rate; if (sv.voice) prefs.voice = sv.voice; if (sv.gender === 'm' || sv.gender === 'f') prefs.gender = sv.gender; if (sv.auto === false) prefs.auto = false; } catch (e) {}
+    var prefs = { rate: 1, voice: '', gender: 'f', auto: true, enabled: true };
+    try { var sv = JSON.parse(localStorage.getItem(KEY) || '{}'); if (sv.rate) prefs.rate = sv.rate; if (sv.voice) prefs.voice = sv.voice; if (sv.gender === 'm' || sv.gender === 'f') prefs.gender = sv.gender; if (sv.auto === false) prefs.auto = false; if (sv.enabled === false) prefs.enabled = false; } catch (e) {}
     function save() { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {} }
 
     var state = 'idle', token = 0, bar, btnRead, btnPause, btnGear, panel, selRate, selVoice, statusEl;
@@ -325,13 +325,14 @@
     function ui() {
         if (!bar) return;
         btnRead.classList.toggle('on', state !== 'idle');
-        btnRead.querySelector('span').textContent = state === 'idle' ? 'Read aloud' : 'Stop';
+        btnRead.querySelector('span').textContent = state === 'idle' ? 'Read question' : 'Stop';
         btnPause.style.display = state === 'idle' ? 'none' : '';
         btnPause.querySelector('span').textContent = state === 'paused' ? 'Resume' : 'Pause';
         btnRead.setAttribute('aria-label', state === 'idle' ? 'Read this question and its options aloud' : 'Stop reading');
     }
     function stop() { token++; state = 'idle'; try { synth && synth.cancel(); } catch (e) {} clearHighlight(); ui(); }
     function start() {
+        if (!prefs.enabled) return;
         if (!synth) { if (statusEl) { statusEl.textContent = 'This browser cannot read aloud.'; } return; }
         stop();
         var items = buildScript(); if (!items.length) return;
@@ -363,7 +364,8 @@
         var qt = document.getElementById('studentQuestionText');
         if (!qt || document.getElementById('cmReadBar')) return !!document.getElementById('cmReadBar');
         bar = document.createElement('div'); bar.id = 'cmReadBar'; bar.className = 'cm-readbar';
-        bar.innerHTML = '<button type="button" id="cmReadBtn" class="cm-rb-main"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span>Read aloud</span></button>' +
+        bar.innerHTML = '<button type="button" id="cmReadSwitch" class="cm-rb-switch" role="switch" aria-checked="true"><span class="cm-sw-track"><i></i></span><span class="cm-sw-label">Read aloud: On</span></button>' +
+            '<button type="button" id="cmReadBtn" class="cm-rb-main"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span>Read question</span></button>' +
             '<button type="button" id="cmPauseBtn" class="cm-rb-sub" style="display:none"><span>Pause</span></button>' +
             '<button type="button" id="cmGearBtn" class="cm-rb-gear" aria-label="Voice settings" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>' +
             '<div class="cm-rb-panel" id="cmReadPanel" hidden><label>Voice type <select id="cmGender"><option value="f">Female</option><option value="m">Male</option></select></label><label class="cm-rb-check"><input type="checkbox" id="cmAuto"> Read each new question automatically</label><label>Speed <select id="cmRate"><option value="0.75">Slow</option><option value="1">Normal</option><option value="1.25">Fast</option></select></label><label>Voice <select id="cmVoice"></select></label><small id="cmReadStatus"></small></div>';
@@ -371,6 +373,16 @@
         btnRead = bar.querySelector('#cmReadBtn'); btnPause = bar.querySelector('#cmPauseBtn'); btnGear = bar.querySelector('#cmGearBtn');
         panel = bar.querySelector('#cmReadPanel'); selRate = bar.querySelector('#cmRate'); selVoice = bar.querySelector('#cmVoice'); statusEl = bar.querySelector('#cmReadStatus');
         selRate.value = String(prefs.rate);
+        var sw = bar.querySelector('#cmReadSwitch');
+        function applyEnabled(fromUser) {
+            sw.setAttribute('aria-checked', String(!!prefs.enabled));
+            sw.querySelector('.cm-sw-label').textContent = 'Read aloud: ' + (prefs.enabled ? 'On' : 'Off');
+            bar.classList.toggle('cm-off', !prefs.enabled);
+            if (!prefs.enabled) { stop(); panel.hidden = true; btnGear.setAttribute('aria-expanded', 'false'); }
+            else if (fromUser) start();
+        }
+        sw.addEventListener('click', function () { prefs.enabled = !prefs.enabled; save(); applyEnabled(true); });
+        applyEnabled(false);
         var selGender = bar.querySelector('#cmGender'), chkAuto = bar.querySelector('#cmAuto');
         selGender.value = prefs.gender; chkAuto.checked = !!prefs.auto;
         selGender.addEventListener('change', function () { prefs.gender = selGender.value === 'm' ? 'm' : 'f'; prefs.voice = ''; save(); fillVoices(); if (state !== 'idle') start(); else { start(); } });
@@ -391,7 +403,7 @@
             lastKey = k;
             if (state !== 'idle') stop();
             clearTimeout(autoTimer);
-            if (k && prefs.auto && synth && !root.studentIsTimeUp) autoTimer = setTimeout(function () { if (keyNow() === lastKey && !root.studentIsTimeUp) start(); }, 450);
+            if (k && prefs.enabled && prefs.auto && synth && !root.studentIsTimeUp) autoTimer = setTimeout(function () { if (keyNow() === lastKey && !root.studentIsTimeUp) start(); }, 450);
         }
         if (root.MutationObserver) new MutationObserver(onChange).observe(qt, { childList: true, characterData: true, subtree: true });
         return true;
