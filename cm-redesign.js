@@ -57,7 +57,26 @@
         lay.classList.toggle('cm-rail');
     }, true);
 
-    function tick() { syncTeacher(); pills(); tagSteps(); }
+
+    /* roster search + result avatars */
+    function rosterFilter() {
+        var q = ((document.getElementById('rosterSearch') || {}).value || '').trim().toLowerCase();
+        $$('#rosterEditList .roster-edit-row').forEach(function (r) {
+            var n = ($('.roster-edit-name', r) || {}).value || '', a = ($('.roster-edit-admission', r) || {}).value || '';
+            r.style.display = (!q || (n + ' ' + a).toLowerCase().indexOf(q) > -1) ? '' : 'none';
+        });
+    }
+    document.addEventListener('input', function (e) { if (e.target && e.target.id === 'rosterSearch') rosterFilter(); });
+    function avatars() {
+        $$('#teacherResultsTableBody tr').forEach(function (tr) {
+            if (tr.getAttribute('data-av')) return;
+            var td = tr.children[3]; if (!td || td.getAttribute('colspan')) return;
+            var nm = (td.childNodes[0] && td.childNodes[0].textContent || td.textContent || '').trim();
+            tr.setAttribute('data-av', '1');
+            td.insertAdjacentHTML('afterbegin', '<span class="cm-av">' + initials(nm) + '</span>');
+        });
+    }
+    function tick() { syncTeacher(); pills(); tagSteps(); avatars(); rosterFilter(); }
     function init() {
         tick();
         if (window.MutationObserver) { var t; new MutationObserver(function () { clearTimeout(t); t = setTimeout(tick, 120); }).observe(document.body, { childList: true, subtree: true, characterData: true }); }

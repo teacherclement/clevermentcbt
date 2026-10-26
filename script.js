@@ -3000,7 +3000,10 @@ function renderRosterEditList() {
     }
 
     var cameraIcon = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
-    var html = '';
+    var rtCls = (document.getElementById('rosterClassSelect') || {}).value || '';
+    if (rtCls === 'Other') { var rtC = document.getElementById('rosterCustomClass'); rtCls = (rtC && rtC.value) || rtCls; }
+    var trashIcon = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+    var html = '<div class="rt-head" aria-hidden="true"><span>Photo</span><span>Name</span><span>Admission No.</span><span>Class</span><span>Parent phone</span><span>Actions</span></div>';
     for (var i = 0; i < currentRosterEditEntries.length; i++) {
         var entry = currentRosterEditEntries[i];
         html += '<div class="roster-edit-row" style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">' +
@@ -3011,8 +3014,9 @@ function renderRosterEditList() {
             '</div>' +
             '<input type="text" class="roster-edit-name form-input" style="flex:2; min-width:130px;" placeholder="Student Name" value="' + escapeHtmlAttr(entry.name) + '">' +
             '<input type="text" class="roster-edit-admission form-input" style="flex:1; min-width:110px;" placeholder="Admission Number" value="' + escapeHtmlAttr(entry.admissionNumber) + '">' +
+            '<span class="rt-class-cell">' + escapeHtml(rtCls) + '</span>' +
             '<input type="tel" class="roster-edit-parent form-input" style="flex:1; min-width:120px;" placeholder="Parent phone (optional)" value="' + escapeHtmlAttr(entry.parentPhone || '') + '">' +
-            '<button onclick="deleteRosterEditRow(' + i + ')" class="secondary-btn" style="background:#dc3545; color:white; padding:8px 12px;">✕</button>' +
+            '<button onclick="deleteRosterEditRow(' + i + ')" class="secondary-btn" aria-label="Remove student" title="Remove student">' + trashIcon + '</button>' +
             '</div>';
     }
     container.innerHTML = html;

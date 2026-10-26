@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="competition.css">
     <link rel="stylesheet" href="cm-theme.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap">
-    <link rel="stylesheet" href="cm-redesign.css?v=5">
+    <link rel="stylesheet" href="cm-redesign.css?v=6">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
@@ -749,9 +749,7 @@
         <div class="dash-panel" id="rosterSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
             <h3 style="margin-bottom:12px;">Class Roster</h3>
             <p class="helper-text" style="margin-bottom:10px;">Upload the list of students expected in a class (with admission numbers) so only those students can take assessments published for this class, and so you can see who hasn't submitted yet.</p>
-            <div class="form-group">
-                <label for="rosterClassSelect">Class</label>
-                <select id="rosterClassSelect" class="form-input">
+            <div class="rt-bar"><div class="rt-class"><label for="rosterClassSelect">Class</label><select id="rosterClassSelect" class="form-input">
                     <option value="">-- Select Class --</option>
                     <option value="Primary 1">Primary 1</option>
                     <option value="Primary 2">Primary 2</option>
@@ -770,26 +768,14 @@
                     <option value="University 300">University 300 Level</option>
                     <option value="University 400">University 400 Level</option>
                     <option value="Other">Other</option>
-                </select>
-            </div>
-            <div class="custom-class-wrapper-roster" style="display:none; margin-top:8px; margin-bottom:16px;">
+                </select></div><div class="rt-search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" id="rosterSearch" class="form-input" placeholder="Search students..." autocomplete="off" aria-label="Search students"></div></div><div class="custom-class-wrapper-roster" style="display:none; margin-top:8px; margin-bottom:16px;">
                 <label for="rosterCustomClass">Custom class name</label>
                 <div class="roster-custom-class-entry">
                     <input type="text" id="rosterCustomClass" placeholder="Enter custom class name" class="form-input" autocomplete="off">
                     <button type="button" id="rosterCustomClassLoad" class="secondary-btn" aria-label="Load custom class roster" title="Load this class" onclick="loadCustomRosterClass()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg> Load</button>
                 </div>
                 <p class="helper-text">Enter the exact class name and tap Load to view or edit its roster.</p>
-            </div>
-            <button onclick="downloadRosterTemplate()" class="secondary-btn full-width" style="margin-bottom:12px;">1. Download Roster Template for This Class</button>
-            <p class="helper-text" style="margin-bottom:12px;">Fill in each student's Name and Admission Number in the downloaded spreadsheet, then upload it back below.</p>
-            <div class="form-group">
-                <label for="rosterFileInput">2. Upload Filled-In Roster</label>
-                <input type="file" id="rosterFileInput" accept=".xlsx,.xls,.csv" class="form-input">
-            </div>
-            <button onclick="handleRosterFileUpload()" class="primary-btn full-width">Upload Roster</button>
-            <p id="rosterUploadStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
-
-            <div id="rosterEditWrapper" style="display:none; margin-top:20px; border-top:1.5px solid #eef2f6; padding-top:16px;">
+            </div><div id="rosterEditWrapper" style="display:none; margin-top:20px; border-top:1.5px solid #eef2f6; padding-top:16px;">
                 <h4 style="margin-bottom:4px;">3. Edit This Class's Roster</h4>
                 <p class="helper-text" style="margin-bottom:12px;">Fix a typo, add one student, or remove someone - without redoing the whole spreadsheet.</p>
                 <div class="roster-photo-bulk">
@@ -807,7 +793,14 @@
                 <button onclick="addRosterEditRow()" class="secondary-btn full-width" style="margin-top:8px;">+ Add Student</button>
                 <button onclick="saveRosterEdits()" class="primary-btn full-width" style="margin-top:10px;">Save Changes</button>
                 <p id="rosterEditStatus" class="helper-text" style="display:none; margin-top:10px;"></p>
+            </div><details class="rt-import"><summary>Import roster from a spreadsheet</summary><div class="rt-import-body"><button onclick="downloadRosterTemplate()" class="secondary-btn full-width" style="margin-bottom:12px;">1. Download Roster Template for This Class</button>
+            <p class="helper-text" style="margin-bottom:12px;">Fill in each student's Name and Admission Number in the downloaded spreadsheet, then upload it back below.</p>
+            <div class="form-group">
+                <label for="rosterFileInput">2. Upload Filled-In Roster</label>
+                <input type="file" id="rosterFileInput" accept=".xlsx,.xls,.csv" class="form-input">
             </div>
+            <button onclick="handleRosterFileUpload()" class="primary-btn full-width">Upload Roster</button>
+            <p id="rosterUploadStatus" class="helper-text" style="display:none; margin-top:10px;"></p></div></details>
         </div>
 
         <div class="dash-panel" id="analyticsSection" style="margin-top:0; background:#f8fafc; padding:20px; border-radius:12px; border:1.5px solid #eef2f6;">
@@ -1530,6 +1523,6 @@
     </div>
 
     <script src="cm-theme.js?v=1"></script>
-    <script src="cm-redesign.js?v=2"></script>
+    <script src="cm-redesign.js?v=3"></script>
 </body>
 </html>

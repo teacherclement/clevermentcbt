@@ -448,3 +448,73 @@ td{padding:13px 14px!important;font-size:13.5px}
 .cm-score.ok{background:var(--r-success-soft);color:#047857}
 .cm-score.warn{background:var(--r-warn-soft);color:#b45309}
 .cm-score.bad{background:var(--r-danger-soft);color:#b91c1c}
+
+/* =====================================================================
+   v6: Class Roster as the board's table + Results table the same way
+   ===================================================================== */
+#rosterSection{background:var(--r-surface)!important;padding:22px!important}
+#rosterSection>h3{font-size:24px!important;font-weight:800;margin:0 0 4px!important}
+#rosterSection>.helper-text{margin-bottom:16px!important}
+.rt-bar{display:flex;gap:14px;align-items:center;margin:0 0 16px;flex-wrap:wrap}
+.rt-class{display:flex;align-items:center;gap:10px}
+.rt-class label{font-weight:700;font-size:13px;margin:0}
+.rt-class select{min-width:170px;margin:0!important;width:auto!important}
+.rt-search{flex:1;min-width:200px;position:relative}
+.rt-search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--r-muted);pointer-events:none}
+.rt-search input{padding-left:40px!important;margin:0!important;width:100%}
+#rosterEditWrapper{margin-top:6px!important;border-top:0!important;padding-top:0!important}
+#rosterEditWrapper>h4{font-size:15px;font-weight:700;margin:4px 0 2px!important}
+#rosterEditWrapper>.helper-text{margin-bottom:12px!important}
+#rosterEditList{background:var(--r-surface);border:1px solid var(--r-line);border-radius:12px;overflow:hidden;box-shadow:var(--r-shadow)}
+.rt-head{display:none}
+#rosterEditList .roster-edit-row{border:0!important;border-radius:0!important;box-shadow:none!important;border-bottom:1px solid var(--r-line)!important;margin:0!important;padding:14px 16px!important;background:var(--r-surface)!important}
+#rosterEditList .roster-edit-row:last-child{border-bottom:0!important}
+#rosterEditList .roster-edit-row:hover{background:var(--r-primary-soft)!important}
+#rosterEditList .rt-class-cell{display:none}
+#rosterEditList .roster-edit-row .form-input{background:transparent!important;border:1.5px solid transparent!important;box-shadow:none!important;padding-left:8px!important;font-weight:600;color:var(--r-text)!important}
+#rosterEditList .roster-edit-row .form-input:hover{border-color:var(--r-line)!important}
+#rosterEditList .roster-edit-row .form-input:focus{background:var(--r-surface)!important;border-color:var(--r-primary)!important}
+#rosterEditList .roster-edit-parent{font-weight:500!important}
+#rosterEditList>.helper-text{padding:18px}
+#rosterEditList .roster-edit-row>button.secondary-btn svg{display:block;margin:auto}
+@media(min-width:900px){
+  .rt-head{display:grid;grid-template-columns:62px minmax(0,2fr) minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.3fr) 44px;gap:12px;padding:12px 16px;background:#f1f5fc;border-bottom:1px solid var(--r-line);font-size:12px;font-weight:700;color:var(--r-muted);text-transform:none}
+  html[data-cm-dark] .rt-head{background:#1d2a58}
+  .rt-head span:last-child{text-align:center}
+  #rosterEditList .roster-edit-row{grid-template-columns:62px minmax(0,2fr) minmax(0,1.3fr) minmax(0,1fr) minmax(0,1.3fr) 44px!important;grid-template-rows:auto!important}
+  #rosterEditList .rt-class-cell{display:block;grid-column:4;grid-row:1;font-weight:600;font-size:13.5px;color:var(--r-text)}
+  #rosterEditList .roster-edit-name{grid-column:2;grid-row:1}
+  #rosterEditList .roster-edit-admission{grid-column:3;grid-row:1}
+  #rosterEditList .roster-edit-parent{grid-column:5;grid-row:1}
+  #rosterEditList .roster-edit-row>button.secondary-btn{grid-column:6;grid-row:1}
+}
+.rt-import{margin-top:18px;border:1px solid var(--r-line);border-radius:12px;background:var(--r-surface);padding:0}
+.rt-import summary{cursor:pointer;padding:14px 16px;font-weight:700;font-size:14px;color:var(--r-primary);list-style:none}
+.rt-import summary::-webkit-details-marker{display:none}
+.rt-import summary::before{content:"+";display:inline-block;width:22px;height:22px;line-height:20px;text-align:center;border-radius:6px;background:var(--r-primary-soft);margin-right:10px}
+.rt-import[open] summary::before{content:"\2212"}
+.rt-import-body{padding:0 16px 16px}
+#rosterEditWrapper>.secondary-btn,#rosterEditWrapper>.primary-btn{width:auto!important;display:inline-flex;margin-right:10px}
+
+/* ---- Results: toolbar + table in board style ---- */
+#adminSection{background:var(--r-surface)!important;padding:22px!important}
+#adminSection .admin-header{display:block!important}
+#adminSection .admin-header>h3{font-size:24px!important;font-weight:800;margin:0 0 14px!important}
+#adminSection .admin-controls{display:flex!important;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+#adminSection .admin-controls select{width:auto!important;min-width:150px!important;margin:0!important}
+#adminSection #teacherExportXlsxBtn{background:var(--r-success)!important;border-color:var(--r-success)!important}
+#adminSection #teacherClearBtn{background:var(--r-danger-soft)!important;color:#b91c1c!important;border:0!important}
+#adminSection .scrollable-panel,#adminSection .table-wrap,#adminSection .results-table-wrap{border:1px solid var(--r-line)!important;border-radius:12px!important;box-shadow:var(--r-shadow)!important;background:var(--r-surface)!important;overflow:auto}
+#adminSection table{border:0!important;border-radius:0!important;width:100%;border-collapse:separate;border-spacing:0}
+#adminSection thead th{background:#f1f5fc!important;color:var(--r-muted)!important;font-size:11.5px!important;letter-spacing:.05em;padding:13px 14px!important;position:sticky;top:0}
+html[data-cm-dark] #adminSection thead th{background:#1d2a58!important}
+#adminSection tbody td{padding:15px 14px!important;border-bottom:1px solid var(--r-line)!important;vertical-align:middle;color:var(--r-text)!important}
+#adminSection tbody tr:hover td{background:var(--r-primary-soft)!important}
+#adminSection tbody td.score-high,#adminSection tbody td.score-mid,#adminSection tbody td.score-low{font-weight:700}
+.cm-av{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--r-primary-soft);color:var(--r-primary);font-weight:800;font-size:11.5px;margin-right:10px;vertical-align:middle;flex:0 0 32px}
+#teacherResultsTableBody td:nth-child(4){font-weight:700}
+.rt-search svg{z-index:2;stroke:var(--r-muted)}
+#rosterEditWrapper[style*="block"]{display:flex!important;flex-direction:column}
+#rosterEditWrapper .roster-photo-bulk{order:9;margin-top:16px}
+#rosterEditWrapper>.secondary-btn,#rosterEditWrapper>.primary-btn{align-self:flex-start}
+#rosterEditWrapper>#pinPanel{order:5}
