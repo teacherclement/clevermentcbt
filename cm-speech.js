@@ -249,23 +249,45 @@
     /* ---------------- UI + speaking ---------------- */
     var synth = root.speechSynthesis;
     var KEY = 'cm_speech_prefs';
-    var prefs = { rate: 1, voice: '' };
-    try { var sv = JSON.parse(localStorage.getItem(KEY) || '{}'); if (sv.rate) prefs.rate = sv.rate; if (sv.voice) prefs.voice = sv.voice; } catch (e) {}
+    var prefs = { rate: 1, voice: '', gender: 'f', auto: true };
+    try { var sv = JSON.parse(localStorage.getItem(KEY) || '{}'); if (sv.rate) prefs.rate = sv.rate; if (sv.voice) prefs.voice = sv.voice; if (sv.gender === 'm' || sv.gender === 'f') prefs.gender = sv.gender; if (sv.auto === false) prefs.auto = false; } catch (e) {}
     function save() { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {} }
 
     var state = 'idle', token = 0, bar, btnRead, btnPause, btnGear, panel, selRate, selVoice, statusEl;
 
+    var FEMALE = /female|zira|samantha|susan|hazel|aria|jenny|emma|libby|sonia|natasha|moira|tessa|karen|fiona|victoria|ava|joanna|salli|kimberly|ivy|allison|amy|kendra|nicole|olivia|serena|veena|heera|catherine|linda|michelle|ana|clara|mia|zoe|siri|kate|stephanie|lucy|ruth|ellen|yara|imogen|grace/i;
+    var MALE = /(^|[^a-z])male|david|mark|daniel|alex|fred|george|james|guy|ryan|thomas|oliver|rishi|aaron|arthur|matthew|joey|justin|brian|russell|gordon|lee|eric|liam|tom|ravi|hemant|christopher|william|connor|prabhat|mike|paul|roger|davis|jason|tony|ronald/i;
     function voices() { return synth ? (synth.getVoices() || []).filter(function (v) { return /^en/i.test(v.lang); }) : []; }
-    function pickVoice() {
-        var all = voices(); if (!all.length) return null;
-        if (prefs.voice) { var f = all.filter(function (v) { return v.voiceURI === prefs.voice; })[0]; if (f) return f; }
-        var order = ['en-NG', 'en-GB', 'en-US', 'en-ZA', 'en-AU', 'en-IN'];
-        for (var o = 0; o < order.length; o++) {
-            var c = all.filter(function (v) { return v.lang.replace('_', '-') === order[o]; });
-            if (c.length) { return c.filter(function (v) { return /natural|online|google|neural/i.test(v.name); })[0] || c[0]; }
-        }
-        return all[0];
+    function genderOf(v) {
+        var n = v.name || '';
+        if (/female/i.test(n)) return 'f';
+        if (/(^|[^a-z])male/i.test(n)) return 'm';
+        if (FEMALE.test(n)) return 'f';
+        if (MALE.test(n)) return 'm';
+        return 'u';
     }
+    var LANG_ORDER = ['en-NG', 'en-GB', 'en-US', 'en-ZA', 'en-AU', 'en-IN'];
+    function rank(v) {
+        var l = (v.lang || '').replace('_', '-'), i = LANG_ORDER.indexOf(l);
+        return (i < 0 ? 9 : i) * 10 + (/natural|online|neural|google/i.test(v.name) ? 0 : 5);
+    }
+    function candidates(g) {
+        var all = voices().slice().sort(function (a, b) { return rank(a) - rank(b); });
+        var exact = all.filter(function (v) { return genderOf(v) === g; });
+        return exact;
+    }
+    /* returns {voice, pitch, note} */
+    function chooseVoice() {
+        var all = voices().slice().sort(function (a, b) { return rank(a) - rank(b); });
+        if (!all.length) return { voice: null, pitch: prefs.gender === 'm' ? 0.8 : 1.1, note: '' };
+        var g = prefs.gender, list = candidates(g);
+        if (prefs.voice) { var f = list.filter(function (v) { return v.voiceURI === prefs.voice; })[0]; if (f) return { voice: f, pitch: 1, note: '' }; }
+        if (list.length) return { voice: list[0], pitch: 1, note: '' };
+        /* no voice of that gender on this phone: use the best voice and shift the pitch */
+        var unk = all.filter(function (v) { return genderOf(v) === 'u'; })[0] || all[0];
+        return { voice: unk, pitch: g === 'm' ? 0.78 : 1.2, note: g === 'm' ? 'No male voice is installed on this phone, so a deeper tone of the default voice is used.' : 'No female voice is installed on this phone, so a higher tone of the default voice is used.' };
+    }
+    function pickVoice() { return chooseVoice().voice; }
 
     function currentQuestion() {
         try {
@@ -313,13 +335,13 @@
         if (!synth) { if (statusEl) { statusEl.textContent = 'This browser cannot read aloud.'; } return; }
         stop();
         var items = buildScript(); if (!items.length) return;
-        var my = ++token, v = pickVoice(), idx = 0; state = 'speaking'; ui();
+        var my = ++token, ch = chooseVoice(), v = ch.voice, idx = 0; state = 'speaking'; ui(); if (statusEl) statusEl.textContent = ch.note;
         function next() {
             if (my !== token) return;
             if (idx >= items.length) { state = 'idle'; clearHighlight(); ui(); return; }
             var it = items[idx++], u = new SpeechSynthesisUtterance(it.say);
             if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-GB';
-            u.rate = prefs.rate; u.pitch = 1;
+            u.rate = prefs.rate; u.pitch = ch.pitch;
             u.onstart = function () { if (my === token) setHighlight(it.opt); };
             u.onend = function () { if (my === token) setTimeout(next, it.opt === -1 && idx < items.length && items[idx].opt === 0 ? 350 : 120); };
             u.onerror = function () { if (my === token) setTimeout(next, 50); };
@@ -334,8 +356,8 @@
     }
     function fillVoices() {
         if (!selVoice) return;
-        var all = voices(), cur = (pickVoice() || {}).voiceURI;
-        selVoice.innerHTML = all.map(function (v) { return '<option value="' + v.voiceURI.replace(/"/g, '&quot;') + '"' + (v.voiceURI === cur ? ' selected' : '') + '>' + v.name.replace(/</g, '') + ' (' + v.lang + ')</option>'; }).join('') || '<option>Default voice</option>';
+        var list = candidates(prefs.gender), cur = chooseVoice().voice;
+        selVoice.innerHTML = list.map(function (v) { return '<option value="' + v.voiceURI.replace(/"/g, '&quot;') + '"' + (cur && v.voiceURI === cur.voiceURI ? ' selected' : '') + '>' + v.name.replace(/</g, '') + ' (' + v.lang + ')</option>'; }).join('') || '<option value="">Default ' + (prefs.gender === 'm' ? 'male' : 'female') + ' tone</option>';
     }
     function build() {
         var qt = document.getElementById('studentQuestionText');
@@ -344,20 +366,34 @@
         bar.innerHTML = '<button type="button" id="cmReadBtn" class="cm-rb-main"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span>Read aloud</span></button>' +
             '<button type="button" id="cmPauseBtn" class="cm-rb-sub" style="display:none"><span>Pause</span></button>' +
             '<button type="button" id="cmGearBtn" class="cm-rb-gear" aria-label="Voice settings" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>' +
-            '<div class="cm-rb-panel" id="cmReadPanel" hidden><label>Speed <select id="cmRate"><option value="0.75">Slow</option><option value="1">Normal</option><option value="1.25">Fast</option></select></label><label>Voice <select id="cmVoice"></select></label><small id="cmReadStatus"></small></div>';
+            '<div class="cm-rb-panel" id="cmReadPanel" hidden><label>Voice type <select id="cmGender"><option value="f">Female</option><option value="m">Male</option></select></label><label class="cm-rb-check"><input type="checkbox" id="cmAuto"> Read each new question automatically</label><label>Speed <select id="cmRate"><option value="0.75">Slow</option><option value="1">Normal</option><option value="1.25">Fast</option></select></label><label>Voice <select id="cmVoice"></select></label><small id="cmReadStatus"></small></div>';
         qt.parentNode.insertBefore(bar, qt);
         btnRead = bar.querySelector('#cmReadBtn'); btnPause = bar.querySelector('#cmPauseBtn'); btnGear = bar.querySelector('#cmGearBtn');
         panel = bar.querySelector('#cmReadPanel'); selRate = bar.querySelector('#cmRate'); selVoice = bar.querySelector('#cmVoice'); statusEl = bar.querySelector('#cmReadStatus');
         selRate.value = String(prefs.rate);
+        var selGender = bar.querySelector('#cmGender'), chkAuto = bar.querySelector('#cmAuto');
+        selGender.value = prefs.gender; chkAuto.checked = !!prefs.auto;
+        selGender.addEventListener('change', function () { prefs.gender = selGender.value === 'm' ? 'm' : 'f'; prefs.voice = ''; save(); fillVoices(); if (state !== 'idle') start(); else { start(); } });
+        chkAuto.addEventListener('change', function () { prefs.auto = chkAuto.checked; save(); });
         btnRead.addEventListener('click', function () { state === 'idle' ? start() : stop(); });
         btnPause.addEventListener('click', pauseToggle);
         btnGear.addEventListener('click', function () { var open = panel.hidden; panel.hidden = !open; btnGear.setAttribute('aria-expanded', String(open)); });
         selRate.addEventListener('change', function () { prefs.rate = parseFloat(selRate.value) || 1; save(); if (state !== 'idle') start(); });
-        selVoice.addEventListener('change', function () { prefs.voice = selVoice.value; save(); if (state !== 'idle') start(); });
+        selVoice.addEventListener('change', function () { prefs.voice = selVoice.value; save(); start(); });
         fillVoices(); ui();
         if (!synth) { btnRead.disabled = true; statusEl.textContent = 'This browser cannot read aloud.'; panel.hidden = false; }
         /* stop reading whenever the question changes */
-        if (root.MutationObserver) new MutationObserver(function () { if (state !== 'idle') stop(); }).observe(qt, { childList: true, characterData: true, subtree: true });
+        var lastKey = null, autoTimer = null;
+        function keyNow() { var q = currentQuestion(); return q ? (root.studentCurrentIndex + ':' + q.question) : null; }
+        function onChange() {
+            var k = keyNow();
+            if (k === lastKey) return;              /* maths re-drawing the same question: ignore */
+            lastKey = k;
+            if (state !== 'idle') stop();
+            clearTimeout(autoTimer);
+            if (k && prefs.auto && synth && !root.studentIsTimeUp) autoTimer = setTimeout(function () { if (keyNow() === lastKey && !root.studentIsTimeUp) start(); }, 450);
+        }
+        if (root.MutationObserver) new MutationObserver(onChange).observe(qt, { childList: true, characterData: true, subtree: true });
         return true;
     }
     function boot() {

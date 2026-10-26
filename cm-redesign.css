@@ -532,3 +532,6 @@ html[data-cm-dark] #adminSection thead th{background:#1d2a58!important}
 .cm-rb-panel label{display:flex;align-items:center;gap:8px;font-weight:600}
 #studentQuestionText.cm-reading{background:var(--r-primary-soft);border-radius:8px;box-shadow:0 0 0 6px var(--r-primary-soft)}
 #studentOptionsContainer .option.cm-reading{border-color:var(--r-primary)!important;background:var(--r-primary-soft)!important;box-shadow:0 0 0 3px rgba(26,79,232,.18)}
+.cm-rb-panel .cm-rb-check{flex:0 0 100%;font-weight:600}
+.cm-rb-panel .cm-rb-check input{width:18px;height:18px;accent-color:var(--r-primary)}
+.cm-rb-panel small{flex:0 0 100%;color:var(--r-muted);font-size:12px}
