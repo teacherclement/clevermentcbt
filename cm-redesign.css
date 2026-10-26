@@ -518,3 +518,17 @@ html[data-cm-dark] #adminSection thead th{background:#1d2a58!important}
 #rosterEditWrapper .roster-photo-bulk{order:9;margin-top:16px}
 #rosterEditWrapper>.secondary-btn,#rosterEditWrapper>.primary-btn{align-self:flex-start}
 #rosterEditWrapper>#pinPanel{order:5}
+
+/* ---- Read aloud bar (assessment page) ---- */
+.cm-readbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:2px 0 12px;position:relative}
+.cm-readbar button{font-family:inherit;cursor:pointer;border-radius:999px;font-weight:700;font-size:13px;display:inline-flex;align-items:center;gap:7px;min-height:38px}
+.cm-rb-main{background:var(--r-primary-soft);color:var(--r-primary);border:1.5px solid var(--r-primary);padding:7px 16px}
+.cm-rb-main.on{background:var(--r-primary);color:#fff}
+.cm-rb-sub{background:var(--r-surface);color:var(--r-text);border:1.5px solid var(--r-line);padding:7px 14px}
+.cm-rb-gear{background:var(--r-surface);color:var(--r-muted);border:1.5px solid var(--r-line);width:38px;justify-content:center;padding:0}
+.cm-rb-panel{flex:0 0 100%;display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;background:var(--r-bg);border:1px solid var(--r-line);border-radius:10px;padding:10px 12px;font-size:13px}
+.cm-rb-panel[hidden]{display:none}
+.cm-rb-panel select{font-family:inherit;font-size:13px;border:1.5px solid var(--r-line);border-radius:8px;padding:6px 8px;background:var(--r-surface);color:var(--r-text);max-width:100%}
+.cm-rb-panel label{display:flex;align-items:center;gap:8px;font-weight:600}
+#studentQuestionText.cm-reading{background:var(--r-primary-soft);border-radius:8px;box-shadow:0 0 0 6px var(--r-primary-soft)}
+#studentOptionsContainer .option.cm-reading{border-color:var(--r-primary)!important;background:var(--r-primary-soft)!important;box-shadow:0 0 0 3px rgba(26,79,232,.18)}
