@@ -12313,6 +12313,7 @@ async function learnLoadGen() {
         window.CMLearnGen.topics = window.CMLearnGen.list();
     }
     if (!window.CMLearnEn) { try { await learnLoadScript('learning-english.js?v=1'); } catch (eEn) {} }
+    if (!window.CMLearnBst) { try { await learnLoadScript('learning-bst.js?v=1'); } catch (eBst) {} }
 }
 function learnFail(e) {
     var m = String((e && e.message) || e || '');
@@ -12401,7 +12402,7 @@ async function learnTopic(id) {
         await learnLoadGen();
         var d;
         if (!window.learnLessons) { try { var rl = await fetch('learning-lessons.json?v=1'); window.learnLessons = rl.ok ? await rl.json() : {}; } catch (e0) { window.learnLessons = {}; } }
-        var NL = window.learnLessons[t.id] || (window.CMLearnEn && window.CMLearnEn.lessons[t.id]);
+        var NL = window.learnLessons[t.id] || (window.CMLearnEn && window.CMLearnEn.lessons[t.id]) || (window.CMLearnBst && window.CMLearnBst.lessons[t.id]);
         if (NL) { d = { title: t.title, summary: t.strand || '', objectives: [], html: learnLessonHtml(NL) }; }
         else if (t.lesson) { d = t.lesson; }
         else {
@@ -12419,7 +12420,7 @@ async function learnTopic(id) {
             return '<div class="cm-flash" style="padding:12px;"><b>Example ' + (i + 1) + '</b>' + (ex.svg || '') + '<p>' + escapeHtml(ex.q) + '</p><p>Answer: <b style="color:#2d9c5c;">' + escapeHtml(ex.options[ex.answer]) + '</b></p><div class="explain"><b>Working:</b> ' + escapeHtml(ex.explain) + '</div></div>';
         }).join('');
         if (t.mistake) extra += '<div class="cm-tip" style="border-left-color:#dc3545;"><b>Common mistake:</b> ' + escapeHtml(t.mistake) + '</div>';
-        extra += '<div class="cm-tip"><b>Remember:</b> ' + (String(t.id).indexOf('p6-eng-') === 0 ? 'read the whole sentence or passage carefully, say each answer in your head, and choose the one that sounds and reads right.' : 'read the question carefully, write your working, and check your answer by estimating or doing the opposite operation.') + '</div>';
+        extra += '<div class="cm-tip"><b>Remember:</b> ' + (String(t.id).indexOf('p6-bst-') === 0 ? 'read the question carefully, think about the science idea, cross out answers you know are wrong, and choose the best one.' : String(t.id).indexOf('p6-eng-') === 0 ? 'read the whole sentence or passage carefully, say each answer in your head, and choose the one that sounds and reads right.' : 'read the question carefully, write your working, and check your answer by estimating or doing the opposite operation.') + '</div>';
         d.html += extra;
         el.innerHTML = '<button type="button" class="secondary-btn" onclick="learnSubject(\'' + learnCur.sub.key + '\')">&larr; ' + escapeHtml(learnCur.sub.name) + '</button><h2>' + escapeHtml(d.title) + '</h2><p class="helper-text">' + escapeHtml(d.summary || '') + '</p>' +
             (d.objectives && d.objectives.length ? '<div class="cm-flash"><b>By the end you can:</b><ul>' + d.objectives.map(function(o) { return '<li>' + escapeHtml(o) + '</li>'; }).join('') + '</ul></div>' : '') +
