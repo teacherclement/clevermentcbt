@@ -12313,7 +12313,8 @@ async function learnLoadGen() {
         window.CMLearnGen.topics = window.CMLearnGen.list();
     }
     if (!window.CMLearnEn) { try { await learnLoadScript('learning-english.js?v=1'); } catch (eEn) {} }
-    if (!window.CMLearnBst) { try { await learnLoadScript('learning-bst.js?v=1'); } catch (eBst) {} }
+    if (!window.CMLearnBst) { try { await learnLoadScript('learning-bst.js?v=2'); } catch (eBst) {} }
+    if (window.CMLearnBst && !window.CMLearnBst.__b2) { try { await learnLoadScript('learning-bst2.js?v=1'); window.CMLearnBst.__b2 = 1; } catch (eBst2) {} }
 }
 function learnFail(e) {
     var m = String((e && e.message) || e || '');
@@ -12341,7 +12342,7 @@ function learnFilter(q) {
 async function learnHome() {
     var el = learnEl(); el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text">Loading...</p>';
     try {
-        if (!learnIndex) { var r = await fetch('learning-index.json?v=5'); if (!r.ok) throw new Error('missing-file:index'); learnIndex = await r.json(); }
+        if (!learnIndex) { var r = await fetch('learning-index.json?v=6'); if (!r.ok) throw new Error('missing-file:index'); learnIndex = await r.json(); }
         el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text">Search for a class, subject or topic, or tap a class below.</p>' + learnSearchBox('Search class, subject or topic...', 'learnGlobalSearch') +
             '<div id="learnList" class="learn-scroll">' + learnIndex.classes.map(function(c) {
                 var ready = c.subjects && c.subjects.length;
