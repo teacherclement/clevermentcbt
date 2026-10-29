@@ -57,6 +57,9 @@ function getPageFromURL() {
     return params.get('page');
 }
 
+// Private address of the staff sign-in. Not linked anywhere on the site. Change this word to change the address.
+var CM_STAFF_DOOR = 'staff-k7x9q2m4';
+
 function updateURL(page) {
     var newURL = window.location.pathname + '?page=' + page;
     var curState = window.history.state;
@@ -147,7 +150,7 @@ function showPageFromURL(page) {
             showTeacherLoginForm();
             updateURL('teacher');
         }
-    } else if (page === 'admin') {
+    } else if (page === CM_STAFF_DOOR) {
         document.getElementById('adminAuth').style.display = 'block';
     } else if (page === 'admin-dashboard') {
         if (localStorage.getItem('cleverment_admin_session') === 'true') {
@@ -156,9 +159,11 @@ function showPageFromURL(page) {
             restoreDashSidebarState('adminDashboard');
             renderAdminDashboard();
         } else {
-            document.getElementById('adminAuth').style.display = 'block';
-            updateURL('admin');
+            document.getElementById('landingPage').style.display = 'block';
+            updateURL('landing');
         }
+    } else {
+        document.getElementById('landingPage').style.display = 'block';
     }
 }
 
@@ -937,7 +942,7 @@ function showAdminLogin() {
     }
     document.getElementById('adminAuth').style.display = 'block';
     document.getElementById('adminPassword').value = '';
-    updateURL('admin');
+    updateURL(CM_STAFF_DOOR);
 }
 
 // ============================================================
@@ -2251,13 +2256,13 @@ function getAvailabilityLabel(a) {
     }
     var now = new Date();
     if (a.availableFrom && now < new Date(a.availableFrom)) {
-        return { text: 'Opens ' + formatDate(new Date(a.availableFrom)), color: '#e67e22' };
+        return { text: 'Will open on ' + cmFmtWhen(a.availableFrom), color: '#e67e22' };
     }
     if (a.availableUntil && now > new Date(a.availableUntil)) {
-        return { text: 'Closed since ' + formatDate(new Date(a.availableUntil)), color: '#dc3545' };
+        return { text: 'Closed on ' + cmFmtWhen(a.availableUntil), color: '#dc3545' };
     }
     if (a.availableUntil) {
-        return { text: 'Live now - closes ' + formatDate(new Date(a.availableUntil)), color: '#2d9c5c' };
+        return { text: 'Live now - will close on ' + cmFmtWhen(a.availableUntil), color: '#2d9c5c' };
     }
     return { text: 'Live now', color: '#2d9c5c' };
 }
@@ -3917,9 +3922,9 @@ async function verifyAssessmentCode(opts) {
                 if (loginStatus) loginStatus.textContent = data.error || 'Please log in with your name and PIN to access this class assessment.';
                 return;
             } else if (data.error === 'not_yet_open') {
-                alert('This assessment is not open yet. It becomes available on ' + formatDate(new Date(data.availableFrom)) + '.');
+                alert('This assessment will open on ' + cmFmtWhen(data.availableFrom) + '.');
             } else if (data.error === 'closed') {
-                alert('This assessment window has closed. It was available until ' + formatDate(new Date(data.availableUntil)) + '.');
+                alert('This assessment closed on ' + cmFmtWhen(data.availableUntil) + '.');
             } else {
                 alert('Invalid assessment code. Please check with your teacher.');
             }
@@ -6368,8 +6373,8 @@ function shareAssessmentOnWhatsApp(assessmentId) {
     lines.push('Open this link (the code is filled in for you):');
     lines.push(link);
     if (a.timeLimit) lines.push('\u23F1 Time: ' + cmFmtDuration(a.timeLimit));
-    if (a.availableFrom) lines.push('\uD83D\uDCC5 Opens: ' + when(a.availableFrom));
-    if (a.availableUntil) lines.push('\uD83D\uDCC5 Closes: ' + when(a.availableUntil));
+    if (a.availableFrom) lines.push('\uD83D\uDCC5 Opens on: ' + cmFmtWhen(a.availableFrom));
+    if (a.availableUntil) lines.push('\uD83D\uDCC5 Closes on: ' + cmFmtWhen(a.availableUntil));
     lines.push('Good luck!');
 
     var url = 'https://wa.me/?text=' + encodeURIComponent(lines.join('\n'));
@@ -6979,7 +6984,7 @@ function adminLogout() {
     document.getElementById('adminAuth').style.display = 'block';
     setDashboardHeaderVisible(true);
     document.getElementById('adminPassword').value = '';
-    updateURL('admin');
+    updateURL(CM_STAFF_DOOR);
 }
 
 async function renderAdminDashboard() {
@@ -9258,7 +9263,7 @@ function cmOnPopState(e) {
         var adminIn = false;
         try { adminIn = !!localStorage.getItem('cleverment_admin_token'); } catch (err) {}
         // Signed-in people go back to the Welcome page, not to a login form.
-        if ((page === 'teacher' && teacherIn) || (page === 'admin' && adminIn)) {
+        if ((page === 'teacher' && teacherIn) || (page === CM_STAFF_DOOR && adminIn)) {
             page = 'landing';
             window.history.replaceState({ page: 'landing' }, '', path + '?page=landing');
         }
@@ -10133,9 +10138,7 @@ async function loadStudentAssessments() {
             '</div>' +
             '<div class="sa-listbox"><div class="sa-listhead"><h3>Available Assessments</h3><button type="button" class="sa-viewall" onclick="studentAreaShow(\'todo\')">View all</button></div>' +
             (saTodo.length ? saTodo.slice(0, 3).map(function(x) {
-                var meta = escapeHtml(x.className) + ' | ' + x.questionCount + ' questions' + (x.timeLimit ? ' | ' + cmFmtDuration(x.timeLimit) : '');
-                return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div></div>' +
-                    (x.status === 'open' ? '<button type="button" class="primary-btn" data-code="' + escapeHtml(x.code) + '" onclick="studentAreaStart(this.getAttribute(\'data-code\'))">Start</button>' : '<span class="sa-badge">' + (x.status === 'upcoming' ? 'Opens soon' : 'Closed') + '</span>') + '</div>';
+                return cmStudentCard(x);
             }).join('') : '<p class="helper-text" style="padding:8px 4px;">You are all caught up. New assessments from your teacher will appear here.</p>') +
             '</div>' +
             '<div class="sa-quick-actions" style="margin-top:14px;"><button type="button" class="secondary-btn" onclick="loadStudentAssessments()">Refresh dashboard</button></div>';
@@ -10144,27 +10147,52 @@ async function loadStudentAssessments() {
     }
 }
 
+// "Saturday, 31st October, 2026 at 12:00am" - one date style used for every assessment open/close time
+function cmOrd(n) { var t = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (t[(v - 20) % 10] || t[v] || t[0]); }
+function cmFmtWhen(v) {
+    var d = new Date(v);
+    if (!v || isNaN(d.getTime())) return '';
+    var h = d.getHours(), m = d.getMinutes(), ap = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12;
+    return d.toLocaleDateString('en-GB', { weekday: 'long' }) + ', ' + cmOrd(d.getDate()) + ' ' + d.toLocaleDateString('en-GB', { month: 'long' }) + ', ' + d.getFullYear() + ' at ' + h + ':' + (m < 10 ? '0' : '') + m + ap;
+}
+function cmStudentNotes(x) {
+    var e = escapeHtml, out = '', st = x.status;
+    function line(txt, col) { return '<div style="font-size:12.5px;margin-top:6px;font-weight:600;color:' + col + ';">' + txt + '</div>'; }
+    if (st === 'upcoming') {
+        out += x.from ? line('\uD83D\uDD52 This assessment will open on ' + e(cmFmtWhen(x.from)) + '.', '#b45309') : line('\uD83D\uDD52 This assessment has not opened yet.', '#b45309');
+        if (x.until) out += line('\u23F3 It will close on ' + e(cmFmtWhen(x.until)) + '.', '#6b7a8f');
+    } else if (st === 'closed') {
+        if (x.until) out += line('\uD83D\uDD12 This assessment closed on ' + e(cmFmtWhen(x.until)) + '.', '#b42318');
+    } else if (x.until) {
+        out += line('\u23F3 This assessment will close on ' + e(cmFmtWhen(x.until)) + '.', '#2d9c5c');
+    }
+    if (x.cameraMonitoring || x.noiseMonitoring) {
+        var b = [];
+        if (x.cameraMonitoring) b.push('\uD83D\uDCF7 Camera monitoring');
+        if (x.noiseMonitoring) b.push('\uD83C\uDF99 Noise detection');
+        out += '<div style="margin-top:7px;display:flex;flex-wrap:wrap;gap:6px;">' + b.map(function(t) { return '<span style="background:#fdecec;color:#b42318;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:700;">' + t + '</span>'; }).join('') + '</div>' +
+            '<div class="helper-text" style="margin-top:4px;font-size:11.5px;">' + (x.cameraMonitoring && x.noiseMonitoring ? 'Allow your camera and microphone when you start.' : (x.cameraMonitoring ? 'Allow your camera when you start.' : 'Allow your microphone when you start.')) + '</div>';
+    }
+    return out;
+}
+function cmStudentCard(x) {
+    var meta = escapeHtml(x.className) + ' \u00B7 ' + x.questionCount + ' questions' + (x.timeLimit ? ' \u00B7 ' + cmFmtDuration(x.timeLimit) : '');
+    var right = x.status === 'open' ? '<button type="button" class="primary-btn" data-code="' + escapeHtml(x.code) + '" onclick="studentAreaStart(this.getAttribute(\'data-code\'))">Start</button>' : '<span class="sa-badge">' + (x.status === 'upcoming' ? 'Opens soon' : 'Closed') + '</span>';
+    return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div>' + cmStudentNotes(x) + '</div>' + right + '</div>';
+}
+
 function renderStudentTodo(list) {
     var el = document.getElementById('saPanelTodo');
     if (!list.length) { el.innerHTML = '<h2>Available Assessments</h2><p class="helper-text">You are all caught up. New assessments from your teacher will appear here.</p><button type="button" class="secondary-btn" onclick="loadStudentAssessments()">Refresh list</button>'; return; }
-    el.innerHTML = list.map(function(x) {
-        var label = x.status === 'upcoming' ? 'Opens soon' : (x.status === 'closed' ? 'Closed' : 'Start');
-        var meta = escapeHtml(x.className) + ' · ' + x.questionCount + ' questions' + (x.timeLimit ? ' · ' + cmFmtDuration(x.timeLimit) : '') +
-            (x.until ? ' · closes ' + escapeHtml(new Date(x.until).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : '');
-        return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div></div>' +
-            (x.status === 'open' ? '<button type="button" class="primary-btn" data-code="' + escapeHtml(x.code) + '" onclick="studentAreaStart(this.getAttribute(\'data-code\'))">' + label + '</button>' : '<span class="sa-badge">' + label + '</span>') + '</div>';
-    }).join('');
+    el.innerHTML = list.map(cmStudentCard).join('');
 }
 
 function renderStudentClosed(list) {
     var el = document.getElementById('saPanelClosed');
     if (!el) return;
     if (!list.length) { el.innerHTML = '<h2>Closed Assessments</h2><p class="helper-text">Assessments whose time has ended and that you did not take will appear here.</p>'; return; }
-    el.innerHTML = '<h2 style="margin:0 0 12px;">Closed Assessments</h2><p class="helper-text" style="margin:0 0 12px;">These assessments are no longer open. Ask your teacher if you missed one.</p>' + list.map(function(x) {
-        var meta = escapeHtml(x.className) + ' · ' + x.questionCount + ' questions' + (x.timeLimit ? ' · ' + cmFmtDuration(x.timeLimit) : '') +
-            (x.until ? ' · closed ' + escapeHtml(new Date(x.until).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) : '');
-        return '<div class="sa-card"><div><b>' + escapeHtml(x.subject) + '</b><div class="helper-text">' + meta + '</div></div><span class="sa-badge">Closed</span></div>';
-    }).join('');
+    el.innerHTML = '<h2 style="margin:0 0 12px;">Closed Assessments</h2><p class="helper-text" style="margin:0 0 12px;">These assessments are no longer open. Ask your teacher if you missed one.</p>' + list.map(cmStudentCard).join('');
 }
 
 function renderStudentDone(list) {
@@ -12477,3 +12505,17 @@ function learnAnswer(ix) {
     document.getElementById('lnFeed').innerHTML = '<p class="learn-verdict" style="color:' + (ok ? '#2d9c5c' : '#dc3545') + ';">' + (ok ? 'Correct!' : 'Not correct.') + '</p><div class="explain">' + escapeHtml(q.explain) + '</div><button type="button" class="primary-btn" style="margin-top:10px;" onclick="learnRun.answered=false;learnRun.i++;learnShow()">' + (R.i + 1 >= R.qs.length ? 'See results' : 'Next question') + '</button>';
     renderMathIn(document.getElementById('lnFeed'));
 }
+
+
+// Hidden staff door: tap the (c) line in the footer 7 times within 5 seconds to open the staff sign-in.
+(function () {
+    var taps = [];
+    var f = document.getElementById('mainFooter');
+    if (!f) return;
+    f.addEventListener('click', function () {
+        var n = Date.now();
+        taps = taps.filter(function (t) { return n - t < 5000; });
+        taps.push(n);
+        if (taps.length >= 7) { taps = []; if (typeof showAdminLogin === 'function') showAdminLogin(); }
+    });
+})();
