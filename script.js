@@ -7185,6 +7185,7 @@ async function renderAdminTeacherList() {
                 '<br><span style="color:#6b7a8f; font-size:12px;">' + cmLoginText(teachers[i]) + '</span>' +
                 '</div>' +
                 '<div style="display:flex; gap:6px;">' +
+                '<button onclick="adminManageTeacherFeatures(\'' + encodeURIComponent(String(teachers[i].id)) + '\',\'' + encodeURIComponent(String(teachers[i].name || '')).replace(/'/g, '%27') + '\')" class="secondary-btn" style="font-size:12px; padding:4px 12px;">Features</button>' +
                 '<button onclick="adminPauseTeacher(' + teachers[i].id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:' + pauseColor + '; color:white;">' + pauseText + '</button>' +
                 '<button onclick="adminDeleteTeacher(' + teachers[i].id + ')" class="secondary-btn" style="font-size:12px; padding:4px 12px; background:#dc3545; color:white;">Remove</button>' +
                 '</div></div>';
@@ -10454,7 +10455,9 @@ function exportStudentPinsCsv() {
 
 
 function showTeacherSection(panelId, btn) {
+    if (panelId === 'competitionSection' && window.cmTeacherFeaturePermissions && window.cmTeacherFeaturePermissions.liveCompetition === false) { alert('Live Competition has been disabled for your account by the administrator.'); return; }
     showDashSection('teacherDashboard', panelId, btn);
+    if (typeof cmApplyTeacherFeaturePermissions === 'function') cmApplyTeacherFeaturePermissions();
     if (typeof cmShowAnnouncements === 'function') { cmShowAnnouncements('teachers', 'teacherAnnounce'); teacherMsgBadge(); }
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
         loadTeacherAnalytics();
@@ -12518,4 +12521,93 @@ function learnAnswer(ix) {
         taps.push(n);
         if (taps.length >= 7) { taps = []; if (typeof showAdminLogin === 'function') showAdminLogin(); }
     });
+})();
+
+
+// ============================================================
+// Per-teacher feature permissions (administrator-controlled)
+// ============================================================
+var CM_FEATURE_CATALOG = [
+ {key:'liveCompetition', label:'Live Competition', detail:'Host and manage live competitive assessments'},
+ {key:'createAssessments', label:'Create Assessments', detail:'Create and edit assessments'},
+ {key:'questionBank', label:'Question Bank', detail:'Manage saved questions'},
+ {key:'studentReports', label:'Student Reports', detail:'View student results and reports'},
+ {key:'certificates', label:'Certificates', detail:'Generate achievement certificates'},
+ {key:'learningResources', label:'Learning Resources', detail:'Access teaching and learning resources'},
+ {key:'classRoster', label:'Class Roster', detail:'Manage class lists and student records'},
+ {key:'messaging', label:'Messaging', detail:'Use teacher and student messaging'}
+];
+async function adminManageTeacherFeatures(id, name) {
+    try { id = decodeURIComponent(id); name = decodeURIComponent(name || ''); } catch(e) {}
+    var token = localStorage.getItem('cleverment_admin_token');
+    if (!token) { alert('Please log in as administrator again.'); return; }
+    var overlay = document.getElementById('cmFeaturePermissionModal');
+    if (!overlay) {
+      overlay = document.createElement('div'); overlay.id = 'cmFeaturePermissionModal';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:18px;';
+      overlay.innerHTML = '<section role="dialog" aria-modal="true" aria-labelledby="cmFeatureModalTitle" style="width:min(620px,100%);max-height:88vh;overflow:auto;background:var(--cm-surface,#fff);color:var(--cm-text,#172033);border-radius:18px;padding:24px;box-shadow:0 24px 80px rgba(0,0,0,.25)"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div><h2 id="cmFeatureModalTitle" style="margin:0 0 5px">Teacher feature access</h2><p id="cmFeatureTeacherName" style="margin:0;color:#64748b"></p></div><button type="button" id="cmFeatureClose" aria-label="Close" style="border:0;background:transparent;font-size:28px;cursor:pointer">×</button></div><p style="color:#64748b;font-size:13px;margin:16px 0">Disabled features remain visible but unavailable to this teacher. Save changes to apply them.</p><div id="cmFeatureRows"></div><p id="cmFeatureStatus" role="status" style="font-size:13px;color:#64748b"></p><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button type="button" id="cmFeatureCancel" class="secondary-btn">Cancel</button><button type="button" id="cmFeatureSave" class="primary-btn">Save permissions</button></div></section>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('#cmFeatureClose').onclick = overlay.querySelector('#cmFeatureCancel').onclick = function(){ overlay.remove(); };
+    }
+    overlay.style.display = 'flex'; overlay.querySelector('#cmFeatureTeacherName').textContent = name || ('Teacher #' + id);
+    var rows = overlay.querySelector('#cmFeatureRows'), status = overlay.querySelector('#cmFeatureStatus'), saveBtn = overlay.querySelector('#cmFeatureSave');
+    rows.innerHTML = '<p style="color:#64748b">Loading permissions…</p>'; status.textContent = ''; saveBtn.disabled = true;
+    try {
+      var response = await fetch(BACKEND_URL + '/api/admin/teachers/' + encodeURIComponent(id) + '/features', {headers:{Authorization:'Bearer ' + token}});
+      var payload = await response.json();
+      if (!response.ok) throw new Error(payload.migrationRequired ? 'Run supabase_feature_permissions.sql in the Supabase SQL Editor first.' : (payload.error || 'Could not load permissions.'));
+      var current = payload.features || {};
+      rows.innerHTML = CM_FEATURE_CATALOG.map(function(f){ var on = current[f.key] !== false; return '<label style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid #e5eaf0;cursor:pointer"><span><strong style="display:block;font-size:14px">'+f.label+'</strong><small style="display:block;color:#64748b;margin-top:3px">'+f.detail+'</small></span><input type="checkbox" data-feature="'+f.key+'" '+(on?'checked':'')+' style="width:20px;height:20px;accent-color:#2563eb;flex-shrink:0"></label>'; }).join('');
+      saveBtn.disabled = false;
+      saveBtn.onclick = async function(){
+        var features = {}; Array.prototype.forEach.call(rows.querySelectorAll('[data-feature]'),function(el){features[el.getAttribute('data-feature')]=el.checked;});
+        saveBtn.disabled = true; status.textContent = 'Saving permissions…';
+        try { var r = await fetch(BACKEND_URL + '/api/admin/teachers/' + encodeURIComponent(id) + '/features',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({features:features})}); var d = await r.json(); if(!r.ok) throw new Error(d.migrationRequired?'Run supabase_feature_permissions.sql in the Supabase SQL Editor first.':(d.error||'Save failed.')); status.textContent='Permissions saved successfully.'; status.style.color='#16845b'; }
+        catch(e){status.textContent=e.message;status.style.color='#b42318';} finally {saveBtn.disabled=false;}
+      };
+    } catch(e) { rows.innerHTML = '<p style="color:#b42318">'+String(e.message).replace(/</g,'&lt;')+'</p>'; status.textContent=''; }
+}
+async function cmApplyTeacherFeaturePermissions() {
+  if (window.cmTeacherFeaturePermissions || window.cmFeaturePermissionRequest) return window.cmFeaturePermissionRequest || Promise.resolve();
+  var token = localStorage.getItem('cleverment_teacher_token');
+  if (!token || !document.getElementById('teacherDashboard')) return;
+  try {
+    window.cmFeaturePermissionRequest = fetch(BACKEND_URL + '/api/teacher/features', {headers:{Authorization:'Bearer '+token}});
+    var r = await window.cmFeaturePermissionRequest;
+    if (!r.ok) return;
+    var d = await r.json(), features = d.features || {};
+    var map = {'competitionSection':'liveCompetition'};
+    Object.keys(map).forEach(function(panelId){
+      var nav = document.querySelector('#teacherDashboard .dash-nav-item[data-target="'+panelId+'"]');
+      var disabled = features[map[panelId]] === false;
+      if (!nav) return;
+      nav.classList.toggle('cm-feature-disabled', disabled);
+      nav.setAttribute('aria-disabled', String(disabled));
+      nav.title = disabled ? 'This feature has been disabled by your administrator' : '';
+      if (!nav.getAttribute('data-cm-feature-guard')) {
+        nav.setAttribute('data-cm-feature-guard', '1');
+        nav.addEventListener('click', function(ev) {
+          if (this.getAttribute('aria-disabled') !== 'true') return;
+          ev.preventDefault(); ev.stopPropagation();
+          if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+          var note = document.getElementById('cmFeatureDisabledNotice');
+          if (!note) { note = document.createElement('div'); note.id = 'cmFeatureDisabledNotice'; note.setAttribute('role','status'); note.style.cssText = 'position:fixed;z-index:100001;left:50%;bottom:22px;transform:translateX(-50%);max-width:calc(100vw - 32px);padding:12px 16px;border-radius:10px;background:#18233d;color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.22);font:500 13px/1.45 Inter,Arial,sans-serif;text-align:center'; document.body.appendChild(note); }
+          note.textContent = 'This feature has been disabled for your account by the administrator.';
+          note.style.display = 'block';
+          if (note._cmHide) clearTimeout(note._cmHide);
+          note._cmHide = setTimeout(function(){ note.style.display='none'; }, 3200);
+        }, true);
+      }
+      if (disabled) nav.style.cssText += ';opacity:.42;filter:grayscale(1);cursor:not-allowed';
+      else { nav.style.opacity=''; nav.style.filter=''; nav.style.cursor=''; }
+    });
+    window.cmTeacherFeaturePermissions = features;
+  } catch(e) { window.cmFeaturePermissionRequest = null; /* permissions service unavailable: do not silently alter existing workflows */ }
+}
+
+// Re-apply feature state when the teacher dashboard becomes visible after login.
+(function cmWatchTeacherDashboardVisibility(){
+  function apply(){ var el=document.getElementById('teacherDashboard'); if(el && el.style.display !== 'none' && typeof cmApplyTeacherFeaturePermissions==='function') cmApplyTeacherFeaturePermissions(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply); else apply();
+  if(typeof MutationObserver!=='undefined' && document.body) new MutationObserver(function(){apply();}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['style','class']});
 })();

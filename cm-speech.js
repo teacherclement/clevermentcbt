@@ -1,5 +1,4 @@
-/* CleverMent read-aloud: reads the question and options on the assessment page,
-   turning LaTeX maths/science into spoken words. Uses the phone's built-in voices (free, no server). */
+/* CleverMent read-aloud: speaks assessment questions and LaTeX using either configured neural voices or device voices. */
 (function (root) {
     'use strict';
 
@@ -253,7 +252,7 @@
     try { var sv = JSON.parse(localStorage.getItem(KEY) || '{}'); if (sv.rate) prefs.rate = sv.rate; if (sv.voice) prefs.voice = sv.voice; if (sv.gender === 'm' || sv.gender === 'f') prefs.gender = sv.gender; if (sv.auto === false) prefs.auto = false; if (sv.enabled === false) prefs.enabled = false; } catch (e) {}
     function save() { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {} }
 
-    var state = 'idle', token = 0, bar, btnRead, btnPause, btnGear, panel, selRate, selVoice, statusEl;
+    var state = 'idle', token = 0, bar, btnRead, btnPause, btnGear, panel, selRate, selVoice, statusEl, cloudVoices = [], cloudAudio = null, cloudObjectUrl = null;
 
     var FEMALE = /female|zira|samantha|susan|hazel|aria|jenny|emma|libby|sonia|natasha|moira|tessa|karen|fiona|victoria|ava|joanna|salli|kimberly|ivy|allison|amy|kendra|nicole|olivia|serena|veena|heera|catherine|linda|michelle|ana|clara|mia|zoe|siri|kate|stephanie|lucy|ruth|ellen|yara|imogen|grace/i;
     var MALE = /(^|[^a-z])male|david|mark|daniel|alex|fred|george|james|guy|ryan|thomas|oliver|rishi|aaron|arthur|matthew|joey|justin|brian|russell|gordon|lee|eric|liam|tom|ravi|hemant|christopher|william|connor|prabhat|mike|paul|roger|davis|jason|tony|ronald/i;
@@ -279,13 +278,12 @@
     /* returns {voice, pitch, note} */
     function chooseVoice() {
         var all = voices().slice().sort(function (a, b) { return rank(a) - rank(b); });
-        if (!all.length) return { voice: null, pitch: prefs.gender === 'm' ? 0.8 : 1.1, note: '' };
+        if (!all.length) return { voice: null, pitch: 1, note: 'No compatible English voice is available on this device. Install or enable additional system voices, or connect a neural voice provider.' };
         var g = prefs.gender, list = candidates(g);
         if (prefs.voice) { var f = list.filter(function (v) { return v.voiceURI === prefs.voice; })[0]; if (f) return { voice: f, pitch: 1, note: '' }; }
         if (list.length) return { voice: list[0], pitch: 1, note: '' };
-        /* no voice of that gender on this phone: use the best voice and shift the pitch */
-        var unk = all.filter(function (v) { return genderOf(v) === 'u'; })[0] || all[0];
-        return { voice: unk, pitch: g === 'm' ? 0.78 : 1.2, note: g === 'm' ? 'No male voice is installed on this phone, so a deeper tone of the default voice is used.' : 'No female voice is installed on this phone, so a higher tone of the default voice is used.' };
+        /* Never misrepresent pitch-shifting as a voice of the requested gender. */
+        return { voice: null, pitch: 1, note: g === 'm' ? 'No voice identified as male is available on this device. Choose another voice or enable more system voices.' : 'No voice identified as female is available on this device. Choose another voice or enable more system voices.' };
     }
     function pickVoice() { return chooseVoice().voice; }
 
@@ -330,19 +328,54 @@
         btnPause.querySelector('span').textContent = state === 'paused' ? 'Resume' : 'Pause';
         btnRead.setAttribute('aria-label', state === 'idle' ? 'Read this question and its options aloud' : 'Stop reading');
     }
-    function stop() { token++; state = 'idle'; try { synth && synth.cancel(); } catch (e) {} clearHighlight(); ui(); }
+    function stop() { token++; state = 'idle'; try { synth && synth.cancel(); } catch (e) {} if (cloudAudio) { try { cloudAudio.pause(); cloudAudio.src = ''; } catch(e) {} cloudAudio = null; } if (cloudObjectUrl) { try { URL.revokeObjectURL(cloudObjectUrl); } catch(e) {} cloudObjectUrl = null; } clearHighlight(); ui(); }
+    function startCloud(items, my, voiceId) {
+        var idx = 0;
+        if (statusEl) statusEl.textContent = 'Using natural neural voice. Audio is generated securely by CleverMent.';
+        function next() {
+            if (my !== token) return;
+            if (idx >= items.length) { state = 'idle'; clearHighlight(); ui(); return; }
+            var it = items[idx++];
+            if (statusEl) statusEl.textContent = 'Generating speech…';
+            fetch((root.CLEVERMENT_BACKEND_URL || 'https://clevermentcbt-backend.onrender.com') + '/api/tts/speech', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: it.say, voiceId: voiceId })
+            }).then(function(r) {
+                if (!r.ok) return r.json().catch(function(){ return {}; }).then(function(d){ throw new Error(d.error || 'Neural voice generation failed.'); });
+                return r.blob();
+            }).then(function(blob) {
+                if (my !== token) return;
+                if (cloudObjectUrl) URL.revokeObjectURL(cloudObjectUrl);
+                cloudObjectUrl = URL.createObjectURL(blob); cloudAudio = new Audio(cloudObjectUrl); cloudAudio.playbackRate = prefs.rate;
+                cloudAudio.onplay = function(){ if (my === token) { setHighlight(it.opt); if (statusEl) statusEl.textContent = 'Reading with your selected neural voice.'; } };
+                cloudAudio.onended = function(){ if (my === token) setTimeout(next, it.opt === -1 && idx < items.length && items[idx].opt === 0 ? 300 : 80); };
+                cloudAudio.onerror = function(){ if (my === token) { state='idle'; ui(); if(statusEl) statusEl.textContent='Audio playback failed. Please try again.'; } };
+                return cloudAudio.play();
+            }).catch(function(err) {
+                if (my !== token) return;
+                state = 'idle'; ui(); clearHighlight();
+                if (statusEl) statusEl.textContent = err.message || 'Neural voice unavailable. Please try again.';
+            });
+        }
+        next();
+    }
     function start() {
         if (!prefs.enabled) return;
-        if (!synth) { if (statusEl) { statusEl.textContent = 'This browser cannot read aloud.'; } return; }
         stop();
         var items = buildScript(); if (!items.length) return;
-        var my = ++token, ch = chooseVoice(), v = ch.voice, idx = 0; state = 'speaking'; ui(); if (statusEl) statusEl.textContent = ch.note;
+        var my = ++token, idx = 0;
+        if (prefs.voice && prefs.voice.indexOf('cloud:') === 0) {
+            state = 'speaking'; ui(); startCloud(items, my, prefs.voice.slice(6)); return;
+        }
+        if (!synth) { if (statusEl) statusEl.textContent = 'No device voice engine is available. Select a CleverMent neural voice when configured.'; return; }
+        var ch = chooseVoice(), v = ch.voice;
+        if (!v) { state = 'idle'; ui(); if (statusEl) statusEl.textContent = ch.note || 'No suitable voice is available on this device.'; return; }
+        state = 'speaking'; ui(); if (statusEl) statusEl.textContent = ch.note;
         function next() {
             if (my !== token) return;
             if (idx >= items.length) { state = 'idle'; clearHighlight(); ui(); return; }
             var it = items[idx++], u = new SpeechSynthesisUtterance(it.say);
-            if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-GB';
-            u.rate = prefs.rate; u.pitch = ch.pitch;
+            u.voice = v; u.lang = v.lang; u.rate = prefs.rate; u.pitch = 1;
             u.onstart = function () { if (my === token) setHighlight(it.opt); };
             u.onend = function () { if (my === token) setTimeout(next, it.opt === -1 && idx < items.length && items[idx].opt === 0 ? 350 : 120); };
             u.onerror = function () { if (my === token) setTimeout(next, 50); };
@@ -351,14 +384,27 @@
         next();
     }
     function pauseToggle() {
-        if (!synth) return;
-        if (state === 'speaking') { synth.pause(); state = 'paused'; } else if (state === 'paused') { synth.resume(); state = 'speaking'; }
+        if (!synth && !cloudAudio) return;
+        if (state === 'speaking') { if (cloudAudio) cloudAudio.pause(); else if (synth) synth.pause(); state = 'paused'; } else if (state === 'paused') { if (cloudAudio) cloudAudio.play().catch(function(){}); else if (synth) synth.resume(); state = 'speaking'; }
         ui();
     }
     function fillVoices() {
         if (!selVoice) return;
-        var list = candidates(prefs.gender), cur = chooseVoice().voice;
-        selVoice.innerHTML = list.map(function (v) { return '<option value="' + v.voiceURI.replace(/"/g, '&quot;') + '"' + (cur && v.voiceURI === cur.voiceURI ? ' selected' : '') + '>' + v.name.replace(/</g, '') + ' (' + v.lang + ')</option>'; }).join('') || '<option value="">Default ' + (prefs.gender === 'm' ? 'male' : 'female') + ' tone</option>';
+        var list = candidates(prefs.gender).slice(0, 10), cur = chooseVoice().voice;
+        var deviceHtml = list.map(function (v) { return '<option value="' + v.voiceURI.replace(/"/g, '&quot;') + '"' + (prefs.voice === v.voiceURI || (!prefs.voice && cur && v.voiceURI === cur.voiceURI) ? ' selected' : '') + '>' + v.name.replace(/</g, '') + ' (' + v.lang + ') · device</option>'; }).join('');
+        var cloudHtml = cloudVoices.filter(function(v){ return v.gender === prefs.gender; }).map(function(v){ return '<option value="cloud:' + v.id + '"' + (prefs.voice === 'cloud:' + v.id ? ' selected' : '') + '>' + v.name + ' · Neural (' + v.accent + ')</option>'; }).join('');
+        selVoice.innerHTML = '<optgroup label="CleverMent Natural Neural Voices">' + (cloudHtml || '<option value="" disabled>Neural voices require provider setup</option>') + '</optgroup><optgroup label="Voices on this device">' + (deviceHtml || '<option value="" disabled>No matching device voices found</option>') + '</optgroup>';
+        if (!prefs.voice && cur) selVoice.value = cur.voiceURI;
+        if (prefs.voice && prefs.voice.indexOf('cloud:') === 0) selVoice.value = prefs.voice;
+        if (!cloudVoices.length && statusEl) statusEl.textContent = 'Device voices are available now. Natural neural voices activate after the provider API key is configured.';
+    }
+    function loadCloudVoices() {
+        fetch((root.CLEVERMENT_BACKEND_URL || 'https://clevermentcbt-backend.onrender.com') + '/api/tts/voices').then(function(r){return r.ok ? r.json() : null;}).then(function(d){
+            if (!d || !d.available || !Array.isArray(d.voices)) return;
+            cloudVoices = d.voices;
+            if (selGender) { /* list refresh follows the selected voice type */ }
+            fillVoices();
+        }).catch(function(){});
     }
     function build() {
         var qt = document.getElementById('studentQuestionText');
@@ -368,7 +414,7 @@
             '<button type="button" id="cmReadBtn" class="cm-rb-main"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span>Read question</span></button>' +
             '<button type="button" id="cmPauseBtn" class="cm-rb-sub" style="display:none"><span>Pause</span></button>' +
             '<button type="button" id="cmGearBtn" class="cm-rb-gear" aria-label="Voice settings" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>' +
-            '<div class="cm-rb-panel" id="cmReadPanel" hidden><label>Voice type <select id="cmGender"><option value="f">Female</option><option value="m">Male</option></select></label><label class="cm-rb-check"><input type="checkbox" id="cmAuto"> Read each new question automatically</label><label>Speed <select id="cmRate"><option value="0.75">Slow</option><option value="1">Normal</option><option value="1.25">Fast</option></select></label><label>Voice <select id="cmVoice"></select></label><small id="cmReadStatus"></small></div>';
+            '<div class="cm-rb-panel" id="cmReadPanel" hidden><label>Voice type <select id="cmGender"><option value="f">Female</option><option value="m">Male</option></select></label><label class="cm-rb-check"><input type="checkbox" id="cmAuto"> Read each new question automatically</label><label>Speed <select id="cmRate"><option value="0.75">Slow</option><option value="1">Normal</option><option value="1.25">Fast</option></select></label><label>Voice <select id="cmVoice"></select></label><button type="button" id="cmVoicePreview" class="cm-rb-sub">Preview voice</button><small id="cmReadStatus"></small></div>';
         qt.parentNode.insertBefore(bar, qt);
         btnRead = bar.querySelector('#cmReadBtn'); btnPause = bar.querySelector('#cmPauseBtn'); btnGear = bar.querySelector('#cmGearBtn');
         panel = bar.querySelector('#cmReadPanel'); selRate = bar.querySelector('#cmRate'); selVoice = bar.querySelector('#cmVoice'); statusEl = bar.querySelector('#cmReadStatus');
@@ -392,8 +438,10 @@
         btnGear.addEventListener('click', function () { var open = panel.hidden; panel.hidden = !open; btnGear.setAttribute('aria-expanded', String(open)); });
         selRate.addEventListener('change', function () { prefs.rate = parseFloat(selRate.value) || 1; save(); if (state !== 'idle') start(); });
         selVoice.addEventListener('change', function () { prefs.voice = selVoice.value; save(); start(); });
-        fillVoices(); ui();
-        if (!synth) { btnRead.disabled = true; statusEl.textContent = 'This browser cannot read aloud.'; panel.hidden = false; }
+        var previewBtn = bar.querySelector('#cmVoicePreview');
+        if (previewBtn) previewBtn.addEventListener('click', function () { if (prefs.voice && prefs.voice.indexOf('cloud:') === 0) { stop(); var my = ++token; state='speaking'; ui(); startCloud([{say:'Hello. This is a preview of your selected CleverMent assessment reading voice.',opt:-1}],my,prefs.voice.slice(6)); return; } if (!synth) { if(statusEl) statusEl.textContent='No device voice engine is available.'; return; } var ch = chooseVoice(); if (!ch.voice) { if (statusEl) statusEl.textContent = ch.note || 'No suitable voice is available on this device.'; return; } synth.cancel(); var u = new SpeechSynthesisUtterance('Hello. This is a preview of your selected CleverMent assessment reading voice.'); u.voice = ch.voice; u.lang = ch.voice.lang; u.rate = prefs.rate; u.pitch = 1; if (statusEl) statusEl.textContent = 'Previewing ' + ch.voice.name + ' (device voice).'; synth.speak(u); });
+        fillVoices(); loadCloudVoices(); ui();
+        if (!synth) { statusEl.textContent = 'Device voices are unavailable. If CleverMent neural voices are configured, select one below.'; panel.hidden = false; }
         /* stop reading whenever the question changes */
         var lastKey = null, autoTimer = null;
         function keyNow() { var q = currentQuestion(); return q ? (root.studentCurrentIndex + ':' + q.question) : null; }
@@ -403,7 +451,7 @@
             lastKey = k;
             if (state !== 'idle') stop();
             clearTimeout(autoTimer);
-            if (k && prefs.enabled && prefs.auto && synth && !root.studentIsTimeUp) autoTimer = setTimeout(function () { if (keyNow() === lastKey && !root.studentIsTimeUp) start(); }, 450);
+            if (k && prefs.enabled && prefs.auto && (synth || (prefs.voice && prefs.voice.indexOf('cloud:') === 0)) && !root.studentIsTimeUp) autoTimer = setTimeout(function () { if (keyNow() === lastKey && !root.studentIsTimeUp) start(); }, 450);
         }
         if (root.MutationObserver) new MutationObserver(onChange).observe(qt, { childList: true, characterData: true, subtree: true });
         return true;
