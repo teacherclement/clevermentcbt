@@ -12315,6 +12315,8 @@ async function learnLoadGen() {
     if (!window.CMLearnEn) { try { await learnLoadScript('learning-english.js?v=1'); } catch (eEn) {} }
     if (!window.CMLearnBst) { try { await learnLoadScript('learning-bst.js?v=2'); } catch (eBst) {} }
     if (window.CMLearnBst && !window.CMLearnBst.__b2) { try { await learnLoadScript('learning-bst2.js?v=1'); window.CMLearnBst.__b2 = 1; } catch (eBst2) {} }
+    if (window.CMLearnBst && !window.CMLearnBst.__b3) { try { await learnLoadScript('learning-bst3.js?v=1'); window.CMLearnBst.__b3 = 1; } catch (eBst3) {} }
+    if (window.CMLearnBst && !window.CMLearnBst.__more) { try { await learnLoadScript('learning-bst-more.js?v=1'); window.CMLearnBst.__more = 1; } catch (eMore) {} }
 }
 function learnFail(e) {
     var m = String((e && e.message) || e || '');
@@ -12342,7 +12344,7 @@ function learnFilter(q) {
 async function learnHome() {
     var el = learnEl(); el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text">Loading...</p>';
     try {
-        if (!learnIndex) { var r = await fetch('learning-index.json?v=6'); if (!r.ok) throw new Error('missing-file:index'); learnIndex = await r.json(); }
+        if (!learnIndex) { var r = await fetch('learning-index.json?v=7'); if (!r.ok) throw new Error('missing-file:index'); learnIndex = await r.json(); }
         el.innerHTML = '<h2>My Learning Space</h2><p class="helper-text">Search for a class, subject or topic, or tap a class below.</p>' + learnSearchBox('Search class, subject or topic...', 'learnGlobalSearch') +
             '<div id="learnList" class="learn-scroll">' + learnIndex.classes.map(function(c) {
                 var ready = c.subjects && c.subjects.length;
@@ -12391,9 +12393,15 @@ function learnSubject(key) {
 }
 function learnLessonHtml(L) {
     var e = escapeHtml, h = '<h3>What is it?</h3><p>' + e(L.i) + '</p>' + (L.d || '') +
-        '<div class="cm-tip" style="border-left-color:#2d9c5c;"><b>In real life:</b> ' + e(L.r) + '</div>' +
-        '<h3>Key points</h3><ul>' + L.k.map(function(x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ul>';
+        '<div class="cm-tip" style="border-left-color:#2d9c5c;"><b>In real life:</b> ' + e(L.r) + '</div>';
+    if (L.more && L.more.length) h += L.more.map(function(m) { return '<h3>' + e(m[0]) + '</h3><p>' + e(m[1]) + '</p>'; }).join('');
+    if (L.gl && L.gl.length) h += '<h3>Key terms</h3><ul>' + L.gl.map(function(g) { return '<li><b>' + e(g[0]) + '</b> - ' + e(g[1]) + '</li>'; }).join('') + '</ul>';
+    if (L.fa && L.fa.length) h += '<h3>Facts to know</h3><ul>' + L.fa.map(function(x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ul>';
+    if (L.ex && L.ex.length) h += '<h3>Examples to remember</h3><ul>' + L.ex.map(function(g) { return '<li><b>' + e(g[0]) + ':</b> ' + e(g[1]) + '</li>'; }).join('') + '</ul>';
+    h += '<h3>Key points</h3><ul>' + L.k.map(function(x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ul>';
     if (L.e) h += '<h3>Worked example</h3><div class="cm-flash" style="padding:12px;"><p><b>' + e(L.e[0]) + '</b></p><ol>' + L.e[1].map(function(x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ol><p>Answer: <b style="color:#2d9c5c;">' + e(L.e[2]) + '</b></p></div>';
+    if (L.act && L.act.length) h += '<h3>Try it yourself</h3><div class="cm-flash" style="padding:12px;"><p><b>' + e(L.act[0]) + '</b></p><ol>' + L.act[1].map(function(x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ol></div>';
+    if (L.sum) h += '<div class="cm-tip" style="border-left-color:#2563eb;"><b>Summary:</b> ' + e(L.sum) + '</div>';
     return h;
 }
 async function learnTopic(id) {
