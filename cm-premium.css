@@ -696,3 +696,87 @@ html table.cm-rt td .rs-pill,html table.cm-rt td span[style*="border-radius:10px
   html table.cm-rt td{padding:5px 8px!important}
   #teacherResultsTable th:nth-child(2),#teacherResultsTable td:nth-child(2){display:none!important}
 }
+
+/* ==========================================================================
+   BATCH 3: ADMIN, CLEVERBOT, POP-UPS, PHONE PASS
+   ========================================================================== */
+
+/* ---- vertical scrolling inside long lists and tables (header stays visible) ---- */
+html .scrollable-panel{max-height:min(68vh,620px)!important;overflow:auto!important;border-radius:var(--p-r)!important}
+html #teacherResultsTableContainer,html #adminResultsContainer,html .scrollable-panel:has(#teacherResultsTable){max-height:min(76vh,760px)!important}
+html .scrollable-panel table.cm-rt thead th{position:sticky;top:0;z-index:3;box-shadow:0 1px 0 var(--p-line)}
+
+/* ---- admin dashboard ---- */
+#adminDashboard .dash-panel>div:first-child{gap:12px}
+#adminDashboard [style*="background:white"],#adminDashboard [style*="background:#fff;"],#adminDashboard [style*="background: white"]{background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:var(--p-r)!important;box-shadow:var(--p-s1)}
+#adminDashboard [style*="background:#f3fbf6"],#adminDashboard [style*="background:#eef6ff"]{border-radius:var(--p-r)!important}
+#adminDashboard button[style*="background:#2d9c5c"],#adminDashboard button[style*="background:#1d7a45"]{background:var(--p-green)!important;color:#fff!important;border:1px solid #0b7f58!important}
+#adminDashboard select.form-input,#adminDashboard input.form-input{min-height:44px}
+#adminDashboard .admin-controls{background:var(--p-surface-2)}
+#adminDashboard h4{margin-top:22px!important}
+#adminDashboard #adminSecurityBox>div,#adminDashboard #adminSchoolsBox>div,#adminDashboard #adminTeacherList>div{border-radius:var(--p-r)}
+#adminDashboard span[style*="border-radius"][style*="font-size:11px"],#adminDashboard span[style*="border-radius:10px"]{border-radius:999px!important;font-weight:700}
+#adminDashboard .stat-card::before{opacity:.95}
+
+/* ---- CleverBot ---- */
+html #cleverBotFloat{background:linear-gradient(135deg,#2f6df0,#13389c)!important;box-shadow:0 10px 26px rgba(19,56,156,.45)!important;width:54px;height:54px;border:2px solid rgba(255,255,255,.85)}
+html .cleverbot-panel{border-radius:24px!important;border:1px solid var(--p-line)!important;box-shadow:var(--p-s3)!important;background:var(--p-surface)!important}
+html .cleverbot-header{background:radial-gradient(260px 120px at 100% 0,rgba(96,165,250,.45),transparent 62%),linear-gradient(135deg,#081a4b,#13389c)!important;height:66px;flex-basis:66px;padding:12px 16px!important}
+.cleverbot-avatar{background:rgba(255,255,255,.18)!important;border:1px solid rgba(255,255,255,.35)}
+html .cleverbot-close{width:36px;height:36px;border-radius:12px!important;background:rgba(255,255,255,.14)!important;font-size:22px}
+html .cleverbot-messages{background:var(--p-bg)!important;padding:16px!important;gap:12px!important}
+html .cleverbot-msg{font-size:14px!important;line-height:1.6!important;border-radius:18px!important;box-shadow:var(--p-s1)}
+html .cleverbot-msg.bot{background:var(--p-surface)!important;color:var(--p-ink)!important;border:1px solid var(--p-line)!important;border-bottom-left-radius:6px!important}
+html .cleverbot-msg.user{background:linear-gradient(180deg,#2f6df0,#2563eb)!important;color:#fff!important;border-bottom-right-radius:6px!important;box-shadow:0 6px 16px rgba(37,99,235,.28)}
+html .cleverbot-msg.system{background:var(--p-surface-2)!important;color:var(--p-muted)!important;box-shadow:none}
+html .cleverbot-composer{background:var(--p-surface)!important;border-top:1px solid var(--p-line)!important;padding:10px!important;gap:6px!important}
+html .cleverbot-composer textarea{border:1.5px solid var(--p-line-2)!important;border-radius:20px!important;background:var(--p-surface-2)!important;color:var(--p-ink)!important;padding:10px 14px!important;font-size:14px!important}
+html .cleverbot-composer textarea:focus{border-color:var(--p-blue)!important;box-shadow:var(--p-ring)}
+html .cleverbot-send{background:var(--p-blue)!important;color:#fff!important;border-radius:50%!important;box-shadow:0 6px 14px rgba(37,99,235,.35)}
+html .cleverbot-tool{border-radius:50%!important;color:var(--p-muted)!important}
+html .cleverbot-note,html .cleverbot-attachments{background:var(--p-surface)!important;color:var(--p-muted)!important}
+.cb-code-head{border-radius:10px 10px 0 0}
+.cb-table-wrap{border-radius:12px;border:1px solid var(--p-line);overflow:auto}
+
+/* ---- pop-ups, prompts, toasts ---- */
+#resultActionOverlay>div,#customPromptOverlay>div,.live-msg-dialog,.cm-modal-card,#faqFormOverlay>div,#proctorViolationOverlay>div,#proctorResumeOverlay>div{max-width:min(94vw,520px);animation:cmPop .16s ease}
+@keyframes cmPop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+#resultActionOverlay button,#customPromptOverlay button,.cm-modal-card button{min-height:46px;border-radius:12px!important;font-family:var(--p-font);font-weight:650}
+#resultActionOverlay button.cm-icolead{justify-content:flex-start;width:100%;text-align:left;padding:10px 14px!important}
+#customPromptOverlay input,#customPromptOverlay textarea{border:1.5px solid var(--p-line-2)!important;border-radius:12px!important;padding:12px 14px!important;font-family:var(--p-font)}
+#cmFeatureDisabledNotice,.cm-toast,[id$="Toast"]{border-radius:14px!important;box-shadow:var(--p-s3)!important;font-family:var(--p-font)}
+.cm-msgbar button,.cm-bell-menu{border-radius:12px}
+.cm-bell-menu,.cm-um-menu,.cm-notif-panel{background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:var(--p-r-lg)!important;box-shadow:var(--p-s3)!important;color:var(--p-ink)!important}
+.cm-um-menu button,.cm-um-menu a{border-radius:10px!important;color:var(--p-text)!important}
+.cm-um-menu button:hover,.cm-um-menu a:hover{background:var(--p-blue-soft)!important;color:var(--p-blue)!important}
+
+/* ---- floating buttons ---- */
+html .whatsapp-float-btn,html .help-float-btn{border:2px solid rgba(255,255,255,.9)}
+
+/* ---- dark mode touch-ups ---- */
+html[data-cm-dark] .pl-hero,html[data-cm-dark] .pf-hero{filter:saturate(.95)}
+html[data-cm-dark] .pb-card,html[data-cm-dark] .tq,html[data-cm-dark] .sa-card{background:var(--p-surface)}
+html[data-cm-dark] #teacherDashboard [style*="background:white"],html[data-cm-dark] #adminDashboard [style*="background:white"]{background:var(--p-surface)!important}
+html[data-cm-dark] .cm-roll-item{color:#7f90bd!important}
+
+/* ---- final phone pass ---- */
+@media(max-width:640px){
+  html .container>*{max-width:100%}
+  html .cm-nav-extra a{display:none}
+  html #mainHeader .tagline{display:none}
+  html .cm-pagehead h2{font-size:22px!important}
+  html .dash-panel>h3:first-child,.dash-panel>.admin-header>h3{font-size:19px!important}
+  html .primary-btn,html .secondary-btn{min-height:46px}
+  .pb-head b{font-size:16px}
+  html .cleverbot-panel{right:8px!important;left:8px!important;width:auto!important;bottom:84px!important;height:min(78vh,620px)!important}
+  html #adminDashboard .admin-controls .form-input{flex:1 1 100%}
+  #resultActionOverlay>div,#customPromptOverlay>div,.live-msg-dialog,.cm-modal-card{padding:20px!important}
+  html .sa-summary-card strong{font-size:30px}
+  .pl-head{margin-bottom:30px}
+}
+@media(max-width:380px){
+  html .stat-card p{font-size:24px!important}
+  .tq{padding:13px}
+  .pa-card,.pb-card{padding:16px 14px}
+}
+@media(prefers-reduced-motion:reduce){#resultActionOverlay>div,#customPromptOverlay>div,.live-msg-dialog,.cm-modal-card{animation:none}}
