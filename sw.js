@@ -8,7 +8,7 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-v70';
+var CACHE_NAME = 'cleverment-v71';
 var urlsToCache = [
     '/',
     '/index.html',
@@ -19,6 +19,7 @@ var urlsToCache = [
     '/cm-redesign.css',
     '/cm-redesign.js',
     '/cm-premium.css',
+    '/cm-ui.js',
     '/cm-speech.js',
     '/cm-profile.js',
     '/competition-ui.js',

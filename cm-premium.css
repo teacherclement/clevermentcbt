@@ -596,3 +596,111 @@ html .pos-chip{background:var(--p-surface)!important;border:1px solid var(--p-li
   html .cm-topbar{padding:8px 10px!important}
 }
 @media(prefers-reduced-motion:reduce){html .dash-panel.active{animation:none}}
+
+/* ==========================================================================
+   BATCH 2b: FIXES FROM YOUR SCREENSHOTS
+   ========================================================================== */
+
+/* ---- stat cards: keep the room the icon needs ---- */
+html .stat-card{padding:18px 18px 18px 86px!important;min-height:92px;display:flex!important;flex-direction:column;justify-content:center}
+html .stat-card::before{left:18px!important;width:50px!important;height:50px!important;border-radius:14px!important}
+html .stat-card::after{display:none}
+@media(max-width:640px){
+  html .stat-card{padding:14px 12px 14px 70px!important;min-height:84px}
+  html .stat-card::before{left:12px!important;width:46px!important;height:46px!important}
+}
+
+/* ---- time limit picker: light, roomy, units beside the numbers ---- */
+.cm-tp{max-width:none!important;width:100%}
+.cm-tp-none{display:inline-flex!important;align-items:center;gap:8px;font-size:13.5px!important;font-weight:650;color:var(--p-text);background:var(--p-surface-2);border:1px solid var(--p-line);border-radius:999px;padding:7px 14px;margin-bottom:10px!important}
+.cm-tp-rollers{background:var(--p-surface-2)!important;border:1.5px solid var(--p-line-2);border-radius:18px!important;padding:8px 18px!important;gap:22px!important;justify-content:center!important}
+.cm-tp-col{flex:0 0 auto!important;align-items:center;gap:8px;position:relative;z-index:1}
+.cm-roll{width:82px!important;flex:0 0 auto}
+.cm-roll-item{color:#9aa8c8!important;font-family:var(--p-display);font-size:21px!important;font-weight:600}
+.cm-roll-item.on{color:var(--p-ink)!important;font-size:30px!important;font-weight:800}
+.cm-tp-unit{position:static!important;transform:none!important;color:var(--p-blue)!important;font-size:15px!important;font-weight:800;align-self:center}
+.cm-tp-band{position:absolute;left:10px;right:10px;top:50%;height:46px;transform:translateY(-50%);border-radius:13px;background:var(--p-blue-soft);border:1px solid var(--p-blue-line);pointer-events:none;z-index:0}
+
+/* ---- publish page: full width, step cards ---- */
+#uploadSection.active{max-width:none!important}
+#uploadSection.active[data-cm-cards]{display:block!important}
+.pb-card{background:var(--p-surface);border:1px solid var(--p-line);border-radius:var(--p-r-lg);padding:22px;margin:0 0 18px;box-shadow:var(--p-s1)}
+.pb-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--p-line)}
+.pb-num{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:linear-gradient(180deg,#3b82f6,#1d4ed8);color:#fff;font-family:var(--p-display);font-weight:800;font-size:16px;box-shadow:0 6px 14px rgba(37,99,235,.32)}
+.pb-head b{display:block;font-family:var(--p-display);font-size:17px;color:var(--p-ink)}
+.pb-head small{display:block;color:var(--p-muted);font-size:13px;margin-top:2px}
+.pb-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:4px;align-items:start}
+.pb-grid>*{grid-column:span 1;min-width:0;margin-top:0!important}
+.pb-grid>.form-group{margin-bottom:12px!important}
+.pb-grid>.form-group:has(input[type=checkbox]):not(:has(#teacherTimerHost)),.pb-grid>.form-group:has(input[type=file]),.pb-grid>.form-group:has(#teacherQuestionBankSelect),.pb-grid>.form-group:has(#teacherCertSignature),.pb-grid>.custom-class-wrapper-teacher,.pb-grid>div[style*="f5c98f"]{grid-column:1/-1}
+.pb-grid>.form-group:has(input[type=checkbox]):not(:has(#teacherTimerHost)){display:flex!important;flex-wrap:wrap;align-items:center;gap:8px 14px!important;background:var(--p-surface-2);border:1px solid var(--p-line);border-radius:var(--p-r);padding:14px 16px}
+.pb-grid>.form-group:has(input[type=checkbox]):not(:has(#teacherTimerHost)) label{display:inline!important;margin:0!important;font-weight:650!important}
+.pb-grid>div[style*="f5c98f"]{background:var(--p-amber-soft)!important;border:1px solid #f2d089!important;border-radius:var(--p-r)!important;padding:16px 18px!important;margin-bottom:6px!important}
+@media(max-width:760px){.pb-grid{grid-template-columns:1fr}.pb-grid>*{grid-column:1/-1!important}.pb-card{padding:16px}}
+
+/* ---- published assessments: clear cards ---- */
+#teacherPublishedList [style*="background:white; padding:12px 16px"]{border-left:4px solid var(--p-blue)!important;gap:12px!important}
+#teacherPublishedList [style*="background:white; padding:12px 16px"] b,#teacherPublishedList [style*="background:white; padding:12px 16px"] strong{font-family:var(--p-display);font-size:15.5px;color:var(--p-ink)}
+#teacherPublishedList>div:first-child{background:var(--p-surface-2);border:1px solid var(--p-line);border-radius:var(--p-r);padding:10px 14px;margin-bottom:14px!important}
+
+/* ---- icon buttons ---- */
+html button.cm-icobtn,html #teacherDashboard button.cm-icobtn,html #adminDashboard button.cm-icobtn{display:inline-flex!important;align-items:center;justify-content:center;gap:6px;width:auto;min-width:40px;height:40px;min-height:40px!important;padding:0 11px!important;border-radius:12px!important;flex:0 0 auto;line-height:1}
+.cm-icobtn .cm-i,.cm-icolead .cm-i{flex:none}
+.cm-ico-badge{font-size:11px;font-weight:800;letter-spacing:.04em}
+html button.cm-ico-danger{background:var(--p-red-soft)!important;color:var(--p-red)!important;border:1px solid #f3c4ca!important;box-shadow:none!important}
+html button.cm-ico-danger:hover:not(:disabled){background:var(--p-red)!important;color:#fff!important}
+html button.cm-ico-edit{background:var(--p-blue-soft)!important;color:var(--p-blue)!important;border:1px solid var(--p-blue-line)!important;box-shadow:none!important}
+html button.cm-ico-edit:hover:not(:disabled){background:var(--p-blue)!important;color:#fff!important}
+html button.cm-icolead{display:inline-flex!important;align-items:center;justify-content:center;gap:9px}
+
+/* ---- grouped menus ---- */
+html .dash-sidebar nav .nav-group{margin:4px 0}
+html .dash-sidebar .nav-group-head{display:flex;align-items:center;gap:12px;width:100%;background:transparent!important;border:0!important;box-shadow:none!important;color:#a9bbea!important;font-family:var(--p-font);font-weight:700;font-size:12px;letter-spacing:.07em;text-transform:uppercase;padding:12px 14px;border-radius:12px;cursor:pointer;text-align:left;transition:background .15s,color .15s}
+html .dash-sidebar .nav-group-head:hover{background:rgba(255,255,255,.08)!important;color:#fff!important}
+html .dash-sidebar .nav-group-head>span:first-of-type{flex:1}
+.nav-group-chev{display:grid;place-items:center;transition:transform .18s}
+.nav-group.open>.nav-group-head{color:#fff!important}
+.nav-group.open .nav-group-chev{transform:rotate(180deg)}
+.nav-group-body{display:none;margin:2px 0 8px 20px;padding-left:10px;border-left:1px solid rgba(255,255,255,.16)}
+.nav-group.open>.nav-group-body{display:block}
+html .nav-group-body .dash-nav-item{padding:10px 12px!important;font-size:14px!important;margin:2px 0}
+
+/* ---- TABLES: compact on every screen ---- */
+html .scrollable-panel table,html .cm-host table{min-width:0!important;table-layout:auto}
+html table.cm-rt{font-size:13px}
+html table.cm-rt th{padding:10px 10px!important;font-size:11.5px!important}
+html table.cm-rt td{padding:9px 10px!important;line-height:1.35;word-break:break-word}
+html table.cm-rt td.result-action-cell{text-align:right;white-space:nowrap}
+#teacherResultsTable td:nth-child(4){min-width:150px}
+.select-cell{width:38px}
+@media(max-width:1100px){
+  #teacherResultsTable th:nth-child(2),#teacherResultsTable td:nth-child(2){display:none}
+}
+
+/* phones: every table turns into compact cards, no sideways scrolling */
+@media(max-width:760px){
+  html table.cm-rt:not(.pos-table){border:0!important;background:transparent!important;box-shadow:none!important;display:block;min-width:0!important}
+  table.cm-rt:not(.pos-table) thead{display:block}
+  table.cm-rt:not(.pos-table) thead tr{display:flex;align-items:center;background:none!important;border:0;padding:0 2px;margin:0 0 8px}
+  table.cm-rt:not(.pos-table) thead th{display:none!important}
+  table.cm-rt:not(.pos-table) thead th.select-cell{display:flex!important;align-items:center;gap:10px;background:none!important;border:0!important;padding:4px 2px!important}
+  table.cm-rt:not(.pos-table) thead th.select-cell::after{content:"Select all";font-size:12.5px;font-weight:650;color:var(--p-muted);text-transform:none;letter-spacing:0}
+  table.cm-rt:not(.pos-table) tbody{display:block}
+  table.cm-rt:not(.pos-table) tbody tr{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:16px;padding:14px;margin:0 0 10px;box-shadow:var(--p-s1)}
+  table.cm-rt:not(.pos-table) tbody tr:hover td{background:transparent!important}
+  table.cm-rt:not(.pos-table) tbody td{display:flex!important;flex-direction:column;gap:2px;padding:0!important;border:0!important;font-size:13.5px;min-width:0;background:transparent!important}
+  table.cm-rt:not(.pos-table) tbody td::before{content:attr(data-label);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--p-muted)}
+  table.cm-rt:not(.pos-table) tbody td[data-label=""]::before{display:none}
+  table.cm-rt:not(.pos-table) tbody td[colspan]{grid-column:1/-1;text-align:center}
+  #teacherResultsTable tbody td:nth-child(2){display:none!important}
+  #teacherResultsTable tbody td:nth-child(4){grid-column:1/-1;padding-right:34px!important;font-size:15px;font-weight:700;min-width:0}
+  #teacherResultsTable tbody td:nth-child(4)::before{display:none}
+  #teacherResultsTable td.select-cell{position:absolute;right:12px;top:14px;width:auto}
+  #teacherResultsTable td.select-cell::before{display:none}
+  table.cm-rt:not(.pos-table) td.result-action-cell{grid-column:1/-1;flex-direction:row!important;justify-content:flex-end;padding-top:4px!important}
+  table.cm-rt:not(.pos-table) td.result-action-cell::before{display:none}
+  html .scrollable-panel{overflow-x:visible!important}
+}
+/* broadsheets and position tables stay as real tables but are tight */
+html .pos-table{font-size:12.5px}
+html .pos-table th,html .pos-table td{padding:8px 9px!important}
