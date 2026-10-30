@@ -433,3 +433,166 @@ html .help-float-btn,html .whatsapp-float-btn{box-shadow:var(--p-s2)!important}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{transition-duration:.001ms!important;animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
 }
+
+/* ==========================================================================
+   BATCH 2: TEACHER DASHBOARD
+   ========================================================================== */
+
+/* ---- 18. Shell: top bar, welcome banner, content width ---- */
+.container>#teacherDashboard,.container>#adminDashboard{max-width:1240px!important}
+html .cm-topbar{background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:16px!important;box-shadow:var(--p-s1)!important;padding:10px 14px!important;margin-bottom:14px!important}
+.cm-user-name{font-weight:700;color:var(--p-ink)}
+.cm-user small{color:var(--p-muted)}
+.cm-avatar{background:linear-gradient(135deg,#2563eb,#13389c)!important;color:#fff!important;font-family:var(--p-display);font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,.35)}
+html .cm-logout{border-radius:10px!important;font-family:var(--p-font);font-weight:650!important;background:var(--p-surface-2)!important;color:var(--p-text)!important;border:1px solid var(--p-line-2)!important;padding:8px 14px!important;min-height:38px;cursor:pointer}
+html .cm-logout:hover{background:var(--p-red-soft)!important;color:var(--p-red)!important;border-color:#f3c4ca!important}
+html .cm-bell{background:var(--p-surface-2)!important;border:1px solid var(--p-line)!important;color:var(--p-text)!important}
+html .cm-pagehead{margin:0 0 18px!important;padding:0!important}
+html .cm-pagehead>div{position:relative;overflow:hidden;padding:26px 28px;border-radius:var(--p-r-xl);color:#fff;
+  background:radial-gradient(520px 240px at 100% 0,rgba(96,165,250,.4),transparent 62%),linear-gradient(135deg,#081a4b,#13389c)}
+html .cm-pagehead h2{color:#fff!important;font-size:clamp(22px,3.2vw,30px)!important;font-weight:800;letter-spacing:-.025em;margin:0}
+html .cm-pagehead p{color:#cfdcff!important;margin:6px 0 0!important}
+html .dash-main{padding:0!important}
+html .dash-panel.active{padding:24px!important;animation:cmFadeIn .18s ease}
+@keyframes cmFadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.dash-panel>h3:first-child,.dash-panel>.admin-header>h3,.dash-panel>div>h3:first-child{display:flex;align-items:center;gap:12px;font-size:21px!important;font-weight:800;margin:0 0 6px!important;letter-spacing:-.02em}
+.dash-panel>h3:first-child::before,.dash-panel>.admin-header>h3::before{content:"";width:5px;height:22px;border-radius:4px;background:linear-gradient(180deg,#3b82f6,#1d4ed8);flex:none}
+.dash-panel h4{font-family:var(--p-display);font-size:16px;font-weight:700;color:var(--p-ink);margin:22px 0 8px!important}
+.dash-panel .helper-text{line-height:1.6}
+.dash-panel hr{border:0;border-top:1px solid var(--p-line);margin:18px 0}
+
+/* ---- 19. Overview: stats and quick actions ---- */
+html .stats-grid{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))!important;gap:14px!important;margin:16px 0 8px!important}
+html .stat-card{padding:20px!important;text-align:left!important;position:relative;overflow:hidden}
+html .stat-card::after{content:"";position:absolute;right:-22px;top:-22px;width:90px;height:90px;border-radius:50%;background:var(--p-blue-soft);opacity:.7}
+html .stat-card h3{font-size:12.5px!important;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px!important}
+html .stat-card p{font-size:34px!important;font-weight:800!important;margin:0!important;letter-spacing:-.03em;position:relative;z-index:1}
+.tq-label{margin:26px 0 12px!important}
+.tq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin-bottom:8px}
+.tq{display:flex;align-items:center;gap:14px;text-align:left;background:var(--p-surface);border:1px solid var(--p-line);border-radius:var(--p-r);padding:16px;cursor:pointer;font-family:var(--p-font);color:var(--p-ink);box-shadow:var(--p-s1);transition:border-color .15s,box-shadow .15s,transform .1s}
+.tq:hover{border-color:var(--p-blue);box-shadow:var(--p-s2)}
+.tq:active{transform:translateY(1px)}
+.tq-ic{flex:none;display:grid;place-items:center;width:46px;height:46px;border-radius:14px;background:var(--p-blue-soft);color:var(--p-blue)}
+.tq-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.tq-t b{font-family:var(--p-display);font-size:15px}
+.tq-t small{color:var(--p-muted);font-size:12.5px;line-height:1.4}
+.tq-go{flex:none;color:var(--p-muted)}
+.tq:hover .tq-go{color:var(--p-blue)}
+
+/* ---- 20. Publish Assessment: two-column form ---- */
+#uploadSection.active{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:22px;row-gap:2px;align-content:start}
+#uploadSection>*{grid-column:1/-1;min-width:0}
+#uploadSection>.form-group{grid-column:span 1}
+#uploadSection>.form-group:has(input[type=checkbox]),#uploadSection>.form-group:has(input[type=file]),#uploadSection>.form-group:has(#teacherQuestionBankSelect),#uploadSection>.form-group:has(#teacherCertName){grid-column:1/-1}
+#uploadSection>.form-group:has(#teacherCertName){grid-column:span 1}
+#uploadSection>.form-group:has(#teacherCertSignature){grid-column:1/-1}
+#uploadSection>.form-group:has(#teacherAvailableFrom),#uploadSection>.form-group:has(#teacherAvailableUntil){grid-column:span 1}
+#uploadSection>.form-group:has(input[type=checkbox]){display:flex!important;flex-wrap:wrap;align-items:center;gap:10px 14px!important;background:var(--p-surface-2);border:1px solid var(--p-line);border-radius:var(--p-r);padding:14px 16px;margin-bottom:12px!important}
+#uploadSection>.form-group:has(input[type=checkbox]) label{display:inline!important;margin:0!important;font-weight:650!important}
+#uploadSection .custom-class-wrapper-teacher,#uploadSection .custom-subject-wrapper-teacher{grid-column:1/-1}
+#uploadSection>div[style*="#fff8f0"]{background:var(--p-amber-soft)!important;border:1px solid #f2d089!important;border-radius:var(--p-r)!important;padding:16px 18px!important}
+#uploadSection>div[style*="#fff8f0"] p:first-child{color:#8a5200!important}
+html[data-cm-dark] #uploadSection>div[style*="#fff8f0"] p:first-child{color:#fcd34d!important}
+#uploadSection>.primary-btn{position:sticky;bottom:12px;z-index:5;min-height:54px;font-size:16px!important;margin-top:10px;box-shadow:0 10px 30px rgba(37,99,235,.38)!important}
+html .cm-steps{background:var(--p-surface-2);border:1px solid var(--p-line)!important;border-radius:16px;padding:12px 14px!important;margin:12px 0 20px!important}
+html .cm-steps button{font-family:var(--p-font)!important;color:var(--p-muted)!important}
+html .cm-steps button.on{color:var(--p-ink)!important}
+html .cm-steps i{border-color:var(--p-line-2)!important;background:var(--p-surface)!important;color:var(--p-muted)}
+html .cm-steps button.on i{background:var(--p-blue)!important;border-color:var(--p-blue)!important;color:#fff!important;box-shadow:0 4px 12px rgba(37,99,235,.35)}
+
+/* ---- 21. Inline-styled buttons and cards created by the app's code ---- */
+#teacherDashboard button[style*="background:#dc3545"],#adminDashboard button[style*="background:#dc3545"],.cm-modal-card button[style*="background:#dc3545"]{background:var(--p-red-soft)!important;color:var(--p-red)!important;border:1px solid #f3c4ca!important;box-shadow:none!important}
+#teacherDashboard button[style*="background:#dc3545"]:hover:not(:disabled){background:var(--p-red)!important;color:#fff!important}
+#teacherDashboard button[style*="background:#2d6cdf"],#adminDashboard button[style*="background:#2d6cdf"]{background:var(--p-blue)!important;color:#fff!important;border:1px solid var(--p-blue-h)!important}
+#teacherDashboard button[style*="background:#eef6ff"]{background:var(--p-blue-soft)!important;color:var(--p-blue)!important;border:1px solid var(--p-blue-line)!important}
+#teacherDashboard button.secondary-btn[style*="font-size:12px"],#teacherDashboard button.secondary-btn[style*="font-size:13px"]{min-height:36px!important;border-radius:10px!important;padding:6px 14px!important}
+#teacherDashboard [style*="background:white; padding:12px 16px"],#teacherDashboard [style*="background:#fff; padding:12px 16px"]{background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:var(--p-r)!important;padding:14px 18px!important;box-shadow:var(--p-s1);transition:border-color .15s,box-shadow .15s}
+#teacherDashboard [style*="background:white; padding:12px 16px"]:hover{border-color:var(--p-blue-line)!important;box-shadow:var(--p-s2)}
+#teacherDashboard span[style*="background:#eef6ff"]{background:var(--p-blue-soft)!important;color:var(--p-blue)!important;border:1px solid var(--p-blue-line);border-radius:999px!important;padding:5px 14px!important;font-weight:700!important;letter-spacing:.03em}
+#teacherDashboard [style*="color:#6b7a8f"],#adminDashboard [style*="color:#6b7a8f"]{color:var(--p-muted)!important}
+#teacherDashboard [style*="background:#f3fbf6"]{background:var(--p-green-soft)!important;border-color:#b8e6cf!important;border-radius:var(--p-r)!important}
+#teacherDashboard [style*="background:#fff"][style*="border:1px solid #ddd"]{background:#fff!important}
+.whatsapp-share-btn{border-radius:10px!important}
+
+/* ---- 22. Tables and lists inside the dashboards ---- */
+html .scrollable-panel{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;max-height:none;overflow-x:auto}
+.scrollable-panel table,.cm-host table,.pos-table,.teacher-access-log-table{background:var(--p-surface);border:1px solid var(--p-line);border-radius:var(--p-r);overflow:hidden;width:100%}
+html .scrollable-panel table{min-width:560px}
+html .pos-table th{background:var(--p-navy)!important;color:#fff!important;text-transform:none;letter-spacing:.01em;font-size:12.5px!important;padding:12px 12px!important}
+html .pos-table td{padding:11px 12px!important}
+html .pos-table tbody tr:nth-child(even) td{background:var(--p-surface-2)}
+.pos-rank{font-family:var(--p-display);font-weight:800}
+html .admin-header{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:0 0 16px!important;padding:0!important;border:0!important}
+html .admin-controls{display:flex!important;gap:10px!important;flex-wrap:wrap;align-items:center;background:var(--p-surface-2);border:1px solid var(--p-line);border-radius:var(--p-r);padding:10px!important;width:100%}
+html .admin-controls .form-input{min-height:42px!important;flex:1 1 150px;width:auto!important}
+html .admin-controls .primary-btn,html .admin-controls .secondary-btn{min-height:42px!important;flex:0 0 auto}
+.result-action-btn{border-radius:10px!important;font-weight:650}
+.result-select-box,.select-cell input,.published-pick,#publishedSelectAll{width:18px;height:18px}
+html .live-item{display:flex;align-items:center;gap:14px;border-radius:var(--p-r)!important;padding:14px 16px!important;margin-bottom:10px;background:var(--p-surface)!important;border:1px solid var(--p-line)!important}
+.live-dot{box-shadow:0 0 0 4px rgba(15,159,110,.18)}
+html .live-msg-btn{border-radius:10px!important;background:var(--p-blue-soft)!important;color:var(--p-blue)!important;border:1px solid var(--p-blue-line)!important}
+html .live-msg-all-btn{border-radius:12px!important;background:var(--p-navy)!important}
+.cm-empty,.dash-panel p.helper-text:only-child{padding:6px 0}
+
+/* ---- 23. Charts ---- */
+html .cm-chart,html .cm-canvas-wrap{background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:var(--p-r-lg)!important;padding:18px!important;box-shadow:var(--p-s1)}
+.cm-chart-controls{background:var(--p-surface-2);border:1px solid var(--p-line);border-radius:var(--p-r);padding:12px;margin-bottom:14px!important}
+.cm-chart-controls label{color:var(--p-text)!important}
+.cm-stat-row{gap:12px!important}
+html .cm-stat{background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:var(--p-r)!important;box-shadow:var(--p-s1);padding:16px!important}
+.cm-stat span{text-transform:uppercase;letter-spacing:.05em;font-weight:650}
+.cm-stat strong{font-family:var(--p-display);letter-spacing:-.02em;color:var(--p-ink)}
+.cm-tip{background:var(--p-blue-soft)!important;border:1px solid var(--p-blue-line)!important;border-radius:var(--p-r)!important;color:var(--p-text)!important}
+
+/* ---- 24. Roster, positions, progress, insights, messages, backup ---- */
+.rt-bar{background:var(--p-surface-2);border:1px solid var(--p-line);border-radius:var(--p-r);padding:12px 14px}
+html .pos-tabs{background:var(--p-surface-2);border:1px solid var(--p-line);border-radius:14px;padding:6px;gap:6px}
+html .pos-tab{font-family:var(--p-font);font-weight:650;border-radius:10px!important;border:0!important;background:transparent!important;color:var(--p-muted)!important;padding:10px 16px!important;min-height:42px;cursor:pointer}
+html .pos-tab.active{background:var(--p-surface)!important;color:var(--p-blue)!important;box-shadow:var(--p-s1)}
+html .pos-refresh{margin-left:auto}
+html .pos-chip{background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:var(--p-r)!important;box-shadow:var(--p-s1);padding:14px 12px!important}
+.pos-chip-value{font-family:var(--p-display);font-weight:800!important;color:var(--p-ink)!important}
+.pos-chip-label{color:var(--p-muted)!important}
+.pos-remark{font-weight:650}
+.prog-match{background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:var(--p-r)!important;padding:12px 14px!important;color:var(--p-ink)!important;transition:border-color .15s,background .15s}
+.prog-match:hover,.prog-match.active{border-color:var(--p-blue)!important;background:var(--p-blue-soft)!important}
+.prog-bar-track{background:var(--p-line)!important;border-radius:999px!important;height:12px!important;overflow:hidden}
+.prog-bar-fill{background:linear-gradient(90deg,#3b82f6,#2563eb)!important;border-radius:999px!important}
+.prog-bar-label,.prog-bar-value{color:var(--p-text)!important;font-weight:650}
+.cm-compose,textarea.form-input{border-radius:12px!important;border:1.5px solid var(--p-line-2)!important;background:var(--p-surface)!important;color:var(--p-ink)!important;padding:12px 14px!important;font-family:var(--p-font)}
+.cm-compose:focus{border-color:var(--p-blue)!important;box-shadow:var(--p-ring);outline:none}
+#backupSection.active{max-width:760px}
+#backupSection ul{background:var(--p-surface-2);border:1px solid var(--p-line);border-radius:var(--p-r);padding:16px 20px 16px 36px!important;margin:12px 0 18px!important;line-height:1.8}
+#backupSection .primary-btn,#backupSection .secondary-btn{min-height:50px}
+#csvHistoryList>div,#teacherAccessLogsContainer>div{border-radius:var(--p-r)}
+.flag-box{background:var(--p-amber-soft)!important;border:1px solid #f2d089!important;border-radius:var(--p-r)!important;color:var(--p-text)!important}
+
+/* ---- 25. Edit-assessment screen, messages dialog, other teacher pop-ups ---- */
+.assessment-editor-card,.assessment-settings-box,.live-msg-dialog{background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:var(--p-r-lg)!important;box-shadow:var(--p-s1);color:var(--p-ink)}
+.live-msg-dialog{box-shadow:var(--p-s3)!important;padding:26px!important}
+.assessment-settings-box h4,.live-msg-dialog h3{color:var(--p-ink)!important}
+.assessment-settings-toggle{background:var(--p-surface-2)!important;border:1px solid var(--p-line)!important;border-radius:12px!important}
+.assessment-settings-grid label,.live-msg-label{color:var(--p-text)!important}
+.assessment-editor-image-preview{background:var(--p-surface-2)!important;border-color:var(--p-line)!important}
+.assessment-editor-option{border-radius:12px!important}
+.cm-modal-card{background:var(--p-surface)!important;color:var(--p-ink)!important;border-radius:var(--p-r-xl)!important;box-shadow:var(--p-s3)!important}
+
+/* ---- 26. Phones ---- */
+@media(max-width:900px){
+  #uploadSection.active{grid-template-columns:1fr}
+  #uploadSection>.form-group{grid-column:1/-1!important}
+}
+@media(max-width:640px){
+  html .dash-panel.active{padding:18px 14px!important}
+  html .cm-pagehead>div{padding:20px 18px}
+  html .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  html .stat-card{padding:16px!important}
+  html .stat-card p{font-size:28px!important}
+  .tq-grid{grid-template-columns:1fr}
+  html .admin-controls .form-input{flex:1 1 100%}
+  html .pos-tab{flex:1;padding:10px 8px!important}
+  html .pos-refresh{margin-left:0}
+  html .live-item{flex-wrap:wrap}
+  html .cm-topbar{padding:8px 10px!important}
+}
+@media(prefers-reduced-motion:reduce){html .dash-panel.active{animation:none}}

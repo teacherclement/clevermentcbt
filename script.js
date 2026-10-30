@@ -8423,7 +8423,7 @@ var CM_CHART_TYPES = [
     { id: 'polar', label: 'Polar area chart' },
     { id: 'scatter', label: 'Scatter plot' }
 ];
-var CM_PALETTE = ['#2d6cdf', '#2d9c5c', '#f0a500', '#dc3545', '#7b4dc0', '#13a8b4', '#e0637a', '#8a9a5b', '#c9a84c', '#4c6a92'];
+var CM_PALETTE = ['#2563eb', '#0f9f6e', '#f59e0b', '#e0394b', '#7c5cdb', '#0ea5b7', '#ec6b8a', '#64748b', '#d6a21e', '#3b4f8a'];
 var cmChartState = {};
 
 function cmPalette(n) {
@@ -8532,23 +8532,35 @@ function cmAxes(d, horizontal) {
 }
 
 function cmChartConfig(type, d) {
+    try {
+        if (window.Chart && !Chart.__cmPremium) {
+            Chart.__cmPremium = true;
+            Chart.defaults.font.family = 'Inter, "Segoe UI", Arial, sans-serif';
+            Chart.defaults.font.size = 12;
+            Chart.defaults.color = '#5b6b8c';
+            Chart.defaults.borderColor = 'rgba(148,163,184,.25)';
+            Chart.defaults.plugins.tooltip.backgroundColor = '#0a1a4a';
+            Chart.defaults.plugins.tooltip.padding = 10;
+            Chart.defaults.plugins.tooltip.cornerRadius = 10;
+        }
+    } catch (e) {}
     var labels = d.labels, values = d.values, colors = cmPalette(values.length);
     var round = ['pie', 'doughnut', 'polar'].indexOf(type) !== -1;
     var options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: round || type === 'radar' ? round : false } } };
     var ds = { label: d.unit || 'value', data: values };
     if (type === 'histogram') {
-        ds.backgroundColor = '#2d6cdf'; ds.borderColor = '#ffffff'; ds.borderWidth = 1; ds.barPercentage = 1; ds.categoryPercentage = 1;
+        ds.backgroundColor = '#2563eb'; ds.borderColor = '#ffffff'; ds.borderWidth = 1; ds.barPercentage = 1; ds.categoryPercentage = 1;
         options.scales = cmAxes(d, false);
         return { type: 'bar', data: { labels: labels, datasets: [ds] }, options: options };
     }
     if (type === 'bar' || type === 'hbar') {
-        ds.backgroundColor = colors; ds.borderRadius = 4;
+        ds.backgroundColor = colors; ds.borderRadius = 8;
         if (type === 'hbar') options.indexAxis = 'y';
         options.scales = cmAxes(d, type === 'hbar');
         return { type: 'bar', data: { labels: labels, datasets: [ds] }, options: options };
     }
     if (type === 'line' || type === 'area') {
-        ds.borderColor = '#2d6cdf'; ds.backgroundColor = 'rgba(45,108,223,0.2)'; ds.tension = 0.3; ds.pointRadius = 4; ds.fill = type === 'area';
+        ds.borderColor = '#2563eb'; ds.backgroundColor = 'rgba(37,99,235,0.16)'; ds.tension = 0.3; ds.pointRadius = 4; ds.fill = type === 'area';
         options.scales = cmAxes(d, false);
         return { type: 'line', data: { labels: labels, datasets: [ds] }, options: options };
     }
