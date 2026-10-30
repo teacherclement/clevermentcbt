@@ -38,6 +38,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CleverMent">
     <link rel="apple-touch-icon" href="logo.png">
+    <link rel="stylesheet" href="cm-premium.css?v=1">
 </head>
 <body>
 
@@ -78,79 +79,145 @@
 
     <!-- ===== FAQ PAGE ===== -->
     <div id="faqPage" style="display:none;">
-        <button onclick="closeFaqPage()" class="secondary-btn" style="font-size:13px; padding:6px 16px; margin-bottom:16px;">← Back</button>
-        <h2>Frequently Asked Questions</h2>
-        <p style="color:#6b7a8f; margin-bottom:16px;">Search for a topic, or browse by category below.</p>
-        <div class="form-group">
-            <input type="text" id="faqSearchInput" oninput="filterFaqs()" placeholder="Search questions, e.g. 'CSV format', 'camera', 'certificate'..." class="form-input">
+        <div class="pf-hero">
+            <button onclick="closeFaqPage()" class="pf-back"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Back</button>
+            <h2>How can we help?</h2>
+            <p>Search for a topic, or browse by category below.</p>
+            <div class="pf-search">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                <input type="text" id="faqSearchInput" oninput="filterFaqs()" placeholder="Search questions, e.g. 'CSV format', 'camera', 'certificate'..." class="form-input">
+            </div>
         </div>
-        <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
-            <button id="faqTabTeacher" onclick="setFaqCategory('teacher')" class="primary-btn" style="flex:1; min-width:140px;">For Teachers</button>
-            <button id="faqTabStudent" onclick="setFaqCategory('student')" class="secondary-btn" style="flex:1; min-width:140px;">For Students</button>
-        </div>
-        <div id="faqAccordionContainer"></div>
-        <div style="margin-top:20px; background:#eef6ff; border:1.5px solid #2d6cdf; border-radius:10px; padding:16px; text-align:center;">
-            <p style="font-weight:600; margin-bottom:8px;">Still stuck?</p>
-            <a href="https://wa.me/2349069959358" target="_blank" rel="noopener" class="primary-btn whatsapp-inline-btn" style="display:inline-flex; align-items:center; justify-content:center; gap:8px; text-decoration:none; padding:10px 20px;">
+        <div class="pf-body">
+            <div class="pf-tabs">
+                <button id="faqTabTeacher" onclick="setFaqCategory('teacher')" class="primary-btn">For Teachers</button>
+                <button id="faqTabStudent" onclick="setFaqCategory('student')" class="secondary-btn">For Students</button>
+            </div>
+            <div id="faqAccordionContainer"></div>
+            <div class="pf-help">
+                <p><strong>Still stuck?</strong><span>Our team is happy to help.</span></p>
+                <a href="https://wa.me/2349069959358" target="_blank" rel="noopener" class="primary-btn whatsapp-inline-btn">
                 <svg class="whatsapp-icon whatsapp-icon-inline" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
                 <span>Message us on WhatsApp</span>
             </a>
+            </div>
         </div>
     </div>
 
     <!-- ===== LANDING PAGE ===== -->
     <div id="schoolBrandBar" class="school-brand-bar" style="display:none;"></div>
     <div id="landingPage">
-        <section class="lp-hero">
-            <div class="lp-hero-in">
-                <div class="lp-hero-text">
-                    <h1>Smarter Assessments<br>for a Brighter Future</h1>
-                    <p>CleverMent is a secure and reliable Computer-Based Testing (CBT) platform designed for schools, teachers, administrators and students.</p>
-                    <div class="lp-cta">
-                        <button type="button" class="lp-btn lp-btn-solid" onclick="showStudentAccess()">I'm a Student</button>
-                        <button type="button" class="lp-btn lp-btn-ghost" onclick="showTeacherLogin()">I'm a Teacher</button>
+        <section class="pl-hero">
+            <div class="pl-hero-in">
+                <div class="pl-hero-text">
+                    <span class="pl-eyebrow"><i></i>Secure computer-based testing</span>
+                    <h1>Smarter assessments for a brighter future</h1>
+                    <p class="pl-lead">CleverMent helps schools and teachers publish assessments in minutes, keep every attempt fair with live monitoring, and give students instant results and certificates.</p>
+                    <div class="pl-cta">
+                        <button type="button" class="pl-btn pl-btn-primary" onclick="showStudentAccess()">I'm a Student<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+                        <button type="button" class="pl-btn pl-btn-ghost" onclick="showTeacherLogin()">I'm a Teacher</button>
                     </div>
+                    <ul class="pl-trust">
+                        <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Camera and noise monitoring</li>
+                        <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Instant marking</li>
+                        <li><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Works on any phone</li>
+                    </ul>
                 </div>
-                <div class="lp-laptop" aria-hidden="true">
-                    <div class="lp-screen">
-                        <div class="lp-s-side"><i></i><i></i><i></i><i></i><i></i></div>
-                        <div class="lp-s-main">
-                            <div class="lp-s-cards"><b></b><b></b><b></b></div>
-                            <div class="lp-s-q"><span></span><span></span><span class="on"></span><span></span></div>
-                            <div class="lp-s-ring"></div>
+                <div class="pl-app" aria-hidden="true">
+                    <div class="pl-app-bar"><i></i><i></i><i></i><span>CleverMent assessment</span></div>
+                    <div class="pl-app-body">
+                        <div class="pl-app-side"><b></b><i class="on"></i><i></i><i></i><i></i><i></i></div>
+                        <div class="pl-app-main">
+                            <div class="pl-app-head"><div><small>Mathematics</small><strong>Question 7 of 20</strong></div><div class="pl-app-ring"><span>18:42</span></div></div>
+                            <div class="pl-app-q"><span class="l1"></span><span class="l2"></span></div>
+                            <div class="pl-app-opt"><i>A</i><span></span></div>
+                            <div class="pl-app-opt sel"><i>B</i><span></span></div>
+                            <div class="pl-app-opt"><i>C</i><span></span></div>
+                            <div class="pl-app-dots"><u class="d"></u><u class="d"></u><u class="d"></u><u class="d"></u><u class="d"></u><u class="d"></u><u class="c"></u><u></u><u></u><u></u><u></u><u></u></div>
                         </div>
                     </div>
-                    <div class="lp-base"></div>
+                    <div class="pl-chip pl-chip-a"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>Result: 85% Passed</div>
                 </div>
             </div>
         </section>
-        <section class="lp-features" id="lpFeatures">
-            <h2>Everything You Need for Effective Assessments</h2>
-            <div class="lp-feat-grid">
-                <div class="lp-feat"><span><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg></span><b>Secure &amp; Reliable</b><small>Take assessments with confidence.</small></div>
-                <div class="lp-feat"><span><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/></svg></span><b>Easy to Use</b><small>Simple, clean and intuitive interface.</small></div>
-                <div class="lp-feat"><span><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><b>Detailed Results</b><small>Track progress and performance.</small></div>
-                <div class="lp-feat"><span><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M8.5 14L7 22l5-3 5 3-1.5-8"/></svg></span><b>Certificates</b><small>Recognise achievement with digital certificates.</small></div>
+
+        <section class="pl-strip" aria-label="Highlights">
+            <div class="pl-strip-in">
+                <div><b>Instant</b><span>results and corrections</span></div>
+                <div><b>Live</b><span>monitoring and messages</span></div>
+                <div><b>Auto</b><span>certificates and positions</span></div>
+                <div><b>Safe</b><span>timer that cannot be dodged</span></div>
+            </div>
+        </section>
+
+        <section class="pl-sec" id="lpHow">
+            <div class="pl-head"><span class="pl-kicker">How it works</span><h2>From question paper to result in three steps</h2></div>
+            <div class="pl-steps">
+                <div class="pl-step"><em>1</em><h3>Teacher publishes</h3><p>Upload questions from a CSV file or the question bank, set the time, pass mark and monitoring, then share the code.</p></div>
+                <div class="pl-step"><em>2</em><h3>Student takes it</h3><p>Students log in or enter the assessment code and answer on any phone, tablet or computer, with a clear timer.</p></div>
+                <div class="pl-step"><em>3</em><h3>Results right away</h3><p>Scores, corrections and certificates appear instantly, and teachers see results, positions and progress.</p></div>
+            </div>
+        </section>
+
+        <section class="pl-sec pl-sec-alt" id="lpFeatures">
+            <div class="pl-head"><span class="pl-kicker">Features</span><h2>Everything you need for effective assessments</h2></div>
+            <div class="pl-grid">
+                <div class="pl-card"><span class="pl-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></span><h3>Fair and secure</h3><p>Camera and noise monitoring, warnings and a timer that keeps running keep every attempt honest.</p></div>
+                <div class="pl-card"><span class="pl-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg></span><h3>Smart timing</h3><p>A colour-changing countdown, auto-submit when time is up and a gentle warning against rushing.</p></div>
+                <div class="pl-card"><span class="pl-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><h3>Results that teach</h3><p>Instant scores, full corrections, class positions, broadsheets and student progress history.</p></div>
+                <div class="pl-card"><span class="pl-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/></svg></span><h3>Certificates</h3><p>Branded certificates with the student's picture and the teacher's signature, one tap to download.</p></div>
+                <div class="pl-card"><span class="pl-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg></span><h3>Live competitions</h3><p>Run exciting quiz competitions with speed scoring and a live leaderboard.</p></div>
+                <div class="pl-card"><span class="pl-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg></span><h3>My Learning Space</h3><p>Lessons and practice questions for students to study and improve at their own pace.</p></div>
+                <div class="pl-card"><span class="pl-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><h3>Messages</h3><p>Teachers message a class, a group or one student, and send live encouragement during an assessment.</p></div>
+                <div class="pl-card"><span class="pl-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M11 18h2"/></svg></span><h3>Built for phones</h3><p>Fast and clear on any screen, so students can take assessments from school or from home.</p></div>
+            </div>
+        </section>
+
+        <section class="pl-sec" id="lpRoles">
+            <div class="pl-head"><span class="pl-kicker">Get started</span><h2>Choose how you want to use CleverMent</h2></div>
+            <div class="pl-roles">
+                <div class="pl-role">
+                    <h3>Students</h3><p>Log in with your PIN or enter an assessment code to begin.</p>
+                    <button type="button" class="pl-btn pl-btn-primary" onclick="showStudentAccess()">Student access</button>
+                </div>
+                <div class="pl-role">
+                    <h3>Teachers</h3><p>Create assessments, watch them live and see every result.</p>
+                    <button type="button" class="pl-btn pl-btn-outline" onclick="showTeacherLogin()">Teacher login</button>
+                </div>
             </div>
         </section>
     </div>
 
     <!-- ===== STUDENT ACCESS ===== -->
     <div id="studentAccess" style="display:none;">
-        <div class="sx-card">
-            <img src="logo.png" alt="CleverMent Logo" class="sx-logo">
-            <h2>Student Access</h2>
-            <div class="sx-tabs" role="tablist">
-                <button type="button" class="on" role="tab">Enter Assessment Code</button>
-                <button type="button" role="tab" onclick="openStudentLogin()">Login as Student</button>
+        <div class="pa-shell">
+            <aside class="pa-brand">
+                <img src="logo.png" alt="CleverMent" class="pa-brand-logo">
+                <h2>Welcome to CleverMent</h2>
+                <p>Take your assessments, see your results and track your progress, all in one place.</p>
+                <ul>
+                    <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>Instant results and corrections</li>
+                    <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>Certificates you can download</li>
+                    <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>Practice and study materials</li>
+                </ul>
+            </aside>
+            <div class="pa-card">
+                <img src="logo.png" alt="CleverMent Logo" class="pa-card-logo">
+                <h2>Student Access</h2>
+                <p class="pa-sub">Choose how you want to continue.</p>
+                <div class="sx-tabs" role="tablist">
+                    <button type="button" class="on" role="tab">Enter Assessment Code</button>
+                    <button type="button" role="tab" onclick="openStudentLogin()">Login as Student</button>
+                </div>
+                <div class="form-group">
+                    <label for="assessmentCode" class="cm-sr">Assessment Code</label>
+                    <input type="text" id="assessmentCode" placeholder="Enter Assessment Code" class="form-input" maxlength="11" style="text-transform:uppercase; letter-spacing:2px; font-weight:600;">
+                </div>
+                <button onclick="verifyAssessmentCode()" class="primary-btn full-width student-access-code-btn">Continue</button>
+                <div class="pa-or"><span>or</span></div>
+                <button type="button" class="sx-live lc-join-live-btn" onclick="lcOpenJoin()">Join a Live Competition</button>
+                <button type="button" onclick="backToLanding()" class="sx-back">Back to Home</button>
             </div>
-            <div class="form-group">
-                <label for="assessmentCode" class="cm-sr">Assessment Code</label>
-                <input type="text" id="assessmentCode" placeholder="Enter Assessment Code" class="form-input" maxlength="11" style="text-transform:uppercase; letter-spacing:2px; font-weight:600;">
-            </div>
-            <button onclick="verifyAssessmentCode()" class="primary-btn full-width student-access-code-btn">Continue</button>
-            <button type="button" class="sx-live lc-join-live-btn" onclick="lcOpenJoin()">Join a Live Competition</button>
-            <button type="button" onclick="backToLanding()" class="sx-back">Back to Home</button>
         </div>
     </div>
 
@@ -1232,19 +1299,33 @@
     <!-- Student pages live inside the container so the logo (top) and footer (foot) wrap them -->
     <!-- ===== Student login (name + PIN) ===== -->
     <div id="studentLoginPage" class="student-login-page" style="display:none;">
-        <button type="button" class="secondary-btn" onclick="studentLoginBack()">&larr; Back</button>
-        <h2 style="margin:12px 0 4px;">Student login</h2>
-        <p class="helper-text">Type your name, then tap your name in the list. Then enter the 4-digit PIN your teacher gave you.</p>
-        <label class="live-msg-label" for="slClass">Your class</label>
-        <select id="slClass" class="form-input" onchange="studentLoginClassChanged()"><option value="">-- Select your class --</option></select>
-        <label class="live-msg-label" for="slName">Your name</label>
-        <input id="slName" class="form-input" placeholder="Type your name" autocomplete="off" oninput="studentLoginSuggest()">
-        <div id="slSuggest" class="sl-suggest"></div>
-        <p id="slChosen" class="helper-text" style="font-weight:700;"></p>
-        <label class="live-msg-label" for="slPin" style="margin-top:8px;">PIN</label>
-        <input id="slPin" type="password" inputmode="numeric" maxlength="4" class="form-input" placeholder="4 digits">
-        <button type="button" class="primary-btn" style="margin-top:10px;width:100%;" onclick="studentLoginSubmit()">Log in</button>
-        <p id="slStatus" class="helper-text" style="min-height:20px;font-weight:600;"></p>
+        <div class="pa-shell">
+            <aside class="pa-brand">
+                <img src="logo.png" alt="CleverMent" class="pa-brand-logo">
+                <h2>Welcome back</h2>
+                <p>Log in to see your assessments, results, certificates and learning space.</p>
+                <ul>
+                    <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>Your teacher gives you a 4-digit PIN</li>
+                    <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>No assessment codes to remember</li>
+                    <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>Your progress is saved for you</li>
+                </ul>
+            </aside>
+            <div class="pa-card">
+                <button type="button" class="pa-back" onclick="studentLoginBack()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Back</button>
+                <h2>Student login</h2>
+                <p class="pa-sub">Type your name, then tap your name in the list. Then enter the 4-digit PIN your teacher gave you.</p>
+                <label class="live-msg-label" for="slClass">Your class</label>
+                <select id="slClass" class="form-input" onchange="studentLoginClassChanged()"><option value="">-- Select your class --</option></select>
+                <label class="live-msg-label" for="slName">Your name</label>
+                <input id="slName" class="form-input" placeholder="Type your name" autocomplete="off" oninput="studentLoginSuggest()">
+                <div id="slSuggest" class="sl-suggest"></div>
+                <p id="slChosen" class="helper-text" style="font-weight:700;"></p>
+                <label class="live-msg-label" for="slPin">PIN</label>
+                <input id="slPin" type="password" inputmode="numeric" maxlength="4" class="form-input" placeholder="4 digits">
+                <button type="button" class="primary-btn full-width pa-submit" onclick="studentLoginSubmit()">Log in</button>
+                <p id="slStatus" class="helper-text" style="min-height:20px;font-weight:600;"></p>
+            </div>
+        </div>
     </div>
 
     <!-- ===== Student home (after login) ===== -->
@@ -1437,7 +1518,7 @@
   </section>
 </div>
 
-<script src="script.js?v=bst2"></script>
+<script src="script.js?v=prem1"></script>
 <script src="competition-ui.js"></script>
 
 <!-- ===== PUBLISHED ASSESSMENT QUESTION EDITOR ===== -->

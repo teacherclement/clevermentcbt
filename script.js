@@ -429,14 +429,13 @@ function renderFaqAccordion() {
     for (var i = 0; i < filtered.length; i++) {
         var f = filtered[i];
         var answerHtml = f.answer.split('\n').map(function(line) {
-            return line ? '<p style="margin:0 0 8px 0;">' + line + '</p>' : '';
+            return line ? '<p>' + line + '</p>' : '';
         }).join('');
-        var videoHtml = f.video_url ? '<a href="' + f.video_url + '" target="_blank" rel="noopener" style="display:inline-block; margin-top:6px; color:#2d6cdf; font-weight:600; text-decoration:none;">🎥 Watch Video</a>' : '';
+        var videoHtml = f.video_url ? '<a href="' + f.video_url + '" target="_blank" rel="noopener" class="faq-video">🎥 Watch Video</a>' : '';
 
-        html += '<div class="faq-item" style="background:white; border:1.5px solid #eef2f6; border-radius:10px; margin-bottom:10px; overflow:hidden;">' +
-            '<button onclick="toggleFaqItem(' + f.id + ')" style="width:100%; text-align:left; background:none; border:none; padding:14px 16px; font-weight:600; font-size:15px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; color:#1a1a2e;">' +
-            '<span>' + f.question + '</span><span id="faqChevron' + f.id + '" style="margin-left:10px; color:#6b7a8f;">▼</span></button>' +
-            '<div id="faqAnswer' + f.id + '" style="display:none; padding:0 16px 16px; color:#4a5568; font-size:14px; line-height:1.5;">' + answerHtml + videoHtml + '</div>' +
+        html += '<div class="faq-item">' +
+            '<button type="button" class="faq-q" onclick="toggleFaqItem(' + f.id + ')"><span>' + f.question + '</span><span id="faqChevron' + f.id + '" class="faq-chev" aria-hidden="true"></span></button>' +
+            '<div id="faqAnswer' + f.id + '" class="faq-a" style="display:none;">' + answerHtml + videoHtml + '</div>' +
             '</div>';
     }
     container.innerHTML = html;
@@ -447,7 +446,8 @@ function toggleFaqItem(id) {
     var chevronEl = document.getElementById('faqChevron' + id);
     var isOpen = answerEl.style.display === 'block';
     answerEl.style.display = isOpen ? 'none' : 'block';
-    chevronEl.textContent = isOpen ? '▼' : '▲';
+    var itemEl = answerEl.closest ? answerEl.closest('.faq-item') : null;
+    if (itemEl) itemEl.classList.toggle('open', !isOpen);
 }
 
 // ============================================================
@@ -5558,7 +5558,7 @@ async function studentSubmitQuiz() {
     for (var j = 0; j < corrections.length; j++) {
         var item = corrections[j];
         var div = document.createElement('div');
-        div.className = 'correction-item';
+        div.className = 'correction-item ' + (item.isCorrect ? 'ok' : 'bad');
         div.innerHTML = `
             <p><strong>Q${j + 1}:</strong> ${item.question}</p>
             <p>Your answer: <strong style="color:${item.isCorrect ? '#2d9c5c' : '#dc3545'}">${item.userAnswerText || 'Not answered'}</strong></p>
@@ -10245,7 +10245,7 @@ async function studentHistoryOpen(code) {
         for (var j = 0; j < corrections.length; j++) {
             var item = corrections[j];
             var div = document.createElement('div');
-            div.className = 'correction-item';
+            div.className = 'correction-item ' + (item.isCorrect ? 'ok' : 'bad');
             div.innerHTML =
                 '<p><strong>Q' + (j + 1) + ':</strong> ' + item.question + '</p>' +
                 '<p>Your answer: <strong style="color:' + (item.isCorrect ? '#2d9c5c' : '#dc3545') + '">' + (item.userAnswerText || 'Not answered') + '</strong></p>' +
