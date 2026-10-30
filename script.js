@@ -8124,6 +8124,34 @@ function posMethodLabel(m) {
     return m === 'latest' ? 'latest assessment' : (m === 'highest' ? 'highest score' : 'average score');
 }
 
+
+// Results table: download the currently filtered results as a PDF (landscape A4).
+function teacherExportResultsPdf() {
+    var list = (typeof getTeacherFilteredResults === 'function') ? getTeacherFilteredResults() : [];
+    var picked = list.filter(function (r) { return teacherSelectedResultIds && teacherSelectedResultIds[String(r.id)]; });
+    if (picked.length) list = picked;
+    if (!list.length) { alert('There are no results to export.'); return; }
+    try {
+        var total = 0, pass = 0;
+        list.forEach(function (r) { total += r.score; var pm = (r.passMark !== null && r.passMark !== undefined) ? r.passMark : 50; if (r.score >= pm) pass++; });
+        var d = new Date();
+        var pdf = pdfBuildTable({
+            orientation: 'landscape',
+            title: 'Results Report',
+            lines: ['Results: ' + list.length + '   |   Average score: ' + Math.round(total / list.length) + '%   |   Pass rate: ' + Math.round(pass / list.length * 100) + '%   |   Date: ' + d.toLocaleDateString()],
+            headers: ['#', 'Class', 'Student', 'Admission No.', 'Subject', 'Score', 'Correct', 'Time', 'Date'],
+            weights: [4, 11, 24, 15, 16, 7, 8, 7, 12],
+            align: ['center', 'left', 'left', 'left', 'left', 'center', 'center', 'center', 'left'],
+            rows: list.map(function (r, i) {
+                return [i + 1, r.className || '', r.studentName || '', r.admissionNumber || '', r.subject || '', r.score + '%', r.correctAnswers + '/' + r.totalQuestions, r.timeTaken || '', r.date || ''];
+            })
+        });
+        posDownloadBlob(pdf.output('blob'), 'Results-' + d.toISOString().slice(0, 10) + '.pdf');
+    } catch (e) {
+        alert('Could not create the PDF: ' + e.message);
+    }
+}
+
 function posDownloadSubjectPdf() {
     if (!posState.subject) { alert('Choose an assessment that has results first.'); return; }
     var a = posState.subject.assessment, d = posState.subject.data;

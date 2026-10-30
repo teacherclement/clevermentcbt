@@ -677,30 +677,22 @@ html table.cm-rt td.result-action-cell{text-align:right;white-space:nowrap}
   #teacherResultsTable th:nth-child(2),#teacherResultsTable td:nth-child(2){display:none}
 }
 
-/* phones: every table turns into compact cards, no sideways scrolling */
-@media(max-width:760px){
-  html table.cm-rt:not(.pos-table){border:0!important;background:transparent!important;box-shadow:none!important;display:block;min-width:0!important}
-  table.cm-rt:not(.pos-table) thead{display:block}
-  table.cm-rt:not(.pos-table) thead tr{display:flex;align-items:center;background:none!important;border:0;padding:0 2px;margin:0 0 8px}
-  table.cm-rt:not(.pos-table) thead th{display:none!important}
-  table.cm-rt:not(.pos-table) thead th.select-cell{display:flex!important;align-items:center;gap:10px;background:none!important;border:0!important;padding:4px 2px!important}
-  table.cm-rt:not(.pos-table) thead th.select-cell::after{content:"Select all";font-size:12.5px;font-weight:650;color:var(--p-muted);text-transform:none;letter-spacing:0}
-  table.cm-rt:not(.pos-table) tbody{display:block}
-  table.cm-rt:not(.pos-table) tbody tr{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;background:var(--p-surface)!important;border:1px solid var(--p-line)!important;border-radius:16px;padding:14px;margin:0 0 10px;box-shadow:var(--p-s1)}
-  table.cm-rt:not(.pos-table) tbody tr:hover td{background:transparent!important}
-  table.cm-rt:not(.pos-table) tbody td{display:flex!important;flex-direction:column;gap:2px;padding:0!important;border:0!important;font-size:13.5px;min-width:0;background:transparent!important}
-  table.cm-rt:not(.pos-table) tbody td::before{content:attr(data-label);font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--p-muted)}
-  table.cm-rt:not(.pos-table) tbody td[data-label=""]::before{display:none}
-  table.cm-rt:not(.pos-table) tbody td[colspan]{grid-column:1/-1;text-align:center}
-  #teacherResultsTable tbody td:nth-child(2){display:none!important}
-  #teacherResultsTable tbody td:nth-child(4){grid-column:1/-1;padding-right:34px!important;font-size:15px;font-weight:700;min-width:0}
-  #teacherResultsTable tbody td:nth-child(4)::before{display:none}
-  #teacherResultsTable td.select-cell{position:absolute;right:12px;top:14px;width:auto}
-  #teacherResultsTable td.select-cell::before{display:none}
-  table.cm-rt:not(.pos-table) td.result-action-cell{grid-column:1/-1;flex-direction:row!important;justify-content:flex-end;padding-top:4px!important}
-  table.cm-rt:not(.pos-table) td.result-action-cell::before{display:none}
-  html .scrollable-panel{overflow-x:visible!important}
-}
 /* broadsheets and position tables stay as real tables but are tight */
 html .pos-table{font-size:12.5px}
 html .pos-table th,html .pos-table td{padding:8px 9px!important}
+
+/* ---- tables: compact, with sideways scrolling kept (phones and laptops) ---- */
+html .scrollable-panel,html .cm-host,html #teacherResultsTableContainer{overflow-x:auto!important;-webkit-overflow-scrolling:touch;max-width:100%}
+html .scrollable-panel table.cm-rt{width:100%;min-width:max-content!important;white-space:nowrap}
+html table.cm-rt td,html table.cm-rt th{white-space:nowrap;word-break:normal}
+html table.cm-rt td:nth-child(4),html #teacherResultsTable td:nth-child(4){min-width:170px}
+html table.cm-rt{font-size:12.5px}
+html table.cm-rt th{padding:8px 9px!important;position:sticky;top:0;z-index:2}
+html table.cm-rt td{padding:6px 9px!important;line-height:1.25}
+html table.cm-rt td .rs-pill,html table.cm-rt td span[style*="border-radius:10px"]{white-space:nowrap}
+#teacherResultsTable th:nth-child(2),#teacherResultsTable td:nth-child(2){display:table-cell!important}
+@media(max-width:760px){
+  html table.cm-rt{font-size:12px}
+  html table.cm-rt td{padding:5px 8px!important}
+  #teacherResultsTable th:nth-child(2),#teacherResultsTable td:nth-child(2){display:none!important}
+}
