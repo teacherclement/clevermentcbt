@@ -10455,7 +10455,7 @@ function exportStudentPinsCsv() {
 
 
 function showTeacherSection(panelId, btn) {
-    if (panelId === 'competitionSection' && window.cmTeacherFeaturePermissions && window.cmTeacherFeaturePermissions.liveCompetition === false) { alert('Live Competition has been disabled for your account by the administrator.'); return; }
+    if (CM_TEACHER_NAV_FEATURES[panelId] && cmTeacherFeatureOff(CM_TEACHER_NAV_FEATURES[panelId])) { cmFeatureNotice(); return; }
     showDashSection('teacherDashboard', panelId, btn);
     if (typeof cmApplyTeacherFeaturePermissions === 'function') cmApplyTeacherFeaturePermissions();
     if (typeof cmShowAnnouncements === 'function') { cmShowAnnouncements('teachers', 'teacherAnnounce'); teacherMsgBadge(); }
@@ -12528,14 +12528,23 @@ function learnAnswer(ix) {
 // Per-teacher feature permissions (administrator-controlled)
 // ============================================================
 var CM_FEATURE_CATALOG = [
- {key:'liveCompetition', label:'Live Competition', detail:'Host and manage live competitive assessments'},
- {key:'createAssessments', label:'Create Assessments', detail:'Create and edit assessments'},
- {key:'questionBank', label:'Question Bank', detail:'Manage saved questions'},
- {key:'studentReports', label:'Student Reports', detail:'View student results and reports'},
- {key:'certificates', label:'Certificates', detail:'Generate achievement certificates'},
- {key:'learningResources', label:'Learning Resources', detail:'Access teaching and learning resources'},
- {key:'classRoster', label:'Class Roster', detail:'Manage class lists and student records'},
- {key:'messaging', label:'Messaging', detail:'Use teacher and student messaging'}
+ {key:'liveNow', label:'Live Now', detail:'Menu: see students taking assessments right now and send live messages'},
+ {key:'liveCompetition', label:'Live Competition', detail:'Menu: host and manage live competitive assessments'},
+ {key:'accessLogs', label:'Access Attempts', detail:'Menu: see who tried to open an assessment'},
+ {key:'createAssessments', label:'Publish Assessment', detail:'Menu: create, upload and publish assessments'},
+ {key:'publishedAssessments', label:'Published Assessments', detail:'Menu: view, edit, close and delete published assessments'},
+ {key:'insights', label:'Insights', detail:'Menu: assessment insights'},
+ {key:'messaging', label:'Messages', detail:'Menu: send and read messages with students'},
+ {key:'classRoster', label:'Class Roster', detail:'Menu: manage class lists, pictures and student PINs'},
+ {key:'analytics', label:'Analytics & Attendance', detail:'Menu: analytics and attendance'},
+ {key:'studentReports', label:'Results', detail:'Menu: view student results and reports'},
+ {key:'csvHistory', label:'CSV History', detail:'Menu: reuse earlier question uploads'},
+ {key:'classPositions', label:'Class Positions', detail:'Menu: positions and broadsheet'},
+ {key:'studentProgress', label:'Student Progress', detail:'Menu: student progress history'},
+ {key:'backupExport', label:'Backup & Export', detail:'Menu: download backups of results and questions'},
+ {key:'questionBank', label:'Question Bank (inside Publish)', detail:'Page part: load from and save to the question bank'},
+ {key:'certificates', label:'Certificate downloads (inside Results)', detail:'Page part: download certificates, single or in bulk'},
+ {key:'learningResources', label:'Learning Resources', detail:'Page part: teaching and learning resources'}
 ];
 async function adminManageTeacherFeatures(id, name) {
     try { id = decodeURIComponent(id); name = decodeURIComponent(name || ''); } catch(e) {}
@@ -12567,47 +12576,82 @@ async function adminManageTeacherFeatures(id, name) {
       };
     } catch(e) { rows.innerHTML = '<p style="color:#b42318">'+String(e.message).replace(/</g,'&lt;')+'</p>'; status.textContent=''; }
 }
+var CM_TEACHER_NAV_FEATURES = {
+  liveSection:'liveNow', competitionSection:'liveCompetition', accessLogsSection:'accessLogs',
+  uploadSection:'createAssessments', publishedSection:'publishedAssessments', insightsSection:'insights',
+  messagesSection:'messaging', rosterSection:'classRoster', analyticsSection:'analytics',
+  adminSection:'studentReports', csvHistorySection:'csvHistory', positionsSection:'classPositions',
+  progressSection:'studentProgress', backupSection:'backupExport'
+};
+function cmTeacherFeatureOff(key) { return !!(window.cmTeacherFeaturePermissions && window.cmTeacherFeaturePermissions[key] === false); }
+function cmFeatureNotice() {
+  var note = document.getElementById('cmFeatureDisabledNotice');
+  if (!note) { note = document.createElement('div'); note.id = 'cmFeatureDisabledNotice'; note.setAttribute('role','status'); note.style.cssText = 'position:fixed;z-index:100001;left:50%;bottom:22px;transform:translateX(-50%);max-width:calc(100vw - 32px);padding:12px 16px;border-radius:10px;background:#18233d;color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.22);font:500 13px/1.45 Inter,Arial,sans-serif;display:none'; document.body.appendChild(note); }
+  note.textContent = 'This feature has been disabled for your account by the administrator.';
+  note.style.display = 'block';
+  if (note._cmHide) clearTimeout(note._cmHide);
+  note._cmHide = setTimeout(function(){ note.style.display='none'; }, 3200);
+}
+function cmApplyFeatureStateToPage() {
+  var dash = document.getElementById('teacherDashboard'); if (!dash) return;
+  /* 1) menu items */
+  Object.keys(CM_TEACHER_NAV_FEATURES).forEach(function(panelId){
+    var nav = dash.querySelector('.dash-nav-item[data-target="'+panelId+'"]'); if (!nav) return;
+    var disabled = cmTeacherFeatureOff(CM_TEACHER_NAV_FEATURES[panelId]);
+    if (nav.classList.contains('cm-feature-disabled') !== disabled) nav.classList.toggle('cm-feature-disabled', disabled);
+    if (nav.getAttribute('aria-disabled') !== String(disabled)) nav.setAttribute('aria-disabled', String(disabled));
+    if (disabled) { if (!nav.getAttribute('data-orig-title')) nav.setAttribute('data-orig-title', nav.title || ''); if (nav.title !== 'This feature has been disabled by your administrator') nav.title = 'This feature has been disabled by your administrator'; }
+    else if (nav.getAttribute('data-orig-title') !== null && nav.title === 'This feature has been disabled by your administrator') { nav.title = nav.getAttribute('data-orig-title'); }
+    if (!nav.getAttribute('data-cm-feature-guard')) {
+      nav.setAttribute('data-cm-feature-guard', '1');
+      nav.addEventListener('click', function(ev) {
+        if (this.getAttribute('aria-disabled') !== 'true') return;
+        ev.preventDefault(); ev.stopPropagation();
+        if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+        cmFeatureNotice();
+      }, true);
+    }
+    if (disabled && nav.style.opacity !== '0.42') { nav.style.opacity = '.42'; nav.style.filter = 'grayscale(1)'; nav.style.cursor = 'not-allowed'; }
+    else if (!disabled && nav.style.opacity) { nav.style.opacity=''; nav.style.filter=''; nav.style.cursor=''; }
+  });
+  /* 2) parts inside pages */
+  var parts = [
+    ['questionBank', '#teacherQuestionBankSelect, [onclick*="teacherSaveToBank"], label[for="teacherQuestionBankSelect"]'],
+    ['certificates', '[onclick*="teacherDownloadAllCertificates"], [onclick*="teacherDownloadSelectedCertificates"], #teacherBulkCertBtn']
+  ];
+  parts.forEach(function(p){
+    var off = cmTeacherFeatureOff(p[0]);
+    Array.prototype.forEach.call(dash.querySelectorAll(p[1]), function(el){
+      if (off) { if (el.style.display !== 'none') { el.setAttribute('data-cm-hidden-by-feature','1'); el.style.display = 'none'; } }
+      else if (el.getAttribute('data-cm-hidden-by-feature')) { el.removeAttribute('data-cm-hidden-by-feature'); el.style.display = ''; }
+    });
+  });
+  /* 3) if the teacher is sitting on a page that is now disabled, send them to the overview */
+  var active = dash.querySelector('.dash-nav-item.active');
+  if (active && active.getAttribute('aria-disabled') === 'true') {
+    var home = dash.querySelector('.dash-nav-item[data-target="teacherOverviewPanel"]');
+    if (home) { try { showDashSection('teacherDashboard', 'teacherOverviewPanel', home); } catch(e) {} }
+  }
+}
 async function cmApplyTeacherFeaturePermissions() {
-  if (window.cmTeacherFeaturePermissions || window.cmFeaturePermissionRequest) return window.cmFeaturePermissionRequest || Promise.resolve();
+  if (window.cmTeacherFeaturePermissions) { cmApplyFeatureStateToPage(); return; }
+  if (window.cmFeaturePermissionRequest) return window.cmFeaturePermissionRequest;
   var token = localStorage.getItem('cleverment_teacher_token');
   if (!token || !document.getElementById('teacherDashboard')) return;
   try {
     window.cmFeaturePermissionRequest = fetch(BACKEND_URL + '/api/teacher/features', {headers:{Authorization:'Bearer '+token}});
     var r = await window.cmFeaturePermissionRequest;
+    window.cmFeaturePermissionRequest = null;
     if (!r.ok) return;
-    var d = await r.json(), features = d.features || {};
-    var map = {'competitionSection':'liveCompetition'};
-    Object.keys(map).forEach(function(panelId){
-      var nav = document.querySelector('#teacherDashboard .dash-nav-item[data-target="'+panelId+'"]');
-      var disabled = features[map[panelId]] === false;
-      if (!nav) return;
-      nav.classList.toggle('cm-feature-disabled', disabled);
-      nav.setAttribute('aria-disabled', String(disabled));
-      nav.title = disabled ? 'This feature has been disabled by your administrator' : '';
-      if (!nav.getAttribute('data-cm-feature-guard')) {
-        nav.setAttribute('data-cm-feature-guard', '1');
-        nav.addEventListener('click', function(ev) {
-          if (this.getAttribute('aria-disabled') !== 'true') return;
-          ev.preventDefault(); ev.stopPropagation();
-          if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
-          var note = document.getElementById('cmFeatureDisabledNotice');
-          if (!note) { note = document.createElement('div'); note.id = 'cmFeatureDisabledNotice'; note.setAttribute('role','status'); note.style.cssText = 'position:fixed;z-index:100001;left:50%;bottom:22px;transform:translateX(-50%);max-width:calc(100vw - 32px);padding:12px 16px;border-radius:10px;background:#18233d;color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.22);font:500 13px/1.45 Inter,Arial,sans-serif;text-align:center'; document.body.appendChild(note); }
-          note.textContent = 'This feature has been disabled for your account by the administrator.';
-          note.style.display = 'block';
-          if (note._cmHide) clearTimeout(note._cmHide);
-          note._cmHide = setTimeout(function(){ note.style.display='none'; }, 3200);
-        }, true);
-      }
-      if (disabled) nav.style.cssText += ';opacity:.42;filter:grayscale(1);cursor:not-allowed';
-      else { nav.style.opacity=''; nav.style.filter=''; nav.style.cursor=''; }
-    });
-    window.cmTeacherFeaturePermissions = features;
+    var d = await r.json();
+    window.cmTeacherFeaturePermissions = d.features || {};
+    cmApplyFeatureStateToPage();
   } catch(e) { window.cmFeaturePermissionRequest = null; /* permissions service unavailable: do not silently alter existing workflows */ }
 }
 
 // Re-apply feature state when the teacher dashboard becomes visible after login.
 (function cmWatchTeacherDashboardVisibility(){
-  function apply(){ var el=document.getElementById('teacherDashboard'); if(el && el.style.display !== 'none' && typeof cmApplyTeacherFeaturePermissions==='function') cmApplyTeacherFeaturePermissions(); }
+  var cmFeatTimer=null; function apply(){ clearTimeout(cmFeatTimer); cmFeatTimer=setTimeout(function(){ var el=document.getElementById('teacherDashboard'); if(el && el.style.display !== 'none' && typeof cmApplyTeacherFeaturePermissions==='function') cmApplyTeacherFeaturePermissions(); },250); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply); else apply();
   if(typeof MutationObserver!=='undefined' && document.body) new MutationObserver(function(){apply();}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['style','class']});
 })();

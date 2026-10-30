@@ -248,15 +248,17 @@
     /* ---------------- UI + speaking ---------------- */
     var synth = root.speechSynthesis;
     var KEY = 'cm_speech_prefs';
-    var prefs = { rate: 1, voice: '', gender: 'f', auto: true, enabled: true };
-    try { var sv = JSON.parse(localStorage.getItem(KEY) || '{}'); if (sv.rate) prefs.rate = sv.rate; if (sv.voice) prefs.voice = sv.voice; if (sv.gender === 'm' || sv.gender === 'f') prefs.gender = sv.gender; if (sv.auto === false) prefs.auto = false; if (sv.enabled === false) prefs.enabled = false; } catch (e) {}
-    function save() { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {} }
+    var prefs = { rate: 1, voice: '', gender: '', auto: true, enabled: true };
+    try { var sv = JSON.parse(localStorage.getItem(KEY) || '{}'); if (sv.rate) prefs.rate = sv.rate; if (sv.v === 2) { if (sv.voice) prefs.voice = sv.voice; if (sv.gender === 'm' || sv.gender === 'f') prefs.gender = sv.gender; } if (sv.auto === false) prefs.auto = false; if (sv.enabled === false) prefs.enabled = false; } catch (e) {}
+    function save() { try { var o = {}; for (var k in prefs) o[k] = prefs[k]; o.v = 2; localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
 
     var state = 'idle', token = 0, bar, btnRead, btnPause, btnGear, panel, selRate, selVoice, statusEl, cloudVoices = [], cloudAudio = null, cloudObjectUrl = null;
 
     var FEMALE = /female|zira|samantha|susan|hazel|aria|jenny|emma|libby|sonia|natasha|moira|tessa|karen|fiona|victoria|ava|joanna|salli|kimberly|ivy|allison|amy|kendra|nicole|olivia|serena|veena|heera|catherine|linda|michelle|ana|clara|mia|zoe|siri|kate|stephanie|lucy|ruth|ellen|yara|imogen|grace/i;
     var MALE = /(^|[^a-z])male|david|mark|daniel|alex|fred|george|james|guy|ryan|thomas|oliver|rishi|aaron|arthur|matthew|joey|justin|brian|russell|gordon|lee|eric|liam|tom|ravi|hemant|christopher|william|connor|prabhat|mike|paul|roger|davis|jason|tony|ronald/i;
-    function voices() { return synth ? (synth.getVoices() || []).filter(function (v) { return /^en/i.test(v.lang); }) : []; }
+    function allVoices() { try { return synth ? (synth.getVoices() || []) : []; } catch (e) { return []; } }
+    function voices() { var a = allVoices(), en = a.filter(function (v) { return /^en/i.test(v.lang); }); return en.length ? en : a; }
+    function deviceDefault() { var a = voices(); for (var i = 0; i < a.length; i++) if (a[i].default) return a[i]; return null; }
     function genderOf(v) {
         var n = v.name || '';
         if (/female/i.test(n)) return 'f';
@@ -272,18 +274,27 @@
     }
     function candidates(g) {
         var all = voices().slice().sort(function (a, b) { return rank(a) - rank(b); });
-        var exact = all.filter(function (v) { return genderOf(v) === g; });
-        return exact;
+        if (g !== 'm' && g !== 'f') return all;
+        return all.filter(function (v) { return genderOf(v) === g; });
     }
     /* returns {voice, pitch, note} */
     function chooseVoice() {
         var all = voices().slice().sort(function (a, b) { return rank(a) - rank(b); });
-        if (!all.length) return { voice: null, pitch: 1, note: 'No compatible English voice is available on this device. Install or enable additional system voices, or connect a neural voice provider.' };
-        var g = prefs.gender, list = candidates(g);
-        if (prefs.voice) { var f = list.filter(function (v) { return v.voiceURI === prefs.voice; })[0]; if (f) return { voice: f, pitch: 1, note: '' }; }
-        if (list.length) return { voice: list[0], pitch: 1, note: '' };
-        /* Never misrepresent pitch-shifting as a voice of the requested gender. */
-        return { voice: null, pitch: 1, note: g === 'm' ? 'No voice identified as male is available on this device. Choose another voice or enable more system voices.' : 'No voice identified as female is available on this device. Choose another voice or enable more system voices.' };
+        /* 1) a voice the user picked from the list */
+        if (prefs.voice && prefs.voice.indexOf('cloud:') !== 0) {
+            var picked = allVoices().filter(function (v) { return v.voiceURI === prefs.voice; })[0];
+            if (picked) return { voice: picked, pitch: 1, note: '' };
+        }
+        /* 2) a voice type (female/male) the user asked for, if the device has one */
+        var g = prefs.gender;
+        if (g === 'm' || g === 'f') {
+            var list = candidates(g);
+            if (list.length) return { voice: list[0], pitch: 1, note: '' };
+            /* no such voice: never go silent, use the device voice instead */
+            return { voice: deviceDefault() || null, pitch: 1, note: 'This device has no ' + (g === 'm' ? 'male' : 'female') + ' voice, so the device voice is being used.' };
+        }
+        /* 3) DEFAULT: the device text-to-speech voice. Null lets the browser use its own default. */
+        return { voice: deviceDefault() || null, pitch: 1, note: '' };
     }
     function pickVoice() { return chooseVoice().voice; }
 
@@ -353,8 +364,9 @@
                 return cloudAudio.play();
             }).catch(function(err) {
                 if (my !== token) return;
+                if (synth) { prefs.voice = ''; token++; var my2 = token; stop(); prefs.voice = ''; save(); start(); if (statusEl) statusEl.textContent = 'Natural voice unavailable, so the device voice is being used.'; return; }
                 state = 'idle'; ui(); clearHighlight();
-                if (statusEl) statusEl.textContent = err.message || 'Neural voice unavailable. Please try again.';
+                if (statusEl) statusEl.textContent = err.message || 'Voice unavailable. Please try again.';
             });
         }
         next();
@@ -369,16 +381,16 @@
         }
         if (!synth) { if (statusEl) statusEl.textContent = 'No device voice engine is available. Select a CleverMent neural voice when configured.'; return; }
         var ch = chooseVoice(), v = ch.voice;
-        if (!v) { state = 'idle'; ui(); if (statusEl) statusEl.textContent = ch.note || 'No suitable voice is available on this device.'; return; }
-        state = 'speaking'; ui(); if (statusEl) statusEl.textContent = ch.note;
+                state = 'speaking'; ui(); if (statusEl) statusEl.textContent = ch.note;
         function next() {
             if (my !== token) return;
             if (idx >= items.length) { state = 'idle'; clearHighlight(); ui(); return; }
             var it = items[idx++], u = new SpeechSynthesisUtterance(it.say);
-            u.voice = v; u.lang = v.lang; u.rate = prefs.rate; u.pitch = 1;
+            if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'en-GB'; } u.rate = prefs.rate; u.pitch = 1;
             u.onstart = function () { if (my === token) setHighlight(it.opt); };
             u.onend = function () { if (my === token) setTimeout(next, it.opt === -1 && idx < items.length && items[idx].opt === 0 ? 350 : 120); };
             u.onerror = function () { if (my === token) setTimeout(next, 50); };
+            try { synth.resume(); } catch (e) {}
             synth.speak(u);
         }
         next();
@@ -390,11 +402,11 @@
     }
     function fillVoices() {
         if (!selVoice) return;
-        var list = candidates(prefs.gender).slice(0, 10), cur = chooseVoice().voice;
+        var list = candidates(prefs.gender).slice(0, 60), cur = chooseVoice().voice;
         var deviceHtml = list.map(function (v) { return '<option value="' + v.voiceURI.replace(/"/g, '&quot;') + '"' + (prefs.voice === v.voiceURI || (!prefs.voice && cur && v.voiceURI === cur.voiceURI) ? ' selected' : '') + '>' + v.name.replace(/</g, '') + ' (' + v.lang + ') · device</option>'; }).join('');
-        var cloudHtml = cloudVoices.filter(function(v){ return v.gender === prefs.gender; }).map(function(v){ return '<option value="cloud:' + v.id + '"' + (prefs.voice === 'cloud:' + v.id ? ' selected' : '') + '>' + v.name + ' · Neural (' + v.accent + ')</option>'; }).join('');
-        selVoice.innerHTML = '<optgroup label="CleverMent Natural Neural Voices">' + (cloudHtml || '<option value="" disabled>Neural voices require provider setup</option>') + '</optgroup><optgroup label="Voices on this device">' + (deviceHtml || '<option value="" disabled>No matching device voices found</option>') + '</optgroup>';
-        if (!prefs.voice && cur) selVoice.value = cur.voiceURI;
+        var cloudHtml = cloudVoices.filter(function(v){ return !prefs.gender || v.gender === prefs.gender; }).map(function(v){ return '<option value="cloud:' + v.id + '"' + (prefs.voice === 'cloud:' + v.id ? ' selected' : '') + '>' + v.name + ' · Neural (' + v.accent + ')</option>'; }).join('');
+        selVoice.innerHTML = '<optgroup label="CleverMent Natural Neural Voices">' + (cloudHtml || '<option value="" disabled>Neural voices require provider setup</option>') + '</optgroup><optgroup label="Voices on this device">' + '<option value=""' + (!prefs.voice ? ' selected' : '') + '>Device default voice</option>' + deviceHtml + '</optgroup>';
+        if (!prefs.voice) selVoice.value = '';
         if (prefs.voice && prefs.voice.indexOf('cloud:') === 0) selVoice.value = prefs.voice;
         if (!cloudVoices.length && statusEl) statusEl.textContent = 'Device voices are available now. Natural neural voices activate after the provider API key is configured.';
     }
@@ -414,7 +426,7 @@
             '<button type="button" id="cmReadBtn" class="cm-rb-main"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg><span>Read question</span></button>' +
             '<button type="button" id="cmPauseBtn" class="cm-rb-sub" style="display:none"><span>Pause</span></button>' +
             '<button type="button" id="cmGearBtn" class="cm-rb-gear" aria-label="Voice settings" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>' +
-            '<div class="cm-rb-panel" id="cmReadPanel" hidden><label>Voice type <select id="cmGender"><option value="f">Female</option><option value="m">Male</option></select></label><label class="cm-rb-check"><input type="checkbox" id="cmAuto"> Read each new question automatically</label><label>Speed <select id="cmRate"><option value="0.75">Slow</option><option value="1">Normal</option><option value="1.25">Fast</option></select></label><label>Voice <select id="cmVoice"></select></label><button type="button" id="cmVoicePreview" class="cm-rb-sub">Preview voice</button><small id="cmReadStatus"></small></div>';
+            '<div class="cm-rb-panel" id="cmReadPanel" hidden><label>Voice type <select id="cmGender"><option value="">Device default</option><option value="f">Female</option><option value="m">Male</option></select></label><label class="cm-rb-check"><input type="checkbox" id="cmAuto"> Read each new question automatically</label><label>Speed <select id="cmRate"><option value="0.75">Slow</option><option value="1">Normal</option><option value="1.25">Fast</option></select></label><label>Voice <select id="cmVoice"></select></label><button type="button" id="cmVoicePreview" class="cm-rb-sub">Preview voice</button><small id="cmReadStatus"></small></div>';
         qt.parentNode.insertBefore(bar, qt);
         btnRead = bar.querySelector('#cmReadBtn'); btnPause = bar.querySelector('#cmPauseBtn'); btnGear = bar.querySelector('#cmGearBtn');
         panel = bar.querySelector('#cmReadPanel'); selRate = bar.querySelector('#cmRate'); selVoice = bar.querySelector('#cmVoice'); statusEl = bar.querySelector('#cmReadStatus');
@@ -431,7 +443,7 @@
         applyEnabled(false);
         var selGender = bar.querySelector('#cmGender'), chkAuto = bar.querySelector('#cmAuto');
         selGender.value = prefs.gender; chkAuto.checked = !!prefs.auto;
-        selGender.addEventListener('change', function () { prefs.gender = selGender.value === 'm' ? 'm' : 'f'; prefs.voice = ''; save(); fillVoices(); if (state !== 'idle') start(); else { start(); } });
+        selGender.addEventListener('change', function () { prefs.gender = selGender.value === 'm' ? 'm' : (selGender.value === 'f' ? 'f' : ''); prefs.voice = ''; save(); fillVoices(); if (state !== 'idle') start(); else { start(); } });
         chkAuto.addEventListener('change', function () { prefs.auto = chkAuto.checked; save(); });
         btnRead.addEventListener('click', function () { state === 'idle' ? start() : stop(); });
         btnPause.addEventListener('click', pauseToggle);
@@ -439,7 +451,7 @@
         selRate.addEventListener('change', function () { prefs.rate = parseFloat(selRate.value) || 1; save(); if (state !== 'idle') start(); });
         selVoice.addEventListener('change', function () { prefs.voice = selVoice.value; save(); start(); });
         var previewBtn = bar.querySelector('#cmVoicePreview');
-        if (previewBtn) previewBtn.addEventListener('click', function () { if (prefs.voice && prefs.voice.indexOf('cloud:') === 0) { stop(); var my = ++token; state='speaking'; ui(); startCloud([{say:'Hello. This is a preview of your selected CleverMent assessment reading voice.',opt:-1}],my,prefs.voice.slice(6)); return; } if (!synth) { if(statusEl) statusEl.textContent='No device voice engine is available.'; return; } var ch = chooseVoice(); if (!ch.voice) { if (statusEl) statusEl.textContent = ch.note || 'No suitable voice is available on this device.'; return; } synth.cancel(); var u = new SpeechSynthesisUtterance('Hello. This is a preview of your selected CleverMent assessment reading voice.'); u.voice = ch.voice; u.lang = ch.voice.lang; u.rate = prefs.rate; u.pitch = 1; if (statusEl) statusEl.textContent = 'Previewing ' + ch.voice.name + ' (device voice).'; synth.speak(u); });
+        if (previewBtn) previewBtn.addEventListener('click', function () { if (prefs.voice && prefs.voice.indexOf('cloud:') === 0) { stop(); var my = ++token; state='speaking'; ui(); startCloud([{say:'Hello. This is a preview of your selected CleverMent assessment reading voice.',opt:-1}],my,prefs.voice.slice(6)); return; } if (!synth) { if(statusEl) statusEl.textContent='No device voice engine is available.'; return; } var ch = chooseVoice(); synth.cancel(); try { synth.resume(); } catch (e) {} var u = new SpeechSynthesisUtterance('Hello. This is a preview of your selected CleverMent assessment reading voice.'); if (ch.voice) { u.voice = ch.voice; u.lang = ch.voice.lang; } u.rate = prefs.rate; u.pitch = 1; if (statusEl) statusEl.textContent = ch.voice ? 'Previewing ' + ch.voice.name + ' (device voice).' : 'Previewing the device default voice.'; synth.speak(u); });
         fillVoices(); loadCloudVoices(); ui();
         if (!synth) { statusEl.textContent = 'Device voices are unavailable. If CleverMent neural voices are configured, select one below.'; panel.hidden = false; }
         /* stop reading whenever the question changes */
