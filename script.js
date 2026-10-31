@@ -3851,7 +3851,7 @@ function hideConnectBanner() {
 
 async function fetchWithRetry(url, options, cfg) {
     cfg = cfg || {};
-    var attempts = cfg.attempts || 5;
+    var attempts = cfg.attempts || 8;
     var baseDelay = cfg.baseDelay || 2000;
     var label = cfg.label || '';
     for (var i = 1; ; i++) {
@@ -3909,7 +3909,7 @@ async function verifyAssessmentCode(opts) {
     }
 
     try {
-        var res = await fetchWithRetry(BACKEND_URL + '/api/quiz/assessment/' + encodeURIComponent(code), { headers: cmStudentAuthHeader() }, { attempts: 6, label: 'Connecting to CleverMent' });
+        var res = await fetchWithRetry(BACKEND_URL + '/api/quiz/assessment/' + encodeURIComponent(code), { headers: cmStudentAuthHeader() }, { attempts: 8, label: 'Connecting to CleverMent' });
         var data = await res.json();
 
         if (!res.ok) {
@@ -4070,9 +4070,13 @@ async function restoreQuizState() {
                 studentName: state.studentName || '',
                 admissionNumber: state.studentAdmissionNumber
             })
-        }, { attempts: 2, baseDelay: 1500 });
+        }, { attempts: 6, baseDelay: 2000, label: 'Restoring your assessment' });
         var eligibility = await eligibilityRes.json().catch(function() { return {}; });
-        if (!eligibilityRes.ok || !eligibility.allowed) {
+        // Server asleep or busy: that is NOT a reason to throw away the student's answers.
+        var cmServerBusy = !eligibilityRes.ok && (eligibilityRes.status >= 500 || eligibilityRes.status === 429 || eligibilityRes.status === 408);
+        if (cmServerBusy) {
+            showConnectBanner('The server is slow. Your saved answers were restored from this phone and will sync soon.');
+        } else if (!eligibilityRes.ok || !eligibility.allowed) {
             // If this saved attempt has reached its own deadline, keep the
             // local answers long enough to submit them automatically. A closed
             // assessment window must not strand a timed-out student. For other
@@ -4091,9 +4095,10 @@ async function restoreQuizState() {
             }
         }
     } catch (e) {
-        // Do not resurrect an old quiz when its server-side status cannot be verified.
-        clearQuizState();
-        return false;
+        // No signal or the server is still waking up. Keep the saved answers and the deadline
+        // (both are stored on this phone) so the student can carry on; the server double-checks
+        // when the connection returns, and refuses anything already submitted.
+        showConnectBanner('No connection. Your saved answers were restored from this phone and will sync when the network returns.');
     }
 
     currentAssessment = state.currentAssessment;
@@ -4987,7 +4992,10 @@ function syncStudentProgress(useKeepalive) {
                 proctorViolations: studentProctorStrikes,
                 fastAnswerWarnings: studentFastAnswerWarnings
             })
-        }).catch(function() { /* offline - the next sync will catch up */ });
+        }).then(function(r) {
+            if (r && r.ok) { window.cmLastSyncOk = Date.now(); if (window.cmOnSyncOk) window.cmOnSyncOk(); }
+            else if (window.cmOnSyncFail) window.cmOnSyncFail();
+        }).catch(function() { if (window.cmOnSyncFail) window.cmOnSyncFail(); /* offline - the next sync will catch up */ });
     } catch (e) { /* never let a background save disturb the quiz */ }
 }
 
@@ -5466,9 +5474,9 @@ async function studentSubmitQuiz() {
                     updateURL('results');
                     return;
                 }
-                if (studentAutoSubmitRetries < 8) {
+                if (studentAutoSubmitRetries < 80) {
                     studentAutoSubmitRetries++;
-                    setTimeout(studentSubmitQuiz, 3000);
+                    setTimeout(studentSubmitQuiz, 5000);
                 }
                 return;
             }
@@ -5481,9 +5489,9 @@ async function studentSubmitQuiz() {
         if (studentIsTimeUp || studentEndReason === 'misconduct') {
             // No pop-ups for automatic submissions: keep retrying quietly.
             // (The server also holds the saved answers and will submit them.)
-            if (studentAutoSubmitRetries < 8) {
+            if (studentAutoSubmitRetries < 80) {
                 studentAutoSubmitRetries++;
-                setTimeout(studentSubmitQuiz, 3000);
+                setTimeout(studentSubmitQuiz, 5000);
             }
             return;
         }
