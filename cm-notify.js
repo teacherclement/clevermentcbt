@@ -69,14 +69,12 @@
     var css = '' +
         '.cmn{--cmn-bg:#fff;--cmn-text:#1f2328;--cmn-muted:#667085;--cmn-border:#e4e7ec;--cmn-soft:#f4f6fa;--cmn-accent:#2563eb;--cmn-accent-soft:#e8f0ff;font-family:Inter,system-ui,Arial,sans-serif}' +
         'html[data-cm-dark] .cmn{--cmn-bg:#1c2026;--cmn-text:#e8ebf0;--cmn-muted:#9aa4b2;--cmn-border:#323946;--cmn-soft:#252b34;--cmn-accent:#6ea0ff;--cmn-accent-soft:#1f2c47}' +
-        '#cmnBell{position:fixed;right:20px;bottom:136px;width:48px;height:48px;border-radius:50%;border:0;background:#1e3a8a;color:#fff;box-shadow:0 5px 18px rgba(0,0,0,.28);display:none;align-items:center;justify-content:center;cursor:pointer;z-index:6900;padding:0}' +
-        '#cmnBell.on{display:flex}' +
-        '#cmnBell svg{width:22px;height:22px}' +
-        '#cmnBadge{position:absolute;top:-3px;right:-3px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:#dc2626;color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;box-sizing:border-box;border:2px solid #fff}' +
-        '#cmnBadge.on{display:flex}' +
-        '#cmnPanel{position:fixed;right:12px;bottom:196px;width:min(390px,calc(100vw - 24px));max-height:min(72vh,540px);background:var(--cmn-bg);color:var(--cmn-text);border:1px solid var(--cmn-border);border-radius:16px;box-shadow:0 16px 50px rgba(0,0,0,.28);z-index:7100;display:none;flex-direction:column;overflow:hidden}' +
+        '.cm-bell{position:relative}' +
+        '.cmn-badge{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#dc2626;color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;box-sizing:border-box;border:2px solid #fff;line-height:1}' +
+        '.cmn-badge.on{display:flex}' +
+        '#cmnPanel{position:fixed;right:12px;top:120px;width:min(390px,calc(100vw - 24px));max-height:min(72vh,540px);background:var(--cmn-bg);color:var(--cmn-text);border:1px solid var(--cmn-border);border-radius:16px;box-shadow:0 16px 50px rgba(0,0,0,.28);z-index:7100;display:none;flex-direction:column;overflow:hidden}' +
         '#cmnPanel.on{display:flex}' +
-        '@media(max-width:600px){#cmnPanel{left:8px;right:8px;bottom:8px;width:auto;max-height:82vh}}' +
+        '@media(max-width:600px){#cmnPanel{left:8px;right:8px;width:auto}}' +
         '.cmn-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--cmn-border)}' +
         '.cmn-head b{font-size:15px}' +
         '.cmn-head .cmn-acts{display:flex;align-items:center;gap:4px}' +
@@ -109,15 +107,12 @@
         '.cmn-toast .cmn-b{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}' +
         '@keyframes cmnIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}';
 
-    var root, bell, badge, panel, toasts, built = false;
+    var root, panel, toasts, built = false;
     function build() {
         if (built) return; built = true;
         var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
         root = document.createElement('div'); root.className = 'cmn';
         root.innerHTML =
-            '<button id="cmnBell" type="button" aria-label="Notifications" title="Notifications">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>' +
-            '<span id="cmnBadge"></span></button>' +
             '<div id="cmnPanel" role="dialog" aria-label="Notifications">' +
             '<div class="cmn-head"><b id="cmnTitle">Notifications</b><div class="cmn-acts">' +
             '<button type="button" class="cmn-ibtn" id="cmnReadAll">Mark all read</button>' +
@@ -126,27 +121,50 @@
             '</div></div><div class="cmn-phone" id="cmnPhone"></div><div class="cmn-body" id="cmnBody"></div></div>' +
             '<div id="cmnToasts"></div>';
         document.body.appendChild(root);
-        bell = document.getElementById('cmnBell'); badge = document.getElementById('cmnBadge');
         panel = document.getElementById('cmnPanel'); toasts = document.getElementById('cmnToasts');
-        bell.addEventListener('click', function () { togglePanel(); });
         document.getElementById('cmnClose').addEventListener('click', function () { togglePanel(false); });
         document.getElementById('cmnReadAll').addEventListener('click', markAllRead);
         document.getElementById('cmnGear').addEventListener('click', function () { S.view = (S.view === 'settings') ? 'list' : 'settings'; render(); });
         document.addEventListener('click', function (e) {
-            if (S.open && !panel.contains(e.target) && !bell.contains(e.target) && !toasts.contains(e.target)) togglePanel(false);
+            if (S.open && !panel.contains(e.target) && !(e.target.closest && e.target.closest('.cm-bell')) && !toasts.contains(e.target)) togglePanel(false);
         });
     }
 
+    // Uses the bell that is already in the top bar (teacher, admin and student pages).
+    function visibleBell() {
+        var all = document.querySelectorAll('.cm-bell');
+        for (var i = 0; i < all.length; i++) if (all[i].getClientRects().length > 0) return all[i];
+        return null;
+    }
+    function bindBells() {
+        document.querySelectorAll('.cm-bell').forEach(function (b) {
+            if (b.getAttribute('data-cmn')) return;
+            b.setAttribute('data-cmn', '1');
+            var bd = document.createElement('span'); bd.className = 'cmn-badge'; b.appendChild(bd);
+            b.addEventListener('click', function (e) { e.stopPropagation(); togglePanel(); });
+        });
+        setBadge();
+    }
+
     function togglePanel(force) {
+        if (!S.id) return;
+        build();
         S.open = (typeof force === 'boolean') ? force : !S.open;
         panel.classList.toggle('on', S.open);
-        if (S.open) { S.view = 'list'; render(); loadList(); renderPhone(); }
+        if (S.open) {
+            var b = visibleBell();
+            var top = b ? Math.round(b.getBoundingClientRect().bottom + 8) : 120;
+            panel.style.top = top + 'px';
+            panel.style.maxHeight = Math.max(240, window.innerHeight - top - 12) + 'px';
+            S.view = 'list'; render(); loadList(); renderPhone();
+        }
     }
 
     function setBadge() {
-        if (!badge) return;
-        badge.textContent = S.unread > 99 ? '99+' : String(S.unread);
-        badge.classList.toggle('on', S.unread > 0);
+        document.querySelectorAll('.cmn-badge').forEach(function (bd) {
+            bd.textContent = S.unread > 99 ? '99+' : String(S.unread);
+            bd.classList.toggle('on', S.unread > 0);
+        });
         try { if (navigator.setAppBadge) { if (S.unread > 0) navigator.setAppBadge(S.unread); else navigator.clearAppBadge(); } } catch (e) { }
     }
 
@@ -402,7 +420,7 @@
     // ---------- follow login / logout / exam ----------
     function startFor(id) {
         S.id = id; S.items = []; S.unread = 0; S.backoff = 3000; S.setupNeeded = false;
-        build(); bell.classList.add('on'); setBadge();
+        build(); bindBells(); setBadge();
         loadList(); connect(); rebindPush();
         clearInterval(S.pollTimer);
         S.pollTimer = setInterval(function () { if (!S.abort && document.visibilityState === 'visible') loadList(); }, 60000);
@@ -411,13 +429,13 @@
     function stopAll() {
         disconnect(); clearInterval(S.pollTimer);
         S.id = null; S.items = []; S.unread = 0; S.open = false;
-        if (bell) bell.classList.remove('on');
         if (panel) panel.classList.remove('on');
         if (toasts) toasts.innerHTML = '';
         setBadge();
     }
     function sameId(a, b) { return a && b && a.role === b.role && a.token === b.token; }
     function tickIdentity() {
+        bindBells();
         var id = currentIdentity();
         if (id === 'exam') { if (S.id) stopAll(); return; }   // a quiet, distraction-free assessment
         if (!id) { if (S.id) stopAll(); return; }
