@@ -8,7 +8,7 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-v71';
+var CACHE_NAME = 'cleverment-v72';
 var urlsToCache = [
     '/',
     '/index.html',
@@ -22,6 +22,7 @@ var urlsToCache = [
     '/cm-ui.js',
     '/cm-speech.js',
     '/cm-profile.js',
+    '/cm-notify.js',
     '/competition-ui.js',
     '/competition.css',
     '/logo.png',
@@ -104,5 +105,47 @@ self.addEventListener('fetch', function(event) {
             .catch(function() {
                 return caches.match(event.request);
             })
+    );
+});
+
+// ============================================================
+// PHONE ALERTS (Web Push)
+// ============================================================
+self.addEventListener('push', function(event) {
+    var d = {};
+    try { d = event.data ? event.data.json() : {}; } catch (e) { d = { title: 'CleverMent', body: event.data ? event.data.text() : '' }; }
+    var title = d.title || 'CleverMent';
+    var isApple = /iPhone|iPad|iPod|Macintosh/.test(self.navigator.userAgent || '');
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+            // If CleverMent is open and in front, the in-app alert already shows it (Apple devices always need the system alert).
+            var open = list.some(function(c) { return c.visibilityState === 'visible'; });
+            if (open && !isApple) return;
+            return self.registration.showNotification(title, {
+                body: d.body || '',
+                icon: '/icon-192.png',
+                badge: '/favicon-64.png',
+                tag: d.tag || undefined,
+                renotify: !!d.tag,
+                data: d.data || {}
+            });
+        })
+    );
+});
+
+self.addEventListener('notificationclick', function(event) {
+    event.notification.close();
+    var data = event.notification.data || {};
+    var go = data.go || '';
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {
+            for (var i = 0; i < list.length; i++) {
+                if ('focus' in list[i]) {
+                    try { list[i].postMessage({ type: 'cm-notify-click', go: go }); } catch (e) {}
+                    return list[i].focus();
+                }
+            }
+            return self.clients.openWindow('/?cmn=' + encodeURIComponent(go));
+        })
     );
 });
