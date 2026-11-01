@@ -602,7 +602,7 @@ var EMAILJS_TEMPLATE_ID = 'template_q8w0apk';
 // Everything else in this file still talks to Supabase directly.
 // ============================================================
 
-var BACKEND_URL = 'https://clevermentcbt-backend.onrender.com';
+var BACKEND_URL = 'https://api.thecleverment.com';
 // Wake the free-plan server early so the first CleverBot message is not slow.
 try { fetch(BACKEND_URL + '/', { mode: 'no-cors', cache: 'no-store' }).catch(function(){}); } catch (e) {}
 
