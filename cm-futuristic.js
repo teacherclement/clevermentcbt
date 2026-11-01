@@ -16,22 +16,22 @@
     var MAP = {
         bg: function (r, g, b, a) {
             var q = hls(r, g, b), h = q[0], l = q[1], s = q[2];
-            if (a < .04) return null; if (a < .55 && (l > .9 || l < .08)) return null;
-            if (l >= .70) { var t = s > .22 && l < .975; return css(t ? h : 226, t ? Math.min(.62, s * .95) : .42, .07 + (1 - l) * .5, a); }
-            if (s < .22) return css(226, .42, Math.min(l, .30) * .62, a);
+            if (a < .04 || (a < .55 && (l > .9 || l < .08))) return null;
+            if (l >= .70) { if (s > .22 && l < .975) return css(h, Math.min(.30, s * .40), .085 + (1 - l) * .5, a); return css(0, 0, .075 + (1 - l) * .5, a); }
+            if (s < .22) return css(0, 0, Math.min(l, .30) * .62, a);
             if (l < .20) return null;
             return css(h, Math.max(s, .85), Math.min(.62, Math.max(.48, l + .05)), a);
         },
         tx: function (r, g, b, a) {
             var q = hls(r, g, b), h = q[0], l = q[1], s = q[2];
             if (a < .04 || l >= .80) return null;
-            if (s < .30) return l <= .55 ? css(222, .38, .95 - .55 * l, a) : css(222, .30, .70, a);
-            return css(h, Math.max(s, .88), (h > 35 && h < 70) ? .66 : .70, a);
+            if (s < .30) return l <= .55 ? css(0, 0, .95 - .55 * l, a) : css(0, 0, .66, a);
+            return css(h, Math.max(s, .80), (h > 35 && h < 70) ? .64 : .68, a);
         },
         bd: function (r, g, b, a) {
             var q = hls(r, g, b), h = q[0], l = q[1], s = q[2];
             if (a < .04 || l < .55) return null;
-            return s > .25 ? css(h, Math.min(.6, s * .8), .30, a) : css(224, .38, .24, a);
+            return s > .25 ? css(h, Math.min(.35, s * .4), .26, a) : css(0, 0, .19, a);
         }
     };
     var RGB = /rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:\s*[,\/]\s*([\d.]+%?))?\s*\)/g;
