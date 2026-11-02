@@ -348,7 +348,7 @@
             if (idx >= items.length) { state = 'idle'; clearHighlight(); ui(); return; }
             var it = items[idx++];
             if (statusEl) statusEl.textContent = 'Generating speech…';
-            fetch((root.CLEVERMENT_BACKEND_URL || 'https://clevermentcbt-backend.onrender.com') + '/api/tts/speech', {
+            fetch((root.CLEVERMENT_BACKEND_URL || (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) || 'https://api.thecleverment.com') + '/api/tts/speech', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: it.say, voiceId: voiceId })
             }).then(function(r) {
@@ -411,7 +411,7 @@
         if (!cloudVoices.length && statusEl) statusEl.textContent = 'Device voices are available now. Natural neural voices activate after the provider API key is configured.';
     }
     function loadCloudVoices() {
-        fetch((root.CLEVERMENT_BACKEND_URL || 'https://clevermentcbt-backend.onrender.com') + '/api/tts/voices').then(function(r){return r.ok ? r.json() : null;}).then(function(d){
+        fetch((root.CLEVERMENT_BACKEND_URL || (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) || 'https://api.thecleverment.com') + '/api/tts/voices').then(function(r){return r.ok ? r.json() : null;}).then(function(d){
             if (!d || !d.available || !Array.isArray(d.voices)) return;
             cloudVoices = d.voices;
             if (selGender) { /* list refresh follows the selected voice type */ }
