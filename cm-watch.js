@@ -92,14 +92,21 @@
         if (W.pc) { try { W.pc.close(); } catch (e) { } }
         W.pc = null; W.viewer = null; refreshBadge();
     }
-    async function openLive(viewer) {
+    function setQuality(hq) {
+        if (!W.pc) return;
+        W.pc.getSenders().forEach(function (s) {
+            if (s.track && s.track.kind === 'video') { try { var p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}]; p.encodings[0].maxBitrate = hq ? 350000 : 110000; p.encodings[0].maxFramerate = hq ? 15 : 8; p.encodings[0].scaleResolutionDownBy = hq ? 1 : 2; s.setParameters(p).catch(function () { }); } catch (e) { } }
+        });
+    }
+    async function openLive(viewer, grid) {
         closeLive();
         try {
             if (!W.ice) { var r = await post('/api/quiz/watch/ice', body()); W.ice = (r.iceServers && r.iceServers.length) ? r.iceServers : [{ urls: 'stun:stun.l.google.com:19302' }]; }
             var pc = new RTCPeerConnection({ iceServers: W.ice });
             W.pc = pc; W.viewer = viewer; W.pendingIce = []; W.remoteSet = false;
             proctorMediaStream.getTracks().forEach(function (t) { pc.addTrack(t, proctorMediaStream); });
-            pc.getSenders().forEach(function (s) {
+            if (grid) setQuality(false);
+            else pc.getSenders().forEach(function (s) {
                 if (s.track && s.track.kind === 'video') { try { var p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}]; p.encodings[0].maxBitrate = 250000; p.encodings[0].maxFramerate = 12; s.setParameters(p); } catch (e) { } }
             });
             pc.onicecandidate = function (e) { if (e.candidate) { var b = body(); b.viewer = viewer; b.type = 'ice'; b.data = e.candidate; post('/api/quiz/watch/send', b); } };
@@ -112,9 +119,10 @@
     }
     async function onEvent(ev) {
         if (ev.type === 'snap') return;
-        if (ev.type === 'viewer') return openLive(ev.viewer);
+        if (ev.type === 'viewer') return openLive(ev.viewer, !!ev.grid);
         if (!W.pc || ev.viewer !== W.viewer) return;
         if (ev.type === 'stop') return closeLive();
+        if (ev.type === 'quality') return setQuality(!!(ev.data && ev.data.hq));
         try {
             if (ev.type === 'answer') { await W.pc.setRemoteDescription(ev.data); W.remoteSet = true; (W.pendingIce || []).forEach(function (c) { W.pc.addIceCandidate(c).catch(function () { }); }); W.pendingIce = []; }
             else if (ev.type === 'ice') { if (W.remoteSet) W.pc.addIceCandidate(ev.data).catch(function () { }); else (W.pendingIce = W.pendingIce || []).push(ev.data); }
@@ -155,18 +163,27 @@
         '.cmw-msg{padding:30px 16px;text-align:center;color:#9aa8c7;font-size:14px;grid-column:1/-1}' +
         '.cmw-foot{display:flex;justify-content:center;gap:10px;align-items:center;padding:8px 12px calc(env(safe-area-inset-bottom,0px) + 8px);border-top:1px solid #243049;font-size:13px}' +
         '#cmWatchLive{position:absolute;inset:0;background:#0f172a;display:none;flex-direction:column}#cmWatchLive.on{display:flex}' +
-        '#cmWatchLive video{flex:1;min-height:0;width:100%;background:#000;object-fit:contain}';
+        '#cmWatchLive video{flex:1;min-height:0;width:100%;background:#000;object-fit:contain}' +
+        '.cmw-grid.live{overflow:hidden;padding:8px;gap:8px}' +
+        '.cmw-tile.lv{position:relative;display:block;width:100%}.cmw-tile.lv.listen{border-color:#22c55e;box-shadow:0 0 0 2px #22c55e}.cmw-tile.lv.loud{border-color:#f59e0b;box-shadow:0 0 0 2px #f59e0b}' +
+        '.cmw-tile.lv .cmw-pic{position:relative;padding:0;aspect-ratio:4/3}.cmw-tile.lv video,.cmw-tile.lv .cmw-pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.cmw-tile.lv video{background:#000;display:none}.cmw-tile.lv.isLive video{display:block}' +
+        '.cmw-tile.lv .cmw-name{display:flex;align-items:center;gap:6px;padding:4px 7px;font-size:12px}.cmw-tile.lv .cmw-name span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}' +
+        '.cmw-meter{position:absolute;left:0;right:0;bottom:0;height:5px;background:rgba(0,0,0,.45);z-index:2}.cmw-meter i{display:block;height:100%;width:0;background:#22c55e;transition:width .12s}' +
+        '.cmw-badge{position:absolute;top:5px;left:5px;z-index:2;font-size:10.5px;padding:2px 6px;border-radius:8px;background:rgba(15,23,42,.8);color:#cbd5e1}.cmw-badge.live{background:#dc2626;color:#fff}' +
+        '.cmw-big{position:absolute;top:4px;right:4px;z-index:3;width:28px;height:28px;border-radius:8px;border:0;background:rgba(15,23,42,.8);color:#fff;font-size:15px;cursor:pointer}.cmw-snd{font-size:13px}';
     function buildTeacher() {
         if ($('cmWatchOv')) return;
         var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
         var ov = document.createElement('div'); ov.id = 'cmWatchOv';
-        ov.innerHTML = '<div class="cmw-top"><b style="font-size:15px">👁 Live watching</b><select id="cmWatchSel"></select><button class="cmw-btn ghost" id="cmWatchClose">Close</button></div>' +
+        ov.innerHTML = '<div class="cmw-top"><b style="font-size:15px">👁 Live watching</b><select id="cmWatchSel"></select><button class="cmw-btn ghost" id="cmWatchMode" title="Show live video for every student on screen">🎥 Live grid: ON</button><button class="cmw-btn ghost" id="cmWatchClose">Close</button></div>' +
             '<div class="cmw-grid" id="cmWatchGrid"></div><div class="cmw-foot" id="cmWatchFoot"></div>' +
             '<div id="cmWatchLive"><div class="cmw-top"><b id="cmWatchWho" style="flex:1"></b><button class="cmw-btn ghost" id="cmWatchMute">🔊 Sound on</button><button class="cmw-btn red" id="cmWatchStop">Stop</button></div>' +
             '<video id="cmWatchVideo" autoplay playsinline></video><div class="cmw-foot" id="cmWatchState">Connecting…</div></div>';
         document.body.appendChild(ov);
         $('cmWatchClose').addEventListener('click', closeOverlay);
-        $('cmWatchSel').addEventListener('change', function () { T.code = this.value; T.page = 0; T.cache = {}; T.since = 0; loadGrid(); });
+        $('cmWatchSel').addEventListener('change', function () { gStopAll(); T.code = this.value; T.page = 0; T.cache = {}; T.since = 0; loadGrid(); });
+        $('cmWatchMode').addEventListener('click', function () { G.on = !G.on; try { localStorage.setItem('cmw_live', G.on ? '1' : '0'); } catch (e) { } gStopAll(); resetLive($('cmWatchGrid')); T.page = 0; T.since = 0; modeLabel(); loadGrid(); });
+        modeLabel();
         $('cmWatchStop').addEventListener('click', stopLive);
         $('cmWatchMute').addEventListener('click', function () { var v = $('cmWatchVideo'); v.muted = !v.muted; this.textContent = v.muted ? '🔇 Sound off' : '🔊 Sound on'; });
     }
@@ -190,26 +207,208 @@
             sel.value = T.code; loadGrid();
         }).catch(function (e) { $('cmWatchGrid').innerHTML = '<div class="cmw-msg">' + esc(e.message) + '</div>'; });
     }
-    function closeOverlay() { stopLive(); T.open = false; clearTimeout(T.timer); $('cmWatchOv').classList.remove('on'); }
+    function closeOverlay() { stopLive(); gStopAll(); T.open = false; clearTimeout(T.timer); $('cmWatchOv').classList.remove('on'); }
     function scheduleGrid(ms) { clearTimeout(T.timer); if (T.open) T.timer = setTimeout(function () { if (T.live) return scheduleGrid(8000); if (T.code) loadGrid(); else openOverlay(); }, ms || 8000); }
     function loadGrid() {
         if (!T.open || !T.code) return;
-        tget('/api/teacher/watch/grid?code=' + encodeURIComponent(T.code) + '&page=' + T.page + '&since=' + T.since).then(function (d) {
+        tget('/api/teacher/watch/grid?code=' + encodeURIComponent(T.code) + '&page=' + T.page + '&since=' + T.since + '&per=' + (G.on && LIVE_OK ? deviceCap() : 12)).then(function (d) {
             T.since = d.serverTime - 1000; T.page = d.page;
-            var g = $('cmWatchGrid');
-            if (!d.students.length) { g.innerHTML = '<div class="cmw-msg">No students online in this assessment.</div>'; }
+            var g = $('cmWatchGrid'), usedLive = liveMode(d);
+            if (usedLive) renderLive(d, g);
+            else if (resetLive(g), !d.students.length) { g.innerHTML = '<div class="cmw-msg">No students online in this assessment.</div>'; }
             else g.innerHTML = d.students.map(function (s) {
                 if (s.img) T.cache[s.adm] = { img: s.img, at: s.at };
                 var c = T.cache[s.adm], age = c ? Math.max(1, Math.round((Date.now() - (c.at + (Date.now() - d.serverTime))) / 1000)) : 0;
                 var pic = c ? '<img src="' + c.img + '" alt="">' : (d.camera ? (s.ready ? 'Waiting for picture…' : 'Not ready (no consent yet)') : '🎙 Sound only');
                 return '<button class="cmw-tile' + (s.ready ? '' : ' off') + '" data-adm="' + esc(s.adm) + '" data-name="' + esc(s.name) + '"><div class="cmw-pic">' + pic + '</div><div class="cmw-name">' + esc(s.name) + '<small>' + (s.ready ? 'Tap to watch & listen' : 'Not available yet') + '</small></div></button>';
             }).join('');
-            g.querySelectorAll('.cmw-tile').forEach(function (b) { if (!b.classList.contains('off')) b.addEventListener('click', function () { startLive(b.getAttribute('data-adm'), b.getAttribute('data-name')); }); });
+            if (!usedLive) g.querySelectorAll('.cmw-tile').forEach(function (b) { if (!b.classList.contains('off')) b.addEventListener('click', function () { startLive(b.getAttribute('data-adm'), b.getAttribute('data-name')); }); });
             var f = $('cmWatchFoot');
             f.innerHTML = d.pages > 1 ? '<button class="cmw-btn ghost" id="cmwPrev"' + (d.page <= 0 ? ' disabled' : '') + '>‹ Prev</button><span>Page ' + (d.page + 1) + ' of ' + d.pages + ' (' + d.total + ' students)</span><button class="cmw-btn ghost" id="cmwNext"' + (d.page >= d.pages - 1 ? ' disabled' : '') + '>Next ›</button>' : '<span>' + d.total + ' student' + (d.total === 1 ? '' : 's') + ' online · pictures refresh every ~10 seconds</span>';
             if ($('cmwPrev')) { $('cmwPrev').addEventListener('click', function () { T.page--; T.since = 0; loadGrid(); }); $('cmwNext').addEventListener('click', function () { T.page++; T.since = 0; loadGrid(); }); }
             scheduleGrid(8000);
         }).catch(function (e) { $('cmWatchGrid').innerHTML = '<div class="cmw-msg">' + esc(e.message) + '</div>'; scheduleGrid(12000); });
+    }
+
+    // =================== LIVE GRID (teacher) ===================
+    // Every student on screen is watched live (small video, with a sound meter). Tap a tile to listen to that student only.
+    var LIVE_OK = !!window.RTCPeerConnection;
+    var G = { on: true, tiles: {}, byViewer: {}, ice: null, polling: false, listen: '', since: 0, ctx: null, big: null, meterTimer: null, timer: null, paused: false };
+    try { if (localStorage.getItem('cmw_live') === '0') G.on = false; } catch (e) { }
+    function modeLabel() { var b = $('cmWatchMode'); if (b) b.textContent = '🎥 Live grid: ' + (G.on && LIVE_OK ? 'ON' : 'OFF'); }
+    // How many live videos this device can comfortably show at once.
+    function deviceCap() {
+        var coarse = false; try { coarse = matchMedia('(pointer:coarse)').matches; } catch (e) { }
+        var small = Math.min(window.innerWidth, window.innerHeight);
+        var cap = coarse ? (small < 600 ? 4 : 9) : 16;
+        var low = (navigator.deviceMemory && navigator.deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+        if (low) cap = Math.max(2, Math.floor(cap / 2));
+        return cap;
+    }
+    function liveMode(d) { return G.on && LIVE_OK && (d.camera || d.mic); }
+    function resetLive(g) { if (g && g.dataset.mode === 'live') { gStopAll(); g.dataset.mode = ''; g.classList.remove('live'); g.style.gridTemplateColumns = ''; g.style.justifyContent = ''; g.style.alignContent = ''; g.innerHTML = ''; } }
+    // Choose the column count that makes tiles as large as possible: fewer students = bigger tiles.
+    function layoutGrid(g, n) {
+        if (!n) return;
+        var W = g.clientWidth - 16, H = g.clientHeight - 16, gap = 8, bar = 30, best = 1, bw = 0;
+        for (var c = 1; c <= n; c++) {
+            var rows = Math.ceil(n / c), tw = (W - (c - 1) * gap) / c, th = (H - (rows - 1) * gap) / rows - bar;
+            var w = Math.min(tw, th * 4 / 3); if (w > bw) { bw = w; best = c; }
+        }
+        g.style.gridTemplateColumns = 'repeat(' + best + ',' + Math.max(80, Math.floor(bw)) + 'px)';
+        g.style.justifyContent = 'center'; g.style.alignContent = 'center';
+    }
+    window.addEventListener('resize', function () { var g = $('cmWatchGrid'); if (g && g.dataset.mode === 'live') layoutGrid(g, g.querySelectorAll('.cmw-tile').length); });
+    function tileBadge(t, text, live) { var b = t.el.querySelector('.cmw-badge'); b.textContent = text; b.className = 'cmw-badge' + (live ? ' live' : ''); }
+    function renderLive(d, g) {
+        if (g.dataset.mode !== 'live') { g.innerHTML = ''; g.dataset.mode = 'live'; g.classList.add('live'); }
+        if (!d.students.length) { gStopAll(); g.dataset.mode = 'live'; g.classList.add('live'); g.innerHTML = '<div class="cmw-msg">No students online in this assessment.</div>'; g.style.gridTemplateColumns = ''; g.style.alignContent = 'start'; }
+        else {
+            var empty = g.querySelector('.cmw-msg'); if (empty) g.innerHTML = '';
+            var keep = {};
+            d.students.forEach(function (s) { keep[s.adm] = 1; });
+            Object.keys(G.tiles).forEach(function (adm) { if (!keep[adm]) gDropTile(adm); });
+            d.students.forEach(function (s) {
+                if (s.img) T.cache[s.adm] = { img: s.img, at: s.at };
+                var t = G.tiles[s.adm];
+                if (!t) {
+                    var el = document.createElement('div'); el.className = 'cmw-tile lv' + (s.ready ? '' : ' off'); el.setAttribute('data-adm', s.adm);
+                    el.innerHTML = '<div class="cmw-pic"><img alt="" style="display:none"><video muted autoplay playsinline></video><span class="cmw-badge"></span><div class="cmw-meter"><i></i></div><button type="button" class="cmw-big" title="Enlarge" aria-label="Enlarge">⤢</button></div><div class="cmw-name"><span></span><b class="cmw-snd"></b></div>';
+                    t = G.tiles[s.adm] = { adm: s.adm, name: s.name, el: el, vid: el.querySelector('video'), img: el.querySelector('img'), bar: el.querySelector('.cmw-meter i'), snd: el.querySelector('.cmw-snd'), viewer: '', pc: null, starting: false, attempts: 0, queue: [], meter: null };
+                    el.addEventListener('click', function (e) { if (e.target.classList.contains('cmw-big')) return gEnlarge(t.adm); gListen(t.adm); });
+                    g.appendChild(el);
+                }
+                t.name = s.name; t.ready = s.ready;
+                t.el.classList.toggle('off', !s.ready);
+                t.el.querySelector('.cmw-name span').textContent = s.name;
+                var c = T.cache[s.adm];
+                if (c && !t.live) { t.img.src = c.img; t.img.style.display = 'block'; }
+                if (!t.live && !t.starting) tileBadge(t, s.ready ? (t.failed ? 'Live unavailable' : 'Connecting…') : 'Not ready', false);
+                if (s.ready && !t.viewer && !t.starting && !t.failed && !G.paused) gStart(t.adm);
+            });
+            layoutGrid(g, d.students.length);
+        }
+        if (!G.since) G.since = Date.now();
+        if (!G.timer) G.timer = setInterval(gTick, 30000);
+        if (!G.meterTimer) G.meterTimer = setInterval(gMeters, 150);
+        try { if (G.ctx && G.ctx.state === 'suspended') G.ctx.resume(); } catch (e) { }
+    }
+    // Stagger starts so many connections do not all begin in the same instant.
+    function gStart(adm) {
+        var t = G.tiles[adm]; if (!t || t.starting || t.viewer) return;
+        t.starting = true; G.queueStart = (G.queueStart || Promise.resolve()).then(function () { return sleep(250); }).then(function () { return gConnect(t); });
+    }
+    async function gConnect(t) {
+        if (G.tiles[t.adm] !== t || !T.open || !G.on) { t.starting = false; return; }
+        tileBadge(t, 'Connecting…', false);
+        try {
+            var st = await tpost('/api/teacher/watch/start', { code: T.code, admissionNumber: t.adm, grid: true });
+            if (!st.viewer) throw new Error(st.error || 'Could not start.');
+            if (G.tiles[t.adm] !== t) { tpost('/api/teacher/watch/stop', { viewer: st.viewer }).catch(function () { }); return; }
+            t.viewer = st.viewer; G.byViewer[st.viewer] = t; t.queue = []; t.pendingIce = []; t.remoteSet = false;
+            gPoll();
+            if (!G.ice) { var ice = await tget('/api/teacher/watch/ice'); G.ice = ice.iceServers || []; }
+            var pc = new RTCPeerConnection({ iceServers: G.ice }); t.pc = pc;
+            pc.ontrack = function (e) {
+                t.stream = e.streams[0]; if (t.vid.srcObject !== t.stream) { t.vid.srcObject = t.stream; t.vid.muted = (G.listen !== t.adm); t.vid.play().catch(function () { }); }
+                t.live = true; t.attempts = 0; t.el.classList.add('isLive'); t.img.style.display = 'none'; tileBadge(t, '● Live', true); gMeterAttach(t);
+            };
+            pc.onicecandidate = function (e) { if (e.candidate && t.viewer) tpost('/api/teacher/watch/send', { viewer: t.viewer, type: 'ice', data: e.candidate }); };
+            pc.onconnectionstatechange = function () { if (pc.connectionState === 'failed' && t.pc === pc) gRetry(t); };
+            var q = t.queue; t.queue = []; for (var i = 0; i < q.length; i++) await gEvent(q[i]);
+        } catch (e) { gRetry(t); }
+        finally { t.starting = false; }
+    }
+    function gRetry(t) {
+        if (G.tiles[t.adm] !== t) return;
+        gCloseTile(t); t.attempts++;
+        if (t.attempts > 3) { t.failed = true; tileBadge(t, 'Live unavailable', false); return; }
+        tileBadge(t, 'Reconnecting…', false);
+        setTimeout(function () { if (G.tiles[t.adm] === t && T.open && G.on && !G.paused) gStart(t.adm); }, 4000 * t.attempts);
+    }
+    function gCloseTile(t) {
+        if (t.viewer) { tpost('/api/teacher/watch/stop', { viewer: t.viewer }).catch(function () { }); delete G.byViewer[t.viewer]; t.viewer = ''; }
+        if (t.pc) { try { t.pc.close(); } catch (e) { } t.pc = null; }
+        t.live = false; t.stream = null; t.starting = false; t.vid.srcObject = null; t.el.classList.remove('isLive', 'listen', 'loud');
+        if (t.meter) { try { t.meter.src.disconnect(); } catch (e) { } t.meter = null; }
+        t.bar.style.width = '0';
+    }
+    function gDropTile(adm) { var t = G.tiles[adm]; if (!t) return; gCloseTile(t); if (t.el.parentNode) t.el.parentNode.removeChild(t.el); delete G.tiles[adm]; if (G.listen === adm) G.listen = ''; }
+    function gStopAll() {
+        var any = Object.keys(G.tiles).length || Object.keys(G.byViewer).length;
+        Object.keys(G.tiles).forEach(function (adm) { var t = G.tiles[adm]; if (t.pc) { try { t.pc.close(); } catch (e) { } } if (t.el && t.el.parentNode) t.el.parentNode.removeChild(t.el); });
+        if (G.big) gShrink();
+        G.tiles = {}; G.byViewer = {}; G.polling = false; G.listen = ''; G.queueStart = null;
+        clearInterval(G.timer); G.timer = null; clearInterval(G.meterTimer); G.meterTimer = null; G.since = 0;
+        if (any && tok()) tpost('/api/teacher/watch/stopall', {}).catch(function () { });
+    }
+    // One shared waiting request carries the signalling messages for every tile.
+    async function gPoll() {
+        if (G.polling) return; G.polling = true;
+        while (G.polling && T.open && G.on) {
+            try {
+                var r = await tget('/api/teacher/watch/pollall');
+                if (!G.polling) break;
+                for (var i = 0; r.events && i < r.events.length; i++) await gEvent(r.events[i]);
+            } catch (e) { await sleep(3000); }
+        }
+        G.polling = false;
+    }
+    async function gEvent(ev) {
+        var t = G.byViewer[ev.viewer]; if (!t) return;
+        if (!t.pc) { t.queue.push(ev); return; }
+        var pc = t.pc;
+        try {
+            if (ev.type === 'offer') {
+                await pc.setRemoteDescription(ev.data); t.remoteSet = true;
+                (t.pendingIce || []).forEach(function (c) { pc.addIceCandidate(c).catch(function () { }); }); t.pendingIce = [];
+                var ans = await pc.createAnswer(); await pc.setLocalDescription(ans);
+                tpost('/api/teacher/watch/send', { viewer: t.viewer, type: 'answer', data: { type: ans.type, sdp: ans.sdp } });
+            } else if (ev.type === 'ice') { if (t.remoteSet) pc.addIceCandidate(ev.data).catch(function () { }); else t.pendingIce.push(ev.data); }
+            else if (ev.type === 'ended') { delete G.byViewer[t.viewer]; t.viewer = ''; if (t.pc) { try { t.pc.close(); } catch (e) { } t.pc = null; } t.live = false; t.el.classList.remove('isLive'); if (!G.paused) setTimeout(function () { if (G.tiles[t.adm] === t && T.open && G.on) gStart(t.adm); }, 1500); }
+        } catch (e) { }
+    }
+    function gMeterAttach(t) {
+        if (t.meter || !t.stream || !t.stream.getAudioTracks().length) return;
+        try {
+            var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+            if (!G.ctx) G.ctx = new AC();
+            var src = G.ctx.createMediaStreamSource(t.stream), an = G.ctx.createAnalyser(); an.fftSize = 256; src.connect(an);
+            t.meter = { an: an, src: src, buf: new Uint8Array(an.fftSize) };
+        } catch (e) { }
+    }
+    function gMeters() {
+        Object.keys(G.tiles).forEach(function (adm) {
+            var t = G.tiles[adm]; if (!t.meter) return;
+            t.meter.an.getByteTimeDomainData(t.meter.buf);
+            var sum = 0, b = t.meter.buf; for (var i = 0; i < b.length; i++) { var x = (b[i] - 128) / 128; sum += x * x; }
+            var lvl = Math.min(1, Math.sqrt(sum / b.length) * 5);
+            t.bar.style.width = Math.round(lvl * 100) + '%'; t.el.classList.toggle('loud', lvl > 0.45);
+        });
+    }
+    function gListen(adm) {
+        try { if (G.ctx && G.ctx.state === 'suspended') G.ctx.resume(); } catch (e) { }
+        var was = G.listen; G.listen = (was === adm) ? '' : adm;
+        Object.keys(G.tiles).forEach(function (a) { var t = G.tiles[a], on = (a === G.listen); t.vid.muted = !on; t.el.classList.toggle('listen', on); t.snd.textContent = on ? '🔊' : ''; if (on) t.vid.play().catch(function () { }); });
+    }
+    function gEnlarge(adm) {
+        var t = G.tiles[adm]; if (!t || !t.stream) return;
+        G.big = adm; $('cmWatchLive').classList.add('on'); $('cmWatchWho').textContent = t.name;
+        var v = $('cmWatchVideo'); v.srcObject = t.stream; v.muted = false; v.play().catch(function () { }); state('Live');
+        tpost('/api/teacher/watch/send', { viewer: t.viewer, type: 'quality', data: { hq: true } });
+    }
+    function gShrink() {
+        var t = G.tiles[G.big]; G.big = null;
+        if (t && t.viewer) tpost('/api/teacher/watch/send', { viewer: t.viewer, type: 'quality', data: { hq: false } });
+        var v = $('cmWatchVideo'); if (v) v.srcObject = null;
+    }
+    // Pause after 20 minutes to save data; the teacher taps Resume to continue.
+    function gTick() {
+        if (!T.open || G.paused || !G.since || Date.now() - G.since < 20 * 60 * 1000) return;
+        gStopAll(); G.paused = true;
+        var g = $('cmWatchGrid'); g.dataset.mode = 'live'; g.classList.add('live'); g.style.gridTemplateColumns = ''; g.style.alignContent = 'start';
+        g.innerHTML = '<div class="cmw-msg">Live video paused after 20 minutes to save data.<br><br><button class="cmw-btn" id="cmwResume">Resume live grid</button></div>';
+        $('cmwResume').addEventListener('click', function () { G.paused = false; g.innerHTML = ''; T.since = 0; loadGrid(); });
     }
 
     function state(t) { var s = $('cmWatchState'); if (s) s.textContent = t; }
@@ -251,6 +450,7 @@
         }
     }
     function stopLive(keepMsg) {
+        if (G.big) gShrink();
         var v = T.viewer; T.viewer = null;
         if (v) tpost('/api/teacher/watch/stop', { viewer: v }).catch(function () { });
         if (T.pc) { try { T.pc.close(); } catch (e) { } T.pc = null; }

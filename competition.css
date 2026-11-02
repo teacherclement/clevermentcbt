@@ -88,3 +88,16 @@ body.lc-open { overflow: hidden; }
 .lc-qrow { border-bottom: 1px solid #eef2f6; padding: 8px 4px; } .lc-qrow:last-child { border-bottom: 0; }
 .lc-qtxt { font-size: 14px; margin-bottom: 6px; } .lc-qthumb { display: block; max-height: 90px; max-width: 100%; border-radius: 8px; margin-bottom: 6px; border: 1px solid #eef2f6; }
 .lc-qbtns { display: flex; gap: 8px; flex-wrap: wrap; } .lc-qbtns .secondary-btn { padding: 6px 12px; font-size: 13px; }
+
+/* ---- readability fix: the futuristic theme was washing out the answer buttons and question text ---- */
+.lc-overlay { background: #0b1226 !important; }
+.lc-overlay .lc-q { color: #fff !important; font-size: clamp(20px, 5vw, 30px); font-weight: 800; line-height: 1.3; text-align: center; background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.28); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+.lc-overlay .lc-opt { color: #fff !important; border: 2px solid rgba(255,255,255,.55) !important; text-shadow: 0 1px 2px rgba(0,0,0,.5); transform: none !important; box-shadow: none !important; }
+.lc-overlay .lc-opt:nth-child(1) { background: #e21b3c !important; }
+.lc-overlay .lc-opt:nth-child(2) { background: #1368ce !important; }
+.lc-overlay .lc-opt:nth-child(3) { background: #a87400 !important; }
+.lc-overlay .lc-opt:nth-child(4) { background: #26890c !important; }
+.lc-overlay .lc-opt b, .lc-overlay .lc-opt span, .lc-overlay .lc-opt em { color: #fff !important; }
+.lc-overlay .lc-opt.dim { opacity: .45; }
+html body .lc-overlay .lc-opt.picked { outline: 4px solid #fff !important; outline-offset: 2px; opacity: 1; }
+.lc-overlay .lc-qhead, .lc-overlay .lc-small, .lc-overlay .lc-wait, .lc-overlay .lc-locked { color: #e2e8f0 !important; }

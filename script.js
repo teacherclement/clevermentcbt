@@ -10366,6 +10366,9 @@ async function studentAreaStart(code) {
         document.getElementById('studentNameInput').value = prof.name || '';
         document.getElementById('studentAdmissionNumber').value = prof.admissionNumber || '';
         await startStudentQuiz();
+        // Camera/noise assessments stop at the "I understand" warning screen first: that is NOT a failure, so stay on it.
+        var pw = document.getElementById('proctorWarningScreen');
+        if (pw && pw.style.display === 'block') return;
         var quiz = document.getElementById('studentQuizSection');
         if (!quiz || quiz.style.display === 'none') openStudentArea();
     } catch (e) {
