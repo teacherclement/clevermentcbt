@@ -5,7 +5,7 @@
         dark: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>',
         system: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>'
     };
-    function get() { try { return localStorage.getItem(KEY) || 'dark'; } catch (e) { return 'dark'; } }
+    function get() { try { return localStorage.getItem(KEY) || 'light'; } catch (e) { return 'light'; } }
     function sysDark() { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
     function isDark(t) { return t === 'dark' || (t === 'system' && sysDark()); }
     function apply(t) {
