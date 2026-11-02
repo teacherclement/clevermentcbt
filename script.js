@@ -11276,6 +11276,8 @@ function cleverBotCopyValue(raw) {
     var messages = document.getElementById('cleverBotMessages');
     var input = document.getElementById('cleverBotInput');
     var sendBtn = document.getElementById('cleverBotSend');
+    var stopBtn = document.getElementById('cleverBotStop');
+    var activeStop = null;
     var attachBtn = document.getElementById('cleverBotAttach');
     var fileInput = document.getElementById('cleverBotFileInput');
     var micBtn = document.getElementById('cleverBotMic');
@@ -11450,7 +11452,16 @@ function cleverBotCopyValue(raw) {
             if (resolveDone) { var r=resolveDone; resolveDone=null; r(cleanBotText(displayed).trim()); }
         }
         function getText(){ return cleanBotText(displayed).trim(); }
-        return {push:push, finish:finish, getText:getText, done:donePromise};
+        // Stop right now (user pressed Stop): drop what has not been shown yet and keep what is already on screen.
+        function stop(){
+            if (timer) { clearTimeout(timer); timer=null; }
+            queue=''; finished=true;
+            var txt=cleanBotText(displayed).trim();
+            if (txt) { renderBotBody(target, txt, true); renderMathIn(target.body); if (target.copyBtn) target.copyBtn.style.display = target.raw ? 'inline-flex' : 'none'; }
+            if (resolveDone) { var r=resolveDone; resolveDone=null; r(txt); }
+            return txt;
+        }
+        return {push:push, finish:finish, getText:getText, stop:stop, done:donePromise};
     }
 
     async function consumeCleverBotStream(res, target, onActivity){
@@ -11464,6 +11475,7 @@ function cleverBotCopyValue(raw) {
         if(!reader){ throw new Error('This browser does not support streamed CleverBot responses.'); }
         var decoder=new TextDecoder('utf-8'); var buffer='';
         var streamer=createTextStreamer(target);
+        target.streamer=streamer;
         while(true){
             var part=await reader.read();
             if(onActivity) onActivity();
@@ -11694,6 +11706,9 @@ function cleverBotCopyValue(raw) {
         var streamMessage=null;
         var coldTimer=null, hardTimer=null, watchdog=null, lastActivity=Date.now();
         var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
+        var stopped=false;
+        activeStop=function(){ stopped=true; if(ctrl) ctrl.abort(); };
+        if (stopBtn) stopBtn.style.display='flex';
         try {
             var attachments=[];
             var totalRawBytes=0;
@@ -11772,13 +11787,23 @@ function cleverBotCopyValue(raw) {
             if(!reply){ streamMessage.el.parentNode && streamMessage.el.parentNode.removeChild(streamMessage.el); addMessage('I’m sorry, I could not generate a response.','bot'); }
             else botHistory.push({role:'assistant',text:reply});
         } catch(e){
+            if (stopped) {
+                if (typing.parentNode) typing.parentNode.removeChild(typing);
+                var partial='';
+                if (streamMessage && streamMessage.streamer) partial=streamMessage.streamer.stop();
+                if (streamMessage && !partial && streamMessage.el.parentNode) streamMessage.el.parentNode.removeChild(streamMessage.el);
+                if (partial) botHistory.push({role:'assistant',text:partial});
+                addMessage(partial ? 'Response stopped.' : 'Stopped. You can send a new message.','system');
+                return;
+            }
             if (typing.parentNode) typing.parentNode.removeChild(typing);
             if(streamMessage && streamMessage.el.parentNode) streamMessage.el.parentNode.removeChild(streamMessage.el);
             var shown=(e && e.name==='AbortError') ? 'CleverBot took too long to respond. Please try again.' : (e.message||'I could not connect to CleverBot right now. Please check your internet connection and try again.');
             addMessage(shown,'bot');
-        } finally { clearTimeout(coldTimer); clearTimeout(hardTimer); clearInterval(watchdog); sendBtn.disabled=false; input.focus(); }
+        } finally { clearTimeout(coldTimer); clearTimeout(hardTimer); clearInterval(watchdog); activeStop=null; if (stopBtn) stopBtn.style.display='none'; sendBtn.disabled=false; input.focus(); }
     }
     sendBtn.addEventListener('click',sendMessage);
+    if (stopBtn) stopBtn.addEventListener('click',function(){ if (activeStop) activeStop(); });
     var cbTouch = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
     // Phones: Enter starts a new line and the Send button sends. Computers: Enter sends, Shift+Enter starts a new line.
     input.addEventListener('keydown',function(e){ if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&!cbTouch){e.preventDefault();sendMessage();} });
