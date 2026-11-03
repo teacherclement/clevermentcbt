@@ -8,7 +8,7 @@
     'use strict';
     if (window.__cmRelLoaded) return;
     window.__cmRelLoaded = true;
-    function api() { return (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) ? BACKEND_URL : 'https://clevermentcbt-backend.onrender.com'; }
+    function api() { return (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) ? BACKEND_URL : 'https://api.thecleverment.com'; }
 
     // ---- 1) wake the server early (a sleeping free server needs up to a minute) ----
     var lastWake = 0;

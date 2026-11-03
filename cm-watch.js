@@ -8,7 +8,7 @@
     'use strict';
     if (window.__cmWatchLoaded) return;
     window.__cmWatchLoaded = true;
-    var API = (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) ? BACKEND_URL : 'https://clevermentcbt-backend.onrender.com';
+    var API = (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) ? BACKEND_URL : 'https://api.thecleverment.com';
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function $(id) { return document.getElementById(id); }
     function shown(id) { var el = $(id); return !!el && getComputedStyle(el).display !== 'none' && el.getClientRects().length > 0; }

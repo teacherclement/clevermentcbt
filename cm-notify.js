@@ -10,7 +10,7 @@
     if (window.__cmNotifyLoaded) return;
     window.__cmNotifyLoaded = true;
 
-    var API = (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) ? BACKEND_URL : 'https://clevermentcbt-backend.onrender.com';
+    var API = (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) ? BACKEND_URL : 'https://api.thecleverment.com';
     var LS = {
         get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
         set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { } },

@@ -248,9 +248,9 @@
     /* ---------------- UI + speaking ---------------- */
     var synth = root.speechSynthesis;
     var KEY = 'cm_speech_prefs';
-    var prefs = { rate: 1, voice: '', gender: '', auto: true, enabled: true };
-    try { var sv = JSON.parse(localStorage.getItem(KEY) || '{}'); if (sv.rate) prefs.rate = sv.rate; if (sv.v === 2) { if (sv.voice) prefs.voice = sv.voice; if (sv.gender === 'm' || sv.gender === 'f') prefs.gender = sv.gender; } if (sv.auto === false) prefs.auto = false; if (sv.enabled === false) prefs.enabled = false; } catch (e) {}
-    function save() { try { var o = {}; for (var k in prefs) o[k] = prefs[k]; o.v = 2; localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
+    var prefs = { rate: 1, voice: '', gender: '', auto: true, enabled: false };
+    try { var sv = JSON.parse(localStorage.getItem(KEY) || '{}'); if (sv.rate) prefs.rate = sv.rate; if (sv.v === 2 || sv.v === 3) { if (sv.voice) prefs.voice = sv.voice; if (sv.gender === 'm' || sv.gender === 'f') prefs.gender = sv.gender; } if (sv.auto === false) prefs.auto = false; if (sv.v === 3 && sv.enabled === true) prefs.enabled = true; } catch (e) {}
+    function save() { try { var o = {}; for (var k in prefs) o[k] = prefs[k]; o.v = 3; localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
 
     var state = 'idle', token = 0, bar, btnRead, btnPause, btnGear, panel, selRate, selVoice, statusEl, cloudVoices = [], cloudAudio = null, cloudObjectUrl = null;
 

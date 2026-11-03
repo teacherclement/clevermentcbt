@@ -825,6 +825,7 @@ function reuseCSV(id) {
         }
         var navBtn = document.querySelector('#teacherDashboard [data-target="uploadSection"]');
         showTeacherSection('uploadSection', navBtn || undefined);
+        try { if (typeof cmPubGo === 'function') cmPubGo(4); } catch (e) {}
         if (note && note.scrollIntoView) {
             setTimeout(function() { note.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100);
         }
@@ -2232,6 +2233,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
     document.getElementById('teacherCertSignature').value = '';
     var loadedNote = document.getElementById('teacherLoadedSourceNote');
     if (loadedNote) loadedNote.style.display = 'none';
+    try { if (typeof cmPubGo === 'function') cmPubGo(0); } catch (e) {}
 
     alert('Assessment published successfully!\n\nAssessment Code: ' + code + '\n\nShare this code with your students.');
 
@@ -8648,7 +8650,8 @@ function cmDrawChart(hostId) {
         return;
     }
     empty.style.display = 'none';
-    wrap.style.display = st.hidden ? 'none' : 'block';
+    if (st.hidden) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
     st.chart = new Chart(canvas, cmChartConfig(st.type, d));
 }
 
@@ -8656,7 +8659,7 @@ function cmDrawChart(hostId) {
 function cmRenderChartPanel(hostId, sources) {
     var host = document.getElementById(hostId);
     if (!host) return;
-    var st = cmChartState[hostId] || (cmChartState[hostId] = { type: 'histogram', source: null, hidden: false, chart: null });
+    var st = cmChartState[hostId] || (cmChartState[hostId] = { type: 'histogram', source: null, hidden: true, chart: null });
     st.sources = (sources || []).filter(Boolean);
     if (st.sources.length === 0) {
         if (st.chart) { try { st.chart.destroy(); } catch (e) {} st.chart = null; }
@@ -8678,8 +8681,11 @@ function cmRenderChartPanel(hostId, sources) {
                 '<div class="cm-canvas-wrap"><canvas></canvas></div>' +
                 '<p class="cm-empty helper-text" style="display:none;"></p>' +
             '</div>';
-        host.querySelector('.cm-type').addEventListener('change', function() { st.type = this.value; cmDrawChart(hostId); });
-        host.querySelector('.cm-source').addEventListener('change', function() { st.source = this.value; cmDrawChart(hostId); });
+        // Charts stay closed until the user asks to see one; choosing a graph type or view also opens it.
+        function cmChartOpen() { st.hidden = false; var tg = host.querySelector('.cm-toggle'); if (tg) tg.textContent = 'Hide chart'; }
+        host.querySelector('.cm-type').addEventListener('change', function() { st.type = this.value; cmChartOpen(); cmDrawChart(hostId); });
+        host.querySelector('.cm-source').addEventListener('change', function() { st.source = this.value; cmChartOpen(); cmDrawChart(hostId); });
+        host.querySelector('.cm-toggle').textContent = st.hidden ? 'Show chart' : 'Hide chart';
         host.querySelector('.cm-toggle').addEventListener('click', function() {
             st.hidden = !st.hidden;
             this.textContent = st.hidden ? 'Show chart' : 'Hide chart';
@@ -10401,6 +10407,8 @@ async function teacherEnterStudent(adm) {
         localStorage.setItem('cleverment_student_token', d.token);
         localStorage.setItem('cleverment_student_profile', JSON.stringify(d.student));
         try { sessionStorage.setItem('cm_teacher_view', d.student.name); } catch (e) {}
+        try { stopTeacherLivePolling(); } catch (e) {}
+        var tDash = document.getElementById('teacherDashboard'); if (tDash) tDash.style.display = 'none';
         openStudentArea();
         cmShowTeacherViewBar(d.student.name);
     } catch (e) { alert(e.message || 'Could not open this account.'); }
@@ -10412,12 +10420,23 @@ function cmShowTeacherViewBar(name) {
         bar.style.cssText = 'position:sticky;top:0;z-index:99;background:#fff8c5;border-bottom:1px solid #d4a72c;color:#4d2d00;padding:8px 14px;font-size:13px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;';
         document.body.insertBefore(bar, document.body.firstChild);
     }
-    bar.innerHTML = '<span>You are viewing <b>' + escapeHtml(name || 'this student') + '</b>\'s account as their teacher.</span><button type="button" class="secondary-btn" style="font-size:12px;padding:4px 10px;min-height:0;" onclick="cmExitTeacherView()">Exit student view</button>';
+    bar.innerHTML = '<span>You are viewing <b>' + escapeHtml(name || 'this student') + '</b>\'s account as their teacher.</span><button type="button" class="secondary-btn" style="font-size:12px;padding:4px 10px;min-height:0;" onclick="cmExitTeacherView()">\u2190 Back to Teacher</button>';
 }
 function cmExitTeacherView() {
     try { sessionStorage.removeItem('cm_teacher_view'); } catch (e) {}
     try { localStorage.removeItem('cleverment_student_token'); localStorage.removeItem('cleverment_student_profile'); localStorage.removeItem('cleverment_quiz_state'); } catch (e) {}
-    location.reload();
+    var bar = document.getElementById('cmTeacherViewBar'); if (bar) bar.remove();
+    var tok = localStorage.getItem('cleverment_teacher_token');
+    var dash = document.getElementById('teacherDashboard');
+    if (!tok || !dash) { location.reload(); return; }
+    if (!currentTeacher) { try { currentTeacher = JSON.parse(localStorage.getItem('cleverment_teacher_session') || 'null'); } catch (e) {} }
+    ['landingPage', 'studentAccess', 'studentAssessmentView', 'studentLoginPage', 'studentAreaPage'].forEach(function(x) { var el = document.getElementById(x); if (el) el.style.display = 'none'; });
+    var menuButton = document.getElementById('studentMenuOpen'); if (menuButton) menuButton.style.display = 'none';
+    try { studentMenuToggle(false); } catch (e) {}
+    dash.style.display = 'block';
+    setDashboardHeaderVisible(false);
+    updateURL('teacher-dashboard');
+    try { renderTeacherDashboard(); } catch (e) {}
 }
 try { if (sessionStorage.getItem('cm_teacher_view')) window.addEventListener('load', function() { cmShowTeacherViewBar(sessionStorage.getItem('cm_teacher_view')); }); } catch (e) {}
 async function loadPinPanel(cls) {

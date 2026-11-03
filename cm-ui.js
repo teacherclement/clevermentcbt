@@ -255,11 +255,128 @@
     if (made) up.setAttribute('data-cm-cards', '1');
   }
 
+
+  /* ---------------- 5. PUBLISH FORM: ONE SECTION AT A TIME ---------------- */
+  var wiz = { ready: false, cur: 0, cards: [], bar: null, nav: null, back: null, next: null, label: null, err: null, pub: null };
+  function pubVal(id) { var e = document.getElementById(id); return e ? String(e.value || '').trim() : ''; }
+  function pubValidate(i) {
+    var m = [], f = null;
+    if (i === 0) {
+      var s = pubVal('teacherSubjectSelect');
+      if (!s) { m.push('Choose a subject.'); f = 'teacherSubjectSelect'; }
+      else if (s === 'Other' && !pubVal('teacherCustomSubject')) { m.push('Type your custom subject name.'); f = 'teacherCustomSubject'; }
+    }
+    if (i === 1) {
+      var c = pubVal('teacherClassSelect');
+      if (!c) { m.push('Choose a class.'); f = f || 'teacherClassSelect'; }
+      else if (c === 'Other' && !pubVal('teacherCustomClass')) { m.push('Type your custom class name.'); f = f || 'teacherCustomClass'; }
+      var a = pubVal('teacherAvailableFrom'), b = pubVal('teacherAvailableUntil');
+      if (a && b && new Date(b) <= new Date(a)) { m.push('"Available Until" must be after "Available From".'); f = f || 'teacherAvailableUntil'; }
+    }
+    if (i === 4) {
+      var n = (typeof teacherQuestions !== 'undefined' && teacherQuestions) ? teacherQuestions.length : 0;
+      var fi = document.getElementById('teacherCsvFile');
+      if (!n && !(fi && fi.files && fi.files.length)) { m.push('Upload a CSV file or load a saved question set.'); f = f || 'teacherCsvFile'; }
+    }
+    return { m: m, f: f };
+  }
+  function pubShowErr(list, focusId) {
+    if (!wiz.err) return;
+    if (!list.length) { wiz.err.style.display = 'none'; wiz.err.innerHTML = ''; return; }
+    wiz.err.innerHTML = '<b>Please fix this before you continue:</b><ul>' + list.map(function (t) { return '<li>' + t + '</li>'; }).join('') + '</ul>';
+    wiz.err.style.display = 'block';
+    var el = focusId ? document.getElementById(focusId) : null;
+    if (el && el.focus) { try { el.focus({ preventScroll: true }); } catch (e) {} }
+    if (wiz.err.scrollIntoView) wiz.err.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  function pubGo(n, noScroll) {
+    var last = wiz.cards.length - 1;
+    n = Math.max(0, Math.min(n, last));
+    wiz.cur = n;
+    wiz.cards.forEach(function (c, i) { c.classList.toggle('cmw-hide', i !== n); });
+    Array.prototype.forEach.call(wiz.bar.children, function (b, i) {
+      b.classList.toggle('on', i === n);
+      b.classList.toggle('done', i < n);
+    });
+    wiz.back.style.visibility = n === 0 ? 'hidden' : 'visible';
+    wiz.next.style.display = n === last ? 'none' : '';
+    if (wiz.pub) wiz.pub.classList.toggle('cmw-hide', n !== last);
+    var nm = wiz.cards[n].querySelector('.pb-head b');
+    wiz.label.textContent = 'Step ' + (n + 1) + ' of ' + wiz.cards.length + (nm ? ' \u00b7 ' + nm.textContent : '');
+    pubShowErr([], null);
+    if (!noScroll) {
+      var up = document.getElementById('uploadSection');
+      if (up && up.scrollIntoView) up.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+  function pubNext() {
+    var r = pubValidate(wiz.cur);
+    if (r.m.length) { pubShowErr(r.m, r.f); return; }
+    pubGo(wiz.cur + 1);
+  }
+  function pubJump(target) {
+    if (target <= wiz.cur) { pubGo(target); return; }
+    for (var i = wiz.cur; i < target; i++) {
+      var r = pubValidate(i);
+      if (r.m.length) { pubGo(i); pubShowErr(r.m, r.f); return; }
+    }
+    pubGo(target);
+  }
+  function publishWizard() {
+    var up = document.getElementById('uploadSection');
+    if (!up || !up.getAttribute('data-cm-cards') || up.getAttribute('data-cm-wiz')) return;
+    var cards = Array.prototype.slice.call(up.querySelectorAll(':scope > .pb-card'));
+    if (cards.length < 2) return;
+    up.setAttribute('data-cm-wiz', '1');
+    if (!document.getElementById('cmWizCss')) {
+      var st = document.createElement('style'); st.id = 'cmWizCss';
+      st.textContent =
+        '.cmw-hide{display:none!important}#cmSteps{display:none!important}' +
+        '.cmw-bar{display:flex;gap:6px;margin:12px 0 16px;overflow-x:auto;padding:4px 2px}' +
+        '.cmw-bar button{flex:1 0 auto;display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;border:1px solid var(--p-line,#d0d7de);background:var(--p-surface,#fff);color:var(--p-muted,#57606a);font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}' +
+        '.cmw-bar button i{font-style:normal;width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;border:1.5px solid var(--p-line-2,#b6bec8)}' +
+        '.cmw-bar button.on{color:var(--p-ink,#0f172a);border-color:var(--p-blue,#2563eb);font-weight:700}' +
+        '.cmw-bar button.on i{background:var(--p-blue,#2563eb);border-color:var(--p-blue,#2563eb);color:#fff}' +
+        '.cmw-bar button.done i{background:#16a34a;border-color:#16a34a;color:#fff}' +
+        '.cmw-nav{display:flex;gap:10px;justify-content:space-between;align-items:center;margin:16px 0}' +
+        '.cmw-nav small{color:var(--p-muted,#57606a);font-size:13px;text-align:center;flex:1}' +
+        '.cmw-err{display:none;margin:12px 0;padding:12px 14px;border-radius:12px;border:1px solid #f1aeb5;background:#fdecec;color:#a4262c;font-size:13px}' +
+        '.cmw-err ul{margin:6px 0 0 18px;padding:0}';
+      document.head.appendChild(st);
+    }
+    wiz.cards = cards;
+    wiz.pub = up.querySelector(':scope > .primary-btn.full-width');
+    wiz.bar = document.createElement('div'); wiz.bar.className = 'cmw-bar'; wiz.bar.id = 'cmWizBar';
+    cards.forEach(function (c, i) {
+      var nm = c.querySelector('.pb-head b');
+      var b = document.createElement('button'); b.type = 'button';
+      b.innerHTML = '<i>' + (i + 1) + '</i><span>' + (nm ? nm.textContent : 'Step ' + (i + 1)) + '</span>';
+      b.addEventListener('click', function () { pubJump(i); });
+      wiz.bar.appendChild(b);
+    });
+    wiz.err = document.createElement('div'); wiz.err.className = 'cmw-err';
+    wiz.nav = document.createElement('div'); wiz.nav.className = 'cmw-nav';
+    wiz.back = document.createElement('button'); wiz.back.type = 'button'; wiz.back.className = 'secondary-btn'; wiz.back.textContent = 'Back';
+    wiz.next = document.createElement('button'); wiz.next.type = 'button'; wiz.next.className = 'primary-btn'; wiz.next.textContent = 'Next';
+    wiz.label = document.createElement('small');
+    wiz.back.addEventListener('click', function () { pubGo(wiz.cur - 1); });
+    wiz.next.addEventListener('click', pubNext);
+    wiz.nav.appendChild(wiz.back); wiz.nav.appendChild(wiz.label); wiz.nav.appendChild(wiz.next);
+    cards[0].parentNode.insertBefore(wiz.bar, cards[0]);
+    var after = wiz.pub || null;
+    if (after) { up.insertBefore(wiz.err, after); up.insertBefore(wiz.nav, after); }
+    else { up.appendChild(wiz.err); up.appendChild(wiz.nav); }
+    wiz.ready = true;
+    window.cmPubGo = function (n) { if (wiz.ready) pubGo(n, true); };
+    pubGo(0, true);
+  }
+
   /* ---------------- run ---------------- */
   var timer = null;
   function runAll() {
     try { groupMenus(); } catch (e) {}
     try { wrapPublishForm(); } catch (e) {}
+    try { publishWizard(); } catch (e) {}
     try { labelTables(); } catch (e) {}
     try { scanIcons(); } catch (e) {}
   }
