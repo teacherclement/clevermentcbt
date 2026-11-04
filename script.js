@@ -4103,6 +4103,19 @@ async function restoreQuizState() {
         showConnectBanner('No connection. Your saved answers were restored from this phone and will sync when the network returns.');
     }
 
+    // Immediately ask the student if they want to continue, showing the assessment details.
+    var cmLeftSec = (savedLimit > 0 && savedEndsAt) ? Math.max(0, Math.ceil((savedEndsAt - Date.now()) / 1000)) : 0;
+    if (!(savedLimit > 0 && cmLeftSec <= 0)) {
+        await cmAskResume({
+            subject: (state.currentAssessment && state.currentAssessment.subject) || state.studentSubject || '',
+            code: state.currentAssessmentCode,
+            student: state.studentName || '',
+            answered: cmCountAnswered(state.studentAnswers),
+            total: (state.studentQuestions || []).length,
+            timeLeft: savedLimit > 0 ? cmFmtClock(cmLeftSec) : 'No time limit'
+        });
+    }
+
     currentAssessment = state.currentAssessment;
     currentAssessmentCode = state.currentAssessmentCode;
     studentQuestions = state.studentQuestions;
@@ -4649,6 +4662,18 @@ async function startStudentQuiz() {
         }
         setStudentPhoto(eligibility.photo || '');
         window.cmServerResume = eligibility.resume || null;
+        if (eligibility.resume) {
+            var cmRs = eligibility.resume;
+            if (startBtn) { startBtn.disabled = false; startBtn.textContent = 'Start Assessment'; }
+            await cmAskResume({
+                subject: currentAssessment.subject || '',
+                code: currentAssessmentCode,
+                student: studentName,
+                answered: cmCountAnswered(cmRs.answers),
+                total: (cmRs.answers && cmRs.answers.length) || (currentAssessment.questions || []).length,
+                timeLeft: (cmRs.endsAt && cmRs.remainingSeconds >= 0) ? cmFmtClock(cmRs.remainingSeconds) : 'No time limit'
+            });
+        }
     } catch (e) {
         reportStudentAccessNetworkError(currentAssessmentCode, studentName, studentAdmissionNumber, 'start_check');
         alert('Could not verify your assessment status. Please check your connection and try again.');
@@ -9282,6 +9307,33 @@ function cmLeaveAssessmentNow() {
     window.location.replace(window.location.pathname + '?page=student');
 }
 
+
+// Asks the student to confirm before an unfinished assessment is resumed. There is no "start over":
+// the saved answers and the running clock always continue.
+function cmAskResume(info) {
+    return new Promise(function(resolve) {
+        var old = document.getElementById('cmResumeModal'); if (old) old.remove();
+        var m = document.createElement('div');
+        m.id = 'cmResumeModal';
+        m.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:16px;';
+        var rows = [['Subject', info.subject], ['Assessment code', info.code], ['Student', info.student],
+            ['Questions answered', info.answered + ' of ' + info.total], ['Time left', info.timeLeft]]
+            .filter(function(r) { return r[1] !== '' && r[1] !== undefined && r[1] !== null; })
+            .map(function(r) { return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e5e7eb;"><span style="color:#57606a;">' + escapeHtml(r[0]) + '</span><b style="text-align:right;">' + escapeHtml(String(r[1])) + '</b></div>'; }).join('');
+        m.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fff;color:#0f172a;border-radius:16px;max-width:420px;width:100%;padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.35);">' +
+            '<h3 style="margin:0 0 6px;">Continue your assessment?</h3>' +
+            '<p style="margin:0 0 12px;font-size:14px;color:#57606a;">You have an unfinished assessment. Your answers were saved and your timer has kept running.</p>' +
+            rows + '<button type="button" id="cmResumeGo" class="primary-btn full-width" style="margin-top:16px;">Continue Assessment</button></div>';
+        document.body.appendChild(m);
+        document.getElementById('cmResumeGo').addEventListener('click', function() { m.remove(); resolve(true); });
+    });
+}
+function cmCountAnswered(list) {
+    var n = 0;
+    (list || []).forEach(function(a) { if (a !== null && a !== undefined && a !== '' && !(typeof a === 'object' && (a.selectedOptionText === null || a.selectedOptionText === undefined))) n++; });
+    return n;
+}
+
 // If this device holds an unfinished attempt of the SAME assessment by the SAME student, resume it
 // instead of starting again, so leaving and coming back can never reset the timer.
 async function cmResumeSavedAttempt() {
@@ -12749,4 +12801,74 @@ async function cmApplyTeacherFeaturePermissions() {
   var cmFeatTimer=null; function apply(){ clearTimeout(cmFeatTimer); cmFeatTimer=setTimeout(function(){ var el=document.getElementById('teacherDashboard'); if(el && el.style.display !== 'none' && typeof cmApplyTeacherFeaturePermissions==='function') cmApplyTeacherFeaturePermissions(); },250); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',apply); else apply();
   if(typeof MutationObserver!=='undefined' && document.body) new MutationObserver(function(){apply();}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['style','class']});
+})();
+
+
+/* ---------- Automatic logout after 30 minutes without activity ---------- */
+(function() {
+    var IDLE_MS = 30 * 60 * 1000, WARN_MS = 60 * 1000, KEY = 'cm_last_activity';
+    var lastWrite = 0, warnEl = null, warnTimer = null;
+    function now() { return Date.now(); }
+    function getLast() { try { return Number(localStorage.getItem(KEY)) || now(); } catch (e) { return now(); } }
+    function touch(force) {
+        var t = now();
+        if (!force && t - lastWrite < 5000) return;
+        lastWrite = t;
+        try { localStorage.setItem(KEY, String(t)); } catch (e) {}
+        if (warnEl) hideWarn();
+    }
+    function has(k) { try { return !!localStorage.getItem(k); } catch (e) { return false; } }
+    function studentBusy() {
+        // Never log a student out in the middle of an assessment or while an unfinished attempt is saved.
+        return (typeof studentQuizIsOnScreen === 'function' && studentQuizIsOnScreen()) || has('cleverment_quiz_state');
+    }
+    function anyoneLoggedIn() {
+        return has('cleverment_teacher_token') || has('cleverment_admin_token') || (has('cleverment_student_token') && !studentBusy());
+    }
+    function notice(msg) {
+        var n = document.createElement('div');
+        n.style.cssText = 'position:fixed;left:12px;right:12px;top:12px;z-index:100001;background:#0f172a;color:#fff;padding:12px 14px;border-radius:12px;font-size:14px;text-align:center;';
+        n.textContent = msg;
+        document.body.appendChild(n);
+        setTimeout(function() { n.remove(); }, 8000);
+    }
+    function doLogout() {
+        hideWarn();
+        var did = false;
+        try { sessionStorage.removeItem('cm_teacher_view'); var vb = document.getElementById('cmTeacherViewBar'); if (vb) vb.remove(); } catch (e) {}
+        try { if (has('cleverment_teacher_token')) { teacherLogout(); did = true; } } catch (e) {}
+        try { if (has('cleverment_admin_token')) { adminLogout(); did = true; } } catch (e) {}
+        try { if (has('cleverment_student_token') && !studentBusy()) { studentLogout(); did = true; } } catch (e) {}
+        try { localStorage.removeItem(KEY); } catch (e) {}
+        if (did) notice('You were logged out because of inactivity. Please log in again.');
+    }
+    function hideWarn() {
+        if (warnTimer) { clearInterval(warnTimer); warnTimer = null; }
+        if (warnEl) { warnEl.remove(); warnEl = null; }
+    }
+    function showWarn() {
+        if (warnEl) return;
+        warnEl = document.createElement('div');
+        warnEl.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px;';
+        warnEl.innerHTML = '<div style="background:#fff;color:#0f172a;border-radius:16px;max-width:380px;width:100%;padding:20px;text-align:center;"><h3 style="margin:0 0 8px;">Are you still there?</h3><p style="margin:0 0 14px;font-size:14px;">You will be logged out in <b id="cmIdleLeft">60</b> seconds because of inactivity.</p><button type="button" class="primary-btn full-width" id="cmIdleStay">Stay logged in</button></div>';
+        document.body.appendChild(warnEl);
+        document.getElementById('cmIdleStay').addEventListener('click', function() { touch(true); });
+        warnTimer = setInterval(function() {
+            var left = Math.ceil((getLast() + IDLE_MS - now()) / 1000);
+            var el = document.getElementById('cmIdleLeft'); if (el) el.textContent = Math.max(0, left);
+        }, 1000);
+    }
+    function check() {
+        if (!anyoneLoggedIn()) { hideWarn(); return; }
+        var idle = now() - getLast();
+        if (idle >= IDLE_MS) doLogout();
+        else if (idle >= IDLE_MS - WARN_MS) showWarn();
+    }
+    ['pointerdown', 'keydown', 'touchstart', 'scroll', 'mousemove', 'click'].forEach(function(ev) {
+        window.addEventListener(ev, function() { if (!warnEl) touch(false); }, { passive: true, capture: true });
+    });
+    document.addEventListener('visibilitychange', function() { if (!document.hidden) check(); });
+    // Reopening the app after a long break logs the person out straight away.
+    if (anyoneLoggedIn() && now() - getLast() >= IDLE_MS) setTimeout(doLogout, 0); else touch(true);
+    setInterval(check, 5000);
 })();
