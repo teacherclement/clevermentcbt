@@ -10596,6 +10596,7 @@ function showTeacherSection(panelId, btn) {
     if (panelId === 'progressSection') {
         initProgressPanel();
     }
+    if (panelId === 'soSection') soInit();
     if (panelId === 'messagesSection') teacherMsgInit();
     if (panelId === 'insightsSection') insightsInit();
     if (panelId === 'liveSection') {
@@ -12503,6 +12504,17 @@ function learnFail(e) {
     return 'Could not load. Check your connection and try again.';
 }
 function learnProgress() { try { return JSON.parse(localStorage.getItem('cm_learn_progress') || '{}'); } catch (e) { return {}; } }
+var cmLearnLogged = {};
+function cmLogLearning(payload) {
+    try {
+        if (!localStorage.getItem('cleverment_student_token')) return;
+        if (sessionStorage.getItem('cm_teacher_view')) return;
+        if (payload.type === 'lesson') { if (cmLearnLogged[payload.topicId]) return; cmLearnLogged[payload.topicId] = true; }
+        var sub = (learnCur && learnCur.sub && (learnCur.sub.title || learnCur.sub.name)) || '';
+        payload.subject = sub;
+        fetch(BACKEND_URL + '/api/student/learning-activity', { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, cmStudentAuthHeader()), body: JSON.stringify(payload), keepalive: true }).catch(function() {});
+    } catch (e) {}
+}
 function learnSaveProgress(id, score, total) {
     var p = learnProgress(), t = p[id] || { attempts: 0, best: 0 };
     t.attempts++; t.last = Math.round(score / total * 100); t.best = Math.max(t.best, t.last); p[id] = t;
@@ -12584,6 +12596,7 @@ function learnLessonHtml(L) {
 }
 async function learnTopic(id) {
     var t = learnCur.sub.topics.filter(function(x) { return x.id === id; })[0]; learnCur.topic = t;
+    cmLogLearning({ type: 'lesson', topicId: t.id, topicTitle: t.title });
     var el = learnEl(); el.innerHTML = '<p class="helper-text">Loading lesson...</p>';
     try {
         await learnLoadGen();
@@ -12630,6 +12643,7 @@ function learnShow() {
     var R = learnRun, el = learnEl();
     if (R.i >= R.qs.length) {
         learnSaveProgress(learnCur.topic.id, R.score, R.qs.length);
+        cmLogLearning({ type: 'practice', topicId: learnCur.topic.id, topicTitle: learnCur.topic.title, score: R.score, total: R.qs.length });
         var pc = Math.round(R.score / R.qs.length * 100);
         el.innerHTML = '<h2>Practice complete</h2><div class="cm-stat-row"><div class="cm-stat"><span>Score</span><strong>' + pc + '%</strong></div><div class="cm-stat"><span>Correct</span><strong>' + R.score + '/' + R.qs.length + '</strong></div></div>' +
             '<p>' + (pc >= 80 ? 'Excellent work!' : (pc >= 50 ? 'Good effort. Practise again to improve.' : 'Read the lesson again, then try once more.')) + '</p>' +
@@ -12872,3 +12886,74 @@ async function cmApplyTeacherFeaturePermissions() {
     if (anyoneLoggedIn() && now() - getLast() >= IDLE_MS) setTimeout(doLogout, 0); else touch(true);
     setInterval(check, 5000);
 })();
+
+/* ---------- Student Overview (teacher) ---------- */
+var soData = null;
+function soToken() { return localStorage.getItem('cleverment_teacher_token'); }
+async function soInit() {
+    var sel = document.getElementById('soClass'), st = document.getElementById('soStatus');
+    if (!sel) return;
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/student-overview', { headers: { 'Authorization': 'Bearer ' + soToken() } });
+        var d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not load classes.');
+        var keep = sel.value;
+        sel.innerHTML = '<option value="">Choose a class</option>' + (d.classes || []).map(function(c) { return '<option value="' + escapeHtmlAttr(c) + '">' + escapeHtml(c) + '</option>'; }).join('');
+        if (keep) sel.value = keep;
+        if (st && !sel.value) st.textContent = (d.classes || []).length ? '' : 'No classes yet. Add a roster or publish an assessment first.';
+    } catch (e) { if (st) st.textContent = 'Could not load: ' + e.message; }
+}
+async function soLoad() {
+    var cls = document.getElementById('soClass').value, st = document.getElementById('soStatus');
+    soData = null; soRender();
+    if (!cls) return;
+    st.textContent = 'Loading...';
+    try {
+        var res = await fetch(BACKEND_URL + '/api/teacher/student-overview?className=' + encodeURIComponent(cls), { headers: { 'Authorization': 'Bearer ' + soToken() } });
+        var d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not load.');
+        soData = d; st.textContent = '';
+        soRender();
+    } catch (e) { st.textContent = 'Could not load: ' + e.message; }
+}
+function soList(title, items, kind) {
+    if (!items.length) return '';
+    return '<div style="margin:6px 0;"><b>' + title + '</b><ul style="margin:4px 0 0 18px;padding:0;">' + items.map(function(a) {
+        var extra = '';
+        if (kind === 'done') extra = ' \u2013 ' + escapeHtml(String(a.score)) + (a.total ? '/' + escapeHtml(String(a.total)) : '') + (a.percent !== null && a.percent !== undefined ? ' (' + a.percent + '%)' : '');
+        else if (kind === 'closed' && a.closedAt) extra = ' \u2013 closed ' + escapeHtml(new Date(a.closedAt).toLocaleString());
+        else if (kind === 'available') extra = a.opensAt ? ' \u2013 opens ' + escapeHtml(new Date(a.opensAt).toLocaleString()) : (a.until ? ' \u2013 until ' + escapeHtml(new Date(a.until).toLocaleString()) : '');
+        return '<li>' + escapeHtml(a.subject || a.code) + ' <span style="color:#57606a;">(' + escapeHtml(a.code) + ')</span>' + extra + '</li>';
+    }).join('') + '</ul></div>';
+}
+function soLearnCount(s) { var l = s.learning || { lessons: 0, practices: 0 }; return (l.lessons || l.practices) ? l.lessons + 'L \u00b7 ' + l.practices + 'P' : '\u2013'; }
+function soLearnList(s) {
+    var l = s.learning; if (!l || !l.items || !l.items.length) return '';
+    return '<div style="margin:6px 0;"><b>Learning Space</b> <span class="helper-text">(L = lessons opened, P = practices done)</span><ul style="margin:4px 0 0 18px;padding:0;">' + l.items.map(function(i) {
+        var what = i.kind === 'practice' ? 'Practice' + (i.total ? ' \u2013 ' + i.score + '/' + i.total : '') : 'Opened lesson';
+        return '<li>' + escapeHtml(i.topic) + (i.subject ? ' <span style="color:#57606a;">(' + escapeHtml(i.subject) + ')</span>' : '') + ' \u2013 ' + what + ' <span style="color:#57606a;">' + escapeHtml(new Date(i.at).toLocaleString()) + '</span></li>';
+    }).join('') + '</ul></div>';
+}
+function soToggle(i) { var r = document.getElementById('soDetail' + i); if (r) r.style.display = r.style.display === 'none' ? '' : 'none'; }
+function soRender() {
+    var box = document.getElementById('soTable'), tot = document.getElementById('soTotals');
+    if (!box) return;
+    if (!soData) { box.innerHTML = ''; if (tot) tot.innerHTML = ''; return; }
+    var q = (document.getElementById('soSearch').value || '').trim().toLowerCase();
+    var all = soData.students || [];
+    var rows = all.filter(function(s) { return !q || String(s.name).toLowerCase().indexOf(q) !== -1 || String(s.admissionNumber).toLowerCase().indexOf(q) !== -1; });
+    tot.innerHTML = '<b>' + all.length + '</b> students \u00b7 <b>' + soData.assessmentCount + '</b> assessments for this class';
+    if (!all.length) { box.innerHTML = '<p class="helper-text">No students found for this class.</p>'; return; }
+    var th = 'style="padding:10px;border-bottom:2px solid #d0d7de;text-align:left;white-space:nowrap;"';
+    var thc = 'style="padding:10px;border-bottom:2px solid #d0d7de;text-align:center;"';
+    var html = '<table style="width:100%;border-collapse:collapse;font-size:14px;"><thead><tr><th ' + th + '>#</th><th ' + th + '>Student</th><th ' + thc + '>Available</th><th ' + thc + '>Closed</th><th ' + thc + '>Done</th><th ' + thc + '>Learning</th></tr></thead><tbody>';
+    rows.forEach(function(s, i) {
+        var td = 'style="padding:10px;border-bottom:1px solid #e5e7eb;"';
+        var tdc = 'style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;"';
+        html += '<tr onclick="soToggle(' + i + ')" style="cursor:pointer;"><td ' + td + '>' + (i + 1) + '</td><td ' + td + '>' + escapeHtml(s.name) + (s.admissionNumber ? '<div style="font-size:12px;color:#57606a;">' + escapeHtml(s.admissionNumber) + '</div>' : '') + '</td>' +
+            '<td ' + tdc + ' >' + s.available.length + '</td><td ' + tdc + '>' + s.closed.length + '</td><td ' + tdc + '>' + s.done.length + '</td><td ' + tdc + '>' + soLearnCount(s) + '</td></tr>' +
+            '<tr id="soDetail' + i + '" style="display:none;"><td></td><td colspan="5" style="padding:6px 10px 14px;border-bottom:1px solid #e5e7eb;background:#fff;">' +
+            (soList('Available', s.available, 'available') + soList('Closed', s.closed, 'closed') + soList('Done', s.done, 'done') + soLearnList(s) || '<span class="helper-text">No assessments for this class yet.</span>') + '</td></tr>';
+    });
+    box.innerHTML = html + '</tbody></table>';
+}
