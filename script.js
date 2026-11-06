@@ -2977,8 +2977,10 @@ async function loadRosterForEditing(className) {
     Object.keys(photos).forEach(function(k) { currentRosterEditPhotoKeys[k] = true; });
     currentRosterEditEntries = roster ? roster.map(function(e) {
         var p = photos[rosterKey(e.admissionNumber)] || '';
-        return { name: e.name || '', admissionNumber: e.admissionNumber || '', parentPhone: e.parentPhone || '', photo: p, photoDirty: false };
+        return { name: e.name || '', admissionNumber: e.admissionNumber || '', parentPhone: e.parentPhone || '', session: e.session || '', photo: p, photoDirty: false };
     }) : [];
+    window.cmRosterOrigKeys = {}; currentRosterEditEntries.forEach(function(e) { window.cmRosterOrigKeys[String(e.admissionNumber || '').trim().toLowerCase()] = true; });
+    try { cmRosterSessionBarLoad(className); } catch (e) {}
 
     document.getElementById('rosterEditWrapper').style.display = 'block';
     var bulkStatus = document.getElementById('rosterPhotoBulkStatus');
@@ -2994,7 +2996,7 @@ function syncRosterEditEntriesFromDOM() {
         var admInput = rows[i].querySelector('.roster-edit-admission');
         var old = currentRosterEditEntries[i] || {};
         var parentInput = rows[i].querySelector('.roster-edit-parent');
-        entries.push({ name: nameInput.value, admissionNumber: admInput.value, parentPhone: parentInput ? parentInput.value : (old.parentPhone || ''), photo: old.photo || '', photoDirty: !!old.photoDirty });
+        entries.push({ name: nameInput.value, admissionNumber: admInput.value, session: old.session || '', parentPhone: parentInput ? parentInput.value : (old.parentPhone || ''), photo: old.photo || '', photoDirty: !!old.photoDirty });
     }
     currentRosterEditEntries = entries;
 }
@@ -3209,7 +3211,14 @@ async function saveRosterEdits() {
             return;
         }
         var pp = String(currentRosterEditEntries[i].parentPhone || '').trim();
-        cleaned.push(pp ? { name: name, admissionNumber: admissionNumber, parentPhone: pp } : { name: name, admissionNumber: admissionNumber });
+        var entryObj = { name: name, admissionNumber: admissionNumber };
+        if (pp) entryObj.parentPhone = pp;
+        var sess = String(currentRosterEditEntries[i].session || '').trim();
+        var isNew = !(window.cmRosterOrigKeys || {})[admissionNumber.toLowerCase()];
+        var chosen = ((document.getElementById('rosterNewSession') || {}).value || '').trim();
+        if (!sess && isNew && /^\d{4}\/\d{4}$/.test(chosen)) sess = chosen;
+        if (sess) entryObj.session = sess;
+        cleaned.push(entryObj);
     }
 
     var statusEl = document.getElementById('rosterEditStatus');
@@ -12903,17 +12912,20 @@ async function soInit() {
         if (st && !sel.value) st.textContent = (d.classes || []).length ? '' : 'No classes yet. Add a roster or publish an assessment first.';
     } catch (e) { if (st) st.textContent = 'Could not load: ' + e.message; }
 }
-async function soLoad() {
+async function soLoad(keepView) {
     var cls = document.getElementById('soClass').value, st = document.getElementById('soStatus');
+    if (!keepView) soViewing = '';
     soData = null; soRender();
-    if (!cls) return;
+    if (!cls) { soTerm = null; soTermBarRender(); return; }
     st.textContent = 'Loading...';
     try {
-        var res = await fetch(BACKEND_URL + '/api/teacher/student-overview?className=' + encodeURIComponent(cls), { headers: { 'Authorization': 'Bearer ' + soToken() } });
+        try { soTerm = await cmClassTermFetch(cls); } catch (e0) { soTerm = null; }
+        var vq = soViewing ? '&session=' + encodeURIComponent(soViewing.split('|')[0]) + '&term=' + encodeURIComponent(soViewing.split('|')[1]) : '';
+        var res = await fetch(BACKEND_URL + '/api/teacher/student-overview?className=' + encodeURIComponent(cls) + vq, { headers: { 'Authorization': 'Bearer ' + soToken() } });
         var d = await res.json();
         if (!res.ok) throw new Error(d.error || 'Could not load.');
         soData = d; st.textContent = '';
-        soRender();
+        soRender(); soTermBarRender();
     } catch (e) { st.textContent = 'Could not load: ' + e.message; }
 }
 function soList(title, items, kind) {
@@ -12950,10 +12962,71 @@ function soRender() {
     rows.forEach(function(s, i) {
         var td = 'style="padding:10px;border-bottom:1px solid #e5e7eb;"';
         var tdc = 'style="padding:10px;border-bottom:1px solid #e5e7eb;text-align:center;font-weight:700;"';
-        html += '<tr onclick="soToggle(' + i + ')" style="cursor:pointer;"><td ' + td + '>' + (i + 1) + '</td><td ' + td + '>' + escapeHtml(s.name) + (s.admissionNumber ? '<div style="font-size:12px;color:#57606a;">' + escapeHtml(s.admissionNumber) + '</div>' : '') + '</td>' +
+        html += '<tr onclick="soToggle(' + i + ')" style="cursor:pointer;"><td ' + td + '>' + (i + 1) + '</td><td ' + td + '>' + escapeHtml(s.name) + ((s.admissionNumber || s.session) ? '<div style="font-size:12px;color:#57606a;">' + escapeHtml(s.admissionNumber || '') + (s.session ? ' \u00b7 ' + escapeHtml(s.session) : '') + '</div>' : '') + '</td>' +
             '<td ' + tdc + ' >' + s.available.length + '</td><td ' + tdc + '>' + s.closed.length + '</td><td ' + tdc + '>' + s.done.length + '</td><td ' + tdc + '>' + soLearnCount(s) + '</td></tr>' +
             '<tr id="soDetail' + i + '" style="display:none;"><td></td><td colspan="5" style="padding:6px 10px 14px;border-bottom:1px solid #e5e7eb;background:#fff;">' +
             (soList('Available', s.available, 'available') + soList('Closed', s.closed, 'closed') + soList('Done', s.done, 'done') + soLearnList(s) || '<span class="helper-text">No assessments for this class yet.</span>') + '</td></tr>';
     });
     box.innerHTML = html + '</tbody></table>';
 }
+
+/* ---------- Academic sessions and terms ---------- */
+var CM_TERM_NAMES = { 1: '1st Term', 2: '2nd Term', 3: '3rd Term' };
+var soTerm = null;       // { configured, session, term } for the picked class
+var soViewing = '';      // '' = current term, otherwise 'session|term'
+function cmDefaultSession() { var d = new Date(), y = d.getFullYear(); if (d.getMonth() < 8) y -= 1; return y + '/' + (y + 1); }
+function cmNextSession(s) { var p = String(s).split('/'); return (parseInt(p[0], 10) + 1) + '/' + (parseInt(p[1], 10) + 1); }
+async function cmClassTermFetch(cls) {
+    var res = await fetch(BACKEND_URL + '/api/teacher/class-term?className=' + encodeURIComponent(cls), { headers: { 'Authorization': 'Bearer ' + soToken() } });
+    return await res.json();
+}
+async function cmClassTermSave(cls, session, term) {
+    var res = await fetch(BACKEND_URL + '/api/teacher/class-term', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + soToken() }, body: JSON.stringify({ className: cls, session: session, term: term }) });
+    var d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'Could not save.');
+    return d;
+}
+async function cmRosterSessionBarLoad(cls) {
+    var bar = document.getElementById('rosterSessionBar'), inp = document.getElementById('rosterNewSession');
+    if (!bar || !inp) return;
+    bar.style.display = 'none';
+    try {
+        var d = await cmClassTermFetch(cls);
+        if (d && d.configured) { inp.value = d.session; bar.style.display = 'block'; }
+    } catch (e) {}
+}
+function soTermBarRender() {
+    var bar = document.getElementById('soTermBar'), cls = document.getElementById('soClass').value;
+    if (!bar) return;
+    if (!cls || !soTerm) { bar.style.display = 'none'; return; }
+    bar.style.display = 'block';
+    if (soTerm.setupNeeded) { bar.innerHTML = '<b>Sessions and terms</b><p class="helper-text" style="margin:6px 0 0;">Run <b>supabase_terms.sql</b> in Supabase once to turn this on.</p>'; return; }
+    if (!soTerm.configured) {
+        bar.innerHTML = '<b>Sessions and terms</b><p class="helper-text" style="margin:6px 0 8px;">Start terms for this class. All current students and assessments go into 1st term of the session you enter.</p>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;"><input type="text" id="soStartSession" class="form-input" style="flex:1;min-width:140px;" value="' + cmDefaultSession() + '" placeholder="2026/2027"><button type="button" class="primary-btn" onclick="soTermStart()">Start terms</button></div>';
+        return;
+    }
+    var nextBtn = soTerm.term < 3
+        ? '<button type="button" class="primary-btn" onclick="soTermAdvance()">Move class to ' + CM_TERM_NAMES[soTerm.term + 1] + '</button>'
+        : '<button type="button" class="primary-btn" onclick="soTermAdvance()">Start new session ' + cmNextSession(soTerm.session) + '</button>';
+    var opts = '<option value="">Current: ' + soTerm.session + ' \u00b7 ' + CM_TERM_NAMES[soTerm.term] + '</option>' +
+        ((soData && soData.periods) || []).filter(function(p) { return !(p.session === soTerm.session && p.term === soTerm.term); }).map(function(p) {
+            var v = p.session + '|' + p.term; return '<option value="' + v + '"' + (v === soViewing ? ' selected' : '') + '>' + p.session + ' \u00b7 ' + CM_TERM_NAMES[p.term] + '</option>';
+        }).join('');
+    bar.innerHTML = '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><div><b>' + soTerm.session + ' \u00b7 ' + CM_TERM_NAMES[soTerm.term] + '</b><div class="helper-text">This class is currently here.</div></div>' + nextBtn + '</div>' +
+        '<div style="margin-top:10px;"><label class="helper-text">Showing</label><select id="soPeriod" class="form-input" onchange="soPeriodChange()">' + opts + '</select></div>';
+}
+async function soTermStart() {
+    var cls = document.getElementById('soClass').value, v = (document.getElementById('soStartSession').value || '').trim();
+    if (!/^\d{4}\/\d{4}$/.test(v)) { alert('Write the session like 2026/2027.'); return; }
+    try { await cmClassTermSave(cls, v, 1); await soLoad(); } catch (e) { alert(e.message); }
+}
+async function soTermAdvance() {
+    var cls = document.getElementById('soClass').value;
+    var s = soTerm.session, t = soTerm.term + 1, msg;
+    if (soTerm.term >= 3) { s = cmNextSession(soTerm.session); t = 1; msg = 'Start session ' + s + ' (1st Term) for ' + cls + '? Students keep all their old results.'; }
+    else msg = 'Move ' + cls + ' to ' + CM_TERM_NAMES[t] + '? Assessments you publish from now on belong to ' + CM_TERM_NAMES[t] + '.';
+    if (!confirm(msg)) return;
+    try { await cmClassTermSave(cls, s, t); soViewing = ''; await soLoad(); } catch (e) { alert(e.message); }
+}
+function soPeriodChange() { soViewing = document.getElementById('soPeriod').value; soLoad(true); }

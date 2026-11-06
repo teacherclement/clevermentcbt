@@ -8,7 +8,7 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-v81';
+var CACHE_NAME = 'cleverment-v82';
 var urlsToCache = [
     '/',
     '/index.html',

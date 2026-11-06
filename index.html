@@ -898,6 +898,7 @@
                     <p id="rosterPhotoBulkStatus" class="helper-text" style="display:none; margin-top:8px; font-weight:600;"></p>
                 </div>
                 <input type="file" id="rosterPhotoPicker" accept="image/*" style="display:none;" onchange="onRosterPhotoPicked(this)">
+                <div id="rosterSessionBar" style="display:none;margin:10px 0;padding:10px 12px;border:1px solid #d0d7de;border-radius:12px;background:#fff;"><label for="rosterNewSession" style="font-weight:600;">Session for newly added students</label><input type="text" id="rosterNewSession" class="form-input" placeholder="e.g. 2026/2027" style="margin-top:6px;"><p class="helper-text" style="margin:6px 0 0;">New students you add and save are placed in this session. Students already on the roster keep theirs.</p></div>
                 <div id="rosterEditList"></div>
                 <div class="flag-box" id="pinPanel" style="border-color:#cfe1ff;margin-top:12px;"><h4 style="margin:0 0 6px;">Student login PINs</h4>
                     <p class="helper-text" style="margin:0 0 8px;">Each student logs in with their name and this 4-digit PIN. Generate PINs, then print or export them straight away. PINs are stored scrambled, so they cannot be shown again: reset a PIN if it is lost.</p>
@@ -1015,6 +1016,7 @@
                 <select id="soClass" class="form-input" style="flex:1;min-width:160px;" onchange="soLoad()"><option value="">Choose a class</option></select>
                 <input type="text" id="soSearch" class="form-input" style="flex:1;min-width:160px;" placeholder="Search student" oninput="soRender()">
             </div>
+            <div id="soTermBar" style="display:none;margin-bottom:12px;padding:12px;border:1px solid #d0d7de;border-radius:12px;background:#fff;"></div>
             <div id="soStatus" class="helper-text"></div>
             <div id="soTotals" style="margin-bottom:10px;"></div>
             <div id="soTable" style="overflow-x:auto;"></div>
@@ -1573,7 +1575,7 @@
   </section>
 </div>
 
-<script src="script.js?v=prem6"></script>
+<script src="script.js?v=prem7"></script>
 <script src="competition-ui.js"></script>
 
 <!-- ===== PUBLISHED ASSESSMENT QUESTION EDITOR ===== -->
