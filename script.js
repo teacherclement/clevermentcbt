@@ -5345,6 +5345,21 @@ function normalizeResultRow(r) {
     };
 }
 
+async function getTeacherResultsFromDatabase(teacherEmail) {
+    // Only this teacher's own rows are downloaded (the old code downloaded every teacher's results).
+    try {
+        var { data, error } = await supabase
+            .from('cleverment_results')
+            .select('*')
+            .eq('teacher_email', teacherEmail)
+            .order('id', { ascending: false });
+        if (error || !data) return (getAllResultsLocal() || []).filter(function(r) { return r.teacherEmail === teacherEmail; });
+        return data.map(normalizeResultRow);
+    } catch (e) {
+        return (getAllResultsLocal() || []).filter(function(r) { return r.teacherEmail === teacherEmail; });
+    }
+}
+
 async function getAllResultsFromDatabase() {
     try {
         var { data, error } = await supabase
@@ -6141,8 +6156,7 @@ async function renderTeacherDashboard() {
     try { var pingToken = localStorage.getItem('cleverment_teacher_token'); if (pingToken) fetch(BACKEND_URL + '/api/teacher/ping', { method: 'POST', headers: { 'Authorization': 'Bearer ' + pingToken } }).catch(function() {}); } catch (e) {}
     loadTeacherProfile();
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
-    var allResults = await getAllResultsFromDatabase();
-    var filtered = allResults.filter(function(r) { return r.teacherEmail === teacherEmail; });
+    var filtered = await getTeacherResultsFromDatabase(teacherEmail);
     filtered = await attachPassMarks(filtered, false);
     teacherResultsCache = filtered;
 
@@ -6294,8 +6308,7 @@ function resultRetakeBadgeHtml(item) {
 // Reloads the teacher's results from the database and redraws the table (keeps the current filters).
 async function reloadTeacherResultsCache() {
     var email = currentTeacher ? currentTeacher.email : 'unknown';
-    var all = await getAllResultsFromDatabase();
-    var mine = all.filter(function(r) { return r.teacherEmail === email; });
+    var mine = await getTeacherResultsFromDatabase(email);
     mine = await attachPassMarks(mine, false);
     teacherResultsCache = mine;
     rebuildTeacherFilterOptions();
@@ -6468,8 +6481,7 @@ async function loadBackupData() {
     var email = currentTeacher ? currentTeacher.email : 'unknown';
     var assessments = await getTeacherAssessmentsFromBackend();
     teacherAssessmentsCache = assessments;
-    var all = await getAllResultsFromDatabase();
-    var results = all.filter(function(r) { return r.teacherEmail === email; });
+    var results = await getTeacherResultsFromDatabase(email);
     return { email: email, assessments: assessments, results: results };
 }
 
