@@ -520,6 +520,7 @@
             if (pick !== '__all') targets = targets.filter(function (r) { return sid(r) === pick; });
             if (!targets.length) { status('Nothing to report for this choice.'); return; }
             status('Getting the details...');
+            try { if (typeof cmFillResultAnswersNow === 'function') await cmFillResultAnswersNow(); } catch (e) { }
             await ensureLogo();
             var raw = kind === 'single' ? await loadRaw(code) : null;
             var classRows = all.filter(function (r) { return r.className === cls; });

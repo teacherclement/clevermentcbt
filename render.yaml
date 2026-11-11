@@ -10,19 +10,19 @@ services:
       # Always revalidate so a new frontend deploy is picked up immediately.
       - path: /index.html
         name: Cache-Control
-        value: no-cache, no-store, must-revalidate
+        value: no-cache
       - path: /script.js
         name: Cache-Control
-        value: no-cache, no-store, must-revalidate
+        value: no-cache
       - path: /style.css
         name: Cache-Control
-        value: no-cache, no-store, must-revalidate
+        value: no-cache
       - path: /competition-ui.js
         name: Cache-Control
-        value: no-cache, no-store, must-revalidate
+        value: no-cache
       - path: /competition.css
         name: Cache-Control
-        value: no-cache, no-store, must-revalidate
+        value: no-cache
       - path: /sw.js
         name: Cache-Control
-        value: no-cache, no-store, must-revalidate
+        value: no-cache

@@ -5345,6 +5345,98 @@ function normalizeResultRow(r) {
     };
 }
 
+// ------------------------------------------------------------
+// FAST DASHBOARD LOADING
+// Stage 1: download only the small columns (no per-question answers) so the stats and the table appear quickly.
+// Stage 2: in the background, download the per-question answers and fill them in for the charts and reports.
+// ------------------------------------------------------------
+var CM_RESULT_LITE_COLS = 'id, teacher_email, student_name, admission_number, class_name, subject, score, correct_answers, total_questions, time_taken, assessment_code, tab_switches, proctor_violations, fast_answer_warnings, retake_allowed, created_at';
+
+async function cmFetchResultsLite(teacherEmail) {
+    // Returns normalized rows, or null when the light query is not possible (then the old full download is used).
+    try {
+        var all = [], PAGE = 1000;
+        for (var page = 0; page < 30; page++) {
+            var q = supabase.from('cleverment_results').select(CM_RESULT_LITE_COLS);
+            if (teacherEmail) q = q.eq('teacher_email', teacherEmail);
+            var r = await q.order('id', { ascending: false }).range(page * PAGE, page * PAGE + PAGE - 1);
+            if (r.error || !r.data) return null;
+            all = all.concat(r.data);
+            if (r.data.length < PAGE) break;
+        }
+        return all.map(normalizeResultRow);
+    } catch (e) { return null; }
+}
+
+async function getTeacherResultsLite(teacherEmail) {
+    var rows = await cmFetchResultsLite(teacherEmail);
+    return rows || await getTeacherResultsFromDatabase(teacherEmail);
+}
+
+async function getAllResultsLite() {
+    var rows = await cmFetchResultsLite(null);
+    return rows || await getAllResultsFromDatabase();
+}
+
+// Fills qTimes / qCorrect into rows that were loaded without answers.
+// SPEED FIX: this used to download EVERY student's full answers the moment the dashboard opened,
+// which clogged the connection so every menu sat on "Loading". Now it waits until the page has been
+// idle for a while, or until a chart / report really needs the data, and it only fetches what is missing.
+var cmFillTimer = null, cmFillArgs = null, cmFillRunning = null;
+function cmFillResultAnswers(rows, teacherEmail, now) {
+    cmFillArgs = { rows: rows, email: teacherEmail };
+    if (cmFillTimer) { clearTimeout(cmFillTimer); cmFillTimer = null; }
+    if (now) return cmFillResultAnswersNow();
+    cmFillTimer = setTimeout(function() { cmFillTimer = null; cmFillResultAnswersNow(); }, 60000);
+    return Promise.resolve();
+}
+function cmFillResultAnswersNow() {
+    if (cmFillTimer) { clearTimeout(cmFillTimer); cmFillTimer = null; }
+    if (cmFillRunning) return cmFillRunning;
+    var args = cmFillArgs;
+    if (!args || !args.rows || !args.rows.length) return Promise.resolve();
+    cmFillRunning = (async function() {
+        try {
+            var rows = args.rows, teacherEmail = args.email;
+            var byId = {}, missing = 0;
+            rows.forEach(function(r) {
+                var has = Array.isArray(r.qCorrect) && r.qCorrect.length > 0;
+                if (!has) { byId[String(r.id)] = r; missing++; }
+            });
+            if (!missing) return;
+            var PAGE = 150;
+            for (var from = 0; from < 20000 && missing > 0; from += PAGE) {
+                var q = supabase.from('cleverment_results').select('id, answers');
+                if (teacherEmail) q = q.eq('teacher_email', teacherEmail);
+                var r = await q.order('id', { ascending: false }).range(from, from + PAGE - 1);
+                if (r.error || !r.data) return;
+                r.data.forEach(function(x) {
+                    var row = byId[String(x.id)];
+                    if (!row || !Array.isArray(x.answers)) return;
+                    row.qTimes = x.answers.map(function(a) { return (a && typeof a.timeSeconds === 'number') ? a.timeSeconds : null; });
+                    row.qCorrect = x.answers.map(function(a) { return a && a.isCorrect ? 1 : 0; });
+                    delete byId[String(x.id)]; missing--;
+                });
+                if (r.data.length < PAGE) break;
+            }
+        } catch (e) { /* the charts simply stay empty; the dashboard itself is not affected */ }
+    })().then(function() { cmFillRunning = null; }, function() { cmFillRunning = null; });
+    return cmFillRunning;
+}
+
+// Pass marks only (no questions): a few bytes instead of every assessment with all its questions.
+async function cmGetPassMarkMap(isAdmin) {
+    var map = {};
+    try {
+        var token = localStorage.getItem(isAdmin ? 'cleverment_admin_token' : 'cleverment_teacher_token');
+        var res = await fetch(BACKEND_URL + '/api/' + (isAdmin ? 'admin' : 'teacher') + '/assessments?light=1', { headers: { 'Authorization': 'Bearer ' + token } });
+        var data = await res.json();
+        if (!res.ok) return null;
+        (data.assessments || []).forEach(function(a) { map[a.code] = (a.pass_mark !== null && a.pass_mark !== undefined) ? a.pass_mark : 50; });
+        return map;
+    } catch (e) { return null; }
+}
+
 async function getTeacherResultsFromDatabase(teacherEmail) {
     // Only this teacher's own rows are downloaded (the old code downloaded every teacher's results).
     try {
@@ -6139,11 +6231,15 @@ function studentResetQuiz() {
 var teacherResultsCache = [];
 var teacherAssessmentsCache = [];
 
-async function attachPassMarks(results, isAdmin) {
-    var assessments = isAdmin ? await getAdminAssessmentsFromBackend() : await getTeacherAssessmentsFromBackend();
-    var codeToPassMark = {};
-    for (var i = 0; i < assessments.length; i++) {
-        codeToPassMark[assessments[i].code] = (assessments[i].passMark !== null && assessments[i].passMark !== undefined) ? assessments[i].passMark : 50;
+async function attachPassMarks(results, isAdmin, mapPromise) {
+    var codeToPassMark = await (mapPromise || cmGetPassMarkMap(isAdmin));
+    if (!codeToPassMark) {
+        // Fallback to the old way if the light request failed.
+        var assessments = isAdmin ? await getAdminAssessmentsFromBackend() : await getTeacherAssessmentsFromBackend();
+        codeToPassMark = {};
+        for (var i = 0; i < assessments.length; i++) {
+            codeToPassMark[assessments[i].code] = (assessments[i].passMark !== null && assessments[i].passMark !== undefined) ? assessments[i].passMark : 50;
+        }
     }
     for (var j = 0; j < results.length; j++) {
         results[j].passMark = codeToPassMark.hasOwnProperty(results[j].assessmentCode) ? codeToPassMark[results[j].assessmentCode] : 50;
@@ -6156,9 +6252,12 @@ async function renderTeacherDashboard() {
     try { var pingToken = localStorage.getItem('cleverment_teacher_token'); if (pingToken) fetch(BACKEND_URL + '/api/teacher/ping', { method: 'POST', headers: { 'Authorization': 'Bearer ' + pingToken } }).catch(function() {}); } catch (e) {}
     loadTeacherProfile();
     var teacherEmail = currentTeacher ? currentTeacher.email : 'unknown';
-    var filtered = await getTeacherResultsFromDatabase(teacherEmail);
-    filtered = await attachPassMarks(filtered, false);
+    var pmPromise = cmGetPassMarkMap(false); // started now so both downloads run at the same time
+    var filtered = await getTeacherResultsLite(teacherEmail);
+    filtered = await attachPassMarks(filtered, false, pmPromise);
+    filtered = cmCarryAnswers(filtered, teacherResultsCache);
     teacherResultsCache = filtered;
+    cmFillResultAnswers(filtered, teacherEmail); // background: per-question data for charts and reports
 
     var classSelect = document.getElementById('teacherAdminFilterClass');
     if (classSelect) {
@@ -6306,11 +6405,26 @@ function resultRetakeBadgeHtml(item) {
 }
 
 // Reloads the teacher's results from the database and redraws the table (keeps the current filters).
+// Keeps already-downloaded per-question data when the results list is refreshed (no second download).
+function cmCarryAnswers(newRows, oldRows) {
+    try {
+        var m = {};
+        (oldRows || []).forEach(function(r) { if (Array.isArray(r.qCorrect) && r.qCorrect.length) m[String(r.id)] = r; });
+        (newRows || []).forEach(function(r) {
+            var o = m[String(r.id)];
+            if (o && !(Array.isArray(r.qCorrect) && r.qCorrect.length)) { r.qCorrect = o.qCorrect; r.qTimes = o.qTimes; }
+        });
+    } catch (e) { }
+    return newRows;
+}
+
 async function reloadTeacherResultsCache() {
     var email = currentTeacher ? currentTeacher.email : 'unknown';
-    var mine = await getTeacherResultsFromDatabase(email);
+    var mine = await getTeacherResultsLite(email);
     mine = await attachPassMarks(mine, false);
+    mine = cmCarryAnswers(mine, teacherResultsCache);
     teacherResultsCache = mine;
+    cmFillResultAnswers(mine, email);
     rebuildTeacherFilterOptions();
     applyTeacherFilters();
 }
@@ -7362,9 +7476,11 @@ async function adminDeleteTeacher(id) {
 var adminResultsCache = [];
 
 async function renderAdminResults() {
-    var results = await getAllResultsFromDatabase();
-    results = await attachPassMarks(results, true);
+    var adminPmPromise = cmGetPassMarkMap(true);
+    var results = await getAllResultsLite();
+    results = await attachPassMarks(results, true, adminPmPromise);
     adminResultsCache = results;
+    cmFillResultAnswers(results, null);
 
     var teacherSelect = document.getElementById('adminResultsFilterTeacher');
     if (teacherSelect) {
@@ -7938,6 +8054,7 @@ async function ensureTeacherDataForReports(force) {
     if (force || !teacherAssessmentsCache || !teacherAssessmentsCache.length) {
         teacherAssessmentsCache = await getTeacherAssessmentsFromBackend();
     }
+    try { cmFillResultAnswers(teacherResultsCache, currentTeacher ? currentTeacher.email : null, true); await cmFillResultAnswersNow(); } catch (e) {}
 }
 
 function posEsc(t) { return escapeHtml(String(t === null || t === undefined ? '' : t)); }
@@ -10604,6 +10721,7 @@ function showTeacherSection(panelId, btn) {
     if (typeof cmShowAnnouncements === 'function') { cmShowAnnouncements('teachers', 'teacherAnnounce'); teacherMsgBadge(); }
     if (panelId === 'analyticsSection' && typeof loadTeacherAnalytics === 'function') {
         loadTeacherAnalytics();
+        try { cmFillResultAnswers(teacherResultsCache, currentTeacher ? currentTeacher.email : null, true); } catch (e) {}
     }
     if (panelId === 'accessLogsSection') {
         loadTeacherAccessLogs();
