@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>CleverMent Load Test</title>
+<style>
+body{font-family:system-ui,Arial,sans-serif;margin:0;padding:16px;background:#f4f6fb;color:#1b2430}
+.card{background:#fff;border-radius:12px;padding:16px;margin:0 auto 12px;max-width:520px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+h1{font-size:20px;margin:0 0 6px} label{display:block;font-size:13px;margin-top:10px;font-weight:600}
+input{width:100%;box-sizing:border-box;padding:10px;font-size:16px;border:1px solid #b8c2d4;border-radius:8px}
+button{padding:12px 16px;font-size:16px;border:0;border-radius:8px;margin-top:12px;margin-right:8px;color:#fff;background:#2b6cb0}
+button.stop{background:#c53030} button:disabled{opacity:.5}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.stat{background:#eef2f9;border-radius:8px;padding:10px;font-size:13px}.stat b{display:block;font-size:20px}
+.bad{color:#c53030}.good{color:#2f855a} #verdict{font-size:16px;font-weight:700;margin-top:12px}
+small{color:#556}
+</style></head><body>
+<div class="card">
+<h1>CleverMent Load Test</h1>
+<small>Pretends to be many students in one live competition, so you can see how the server copes. Fake players are named "TestBot 01, 02..." and will show on the leaderboard.</small>
+<label>Backend address</label><input id="api" value="https://api.thecleverment.com">
+<label>Competition room code (start an OPEN room, not a class-only room)</label><input id="code" inputmode="numeric" placeholder="e.g. 123456">
+<label>Number of fake players (8 to 60)</label><input id="n" type="number" value="20" min="1" max="60">
+<button id="go">Start test</button><button id="stop" class="stop" disabled>Stop</button>
+<div id="verdict"></div>
+</div>
+<div class="card"><div class="grid">
+<div class="stat">Joined<b id="sJoined">0</b></div><div class="stat">Still active<b id="sActive">0</b></div>
+<div class="stat">Requests sent<b id="sReq">0</b></div><div class="stat">Requests / second<b id="sRps">0</b></div>
+<div class="stat">Average reply (ms)<b id="sAvg">0</b></div><div class="stat">Slowest 5% (ms)<b id="sP95">0</b></div>
+<div class="stat">Slowest reply (ms)<b id="sMax">0</b></div><div class="stat">Failed / blocked<b id="sErr">0</b></div>
+<div class="stat">Answers sent<b id="sAns">0</b></div><div class="stat">Question now<b id="sQ">-</b></div>
+</div><div id="log" style="font-size:12px;margin-top:10px;color:#556"></div></div>
+<script>
+(function(){
+var running=false, players=[], lat=[], req=0, err=0, blocked=0, joined=0, ans=0, startAt=0, lastQ='-', timer=null, firstErr='';
+function $(i){return document.getElementById(i);}
+function log(t){$('log').textContent=t;}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+async function call(method,path,body){
+  var t0=performance.now(); req++;
+  try{
+    var r=await fetch($('api').value.replace(/\/$/,'')+path,{method:method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+    lat.push(performance.now()-t0); if(lat.length>3000) lat.shift();
+    var d={}; try{d=await r.json();}catch(e){}
+    if(r.status===429){blocked++; err++; if(!firstErr) firstErr='Server blocked requests (too many from one network).';}
+    else if(!r.ok && r.status!==404 && r.status!==403){err++; if(!firstErr) firstErr=(d&&d.error)||('Error '+r.status);}
+    return {ok:r.ok,status:r.status,data:d};
+  }catch(e){ err++; lat.push(performance.now()-t0); if(!firstErr) firstErr='Could not reach the server (network or timeout).'; return {ok:false,status:0,data:{}}; }
+}
+async function runPlayer(i,code){
+  var name='TestBot '+(i<9?'0':'')+(i+1);
+  var j=await call('POST','/api/competition/join',{code:code,name:name});
+  if(!j.ok){ if(!firstErr) firstErr=(j.data&&j.data.error)||'Could not join.'; return; }
+  joined++; var p={alive:true}; players.push(p);
+  var pid=j.data.pid,key=j.data.key,have='',answered={};
+  while(running && p.alive){
+    var s=await call('GET','/api/competition/state?code='+encodeURIComponent(code)+'&pid='+pid+'&key='+key+'&have='+have);
+    if(s.status===404||s.status===403){p.alive=false;break;}
+    var d=s.data||{};
+    if(d.question){have=String(d.qIndex);}
+    if(d.status==='question'){ lastQ=(d.qIndex+1)+' of '+d.total;
+      if(!answered[d.qIndex] && d.question && d.question.options){
+        answered[d.qIndex]=true;
+        (function(q,n){ setTimeout(async function(){ if(!running) return;
+          var a=await call('POST','/api/competition/answer',{code:code,pid:pid,key:key,qIndex:q,choice:Math.floor(Math.random()*n)}); if(a.ok) ans++; },500+Math.random()*4000); })(d.qIndex,d.question.options.length);
+      }
+    }
+    if(d.status==='final'){p.alive=false;break;}
+    await sleep(900+Math.random()*200);
+  }
+  p.alive=false;
+}
+function pct(a,q){ if(!a.length) return 0; var s=a.slice().sort(function(x,y){return x-y;}); return s[Math.min(s.length-1,Math.floor(s.length*q))]; }
+function paint(){
+  var secs=Math.max(1,(Date.now()-startAt)/1000), active=players.filter(function(p){return p.alive;}).length;
+  var avg=lat.length?lat.reduce(function(a,b){return a+b;},0)/lat.length:0, p95=pct(lat,.95), mx=lat.length?Math.max.apply(null,lat.slice(-500)):0;
+  $('sJoined').textContent=joined; $('sActive').textContent=active; $('sReq').textContent=req; $('sRps').textContent=(req/secs).toFixed(1);
+  $('sAvg').textContent=Math.round(avg); $('sP95').textContent=Math.round(p95); $('sMax').textContent=Math.round(mx);
+  $('sErr').textContent=err+(blocked?' ('+blocked+' blocked)':''); $('sAns').textContent=ans; $('sQ').textContent=lastQ;
+  var v=$('verdict');
+  if(req<20){v.textContent='';return;}
+  if(blocked||err>req*0.02||p95>2500){v.className='bad';v.textContent='Struggling. '+(firstErr||'Replies are too slow.');}
+  else if(p95>1000){v.className='bad';v.textContent='Slow. Players would notice lag.';}
+  else {v.className='good';v.textContent='Healthy. The server is coping with this many players.';}
+}
+$('go').onclick=async function(){
+  var code=$('code').value.trim(), n=Math.max(1,Math.min(60,parseInt($('n').value,10)||20));
+  if(!code){log('Type the room code first.');return;}
+  var look=await call('GET','/api/competition/lookup?code='+encodeURIComponent(code));
+  if(!look.ok){log((look.data&&look.data.error)||'Room not found.');return;}
+  if(look.data.access==='roster'){log('This room is class-only. Start an OPEN room so fake players can join.');return;}
+  if(look.data.status!=='lobby'){log('This room already started. Open a new room and run the test while it is in the lobby.');return;}
+  running=true; players=[]; lat=[]; req=0; err=0; blocked=0; joined=0; ans=0; firstErr=''; startAt=Date.now(); lastQ='-';
+  $('go').disabled=true; $('stop').disabled=false; log('Joining '+n+' fake players... Now start the game from your teacher dashboard.');
+  timer=setInterval(paint,1000);
+  for(var i=0;i<n && running;i++){ runPlayer(i,code); await sleep(120); }
+};
+$('stop').onclick=function(){running=false;clearInterval(timer);paint();$('go').disabled=false;$('stop').disabled=true;log('Stopped.');};
+})();
+</script></body></html>
