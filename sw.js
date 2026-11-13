@@ -8,7 +8,9 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-v84';
+var CACHE_NAME = 'cleverment-v85';
+// Only this site's own files are listed. Outside libraries (maths, Excel, PDF...) are NOT listed here:
+// this worker never serves them, so downloading them at install only slowed the first visit.
 var urlsToCache = [
     '/',
     '/index.html',
@@ -33,21 +35,7 @@ var urlsToCache = [
     '/logo.png',
     '/logo-icon.png',
     '/apple-touch-icon.png',
-    '/favicon-64.png',
-    'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap',
-    'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js',
-    'https://unpkg.com/@supabase/supabase-js@2',
-    'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
-    'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
-    'https://i.postimg.cc/q73QqsQR/cleverment-logo.jpg'
+    '/favicon-64.png'
 ];
 
 // Install: cache the core files, and activate this new worker
