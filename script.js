@@ -853,7 +853,6 @@ var currentAssessmentCode = '';
 var studentQuestions = [];
 var studentCurrentIndex = 0;
 var studentAnswers = [];
-var studentAnswerReveals = {};
 var studentTimerInterval = null;
 var studentTimeRemaining = 0;
 var studentTimeLimit = 0;
@@ -3995,7 +3994,6 @@ function saveQuizState() {
         studentQuestions: studentQuestions,
         studentCurrentIndex: studentCurrentIndex,
         studentAnswers: studentAnswers,
-        studentAnswerReveals: studentAnswerReveals,
         studentTimeRemaining: studentTimeRemaining,
         studentTimeLimit: studentTimeLimit,
         studentName: studentName,
@@ -4132,7 +4130,6 @@ async function restoreQuizState() {
     studentQuestions = state.studentQuestions;
     studentCurrentIndex = state.studentCurrentIndex || 0;
     studentAnswers = state.studentAnswers || new Array(studentQuestions.length).fill(null);
-    studentAnswerReveals = state.studentAnswerReveals || {};
     studentTimeLimit = state.studentTimeLimit || 0;
     studentQuizEndsAt = savedEndsAt;
     studentTimeRemaining = studentTimeLimit > 0 && studentQuizEndsAt ? Math.max(0, Math.ceil((studentQuizEndsAt - Date.now()) / 1000)) : 0;
@@ -4173,7 +4170,6 @@ async function restoreQuizState() {
             if (currentAssessment.shuffle) rq = rq.map(shuffleOptionsForQuestion);
             studentQuestions = rq;
             studentAnswers = new Array(rq.length).fill(null);
-            studentAnswerReveals = cmR.answerReveals || {};
             var cmLetters = ['A', 'B', 'C', 'D'], firstOpen = -1;
             cmR.answers.forEach(function(a, ai) {
                 if (!rq[ai]) return;
@@ -4756,7 +4752,6 @@ function proceedToStartQuiz() {
     }
     studentCurrentIndex = 0;
     studentAnswers = new Array(studentQuestions.length).fill(null);
-    studentAnswerReveals = {};
     studentIsTimeUp = false;
     // A previous student's submission may have disabled the shared Submit button.
     // Always restore the button to a clean state when a new attempt begins.
@@ -4915,40 +4910,14 @@ function studentDisplayQuestion() {
         if (studentAnswers[studentCurrentIndex] === letters[i]) {
             div.classList.add('selected');
         }
-        if (studentAnswerReveals[String(q.originalIndex)]) {
-            div.classList.add('locked');
-            div.style.pointerEvents = 'none';
-            div.style.opacity = '0.78';
-        }
 
         div.onclick = (function(index) {
             return function() {
-                if (!studentIsTimeUp && !studentAnswerReveals[String(q.originalIndex)]) studentSelectOption(index);
+                if (!studentIsTimeUp) studentSelectOption(index);
             };
         })(i);
 
         container.appendChild(div);
-    }
-
-    // Show Correct Answer is available only after an answer is selected.
-    var revealWrap = document.getElementById('cmRevealAnswerWrap');
-    if (!revealWrap) {
-        revealWrap = document.createElement('div');
-        revealWrap.id = 'cmRevealAnswerWrap';
-        revealWrap.style.cssText = 'margin-top:14px;';
-        container.parentNode.insertBefore(revealWrap, container.nextSibling);
-    }
-    var revealKey = String(q.originalIndex);
-    var revealed = studentAnswerReveals[revealKey];
-    if (revealed) {
-        var revealedOptionIndex = q.options.indexOf(revealed.correctAnswerText);
-        var revealedLetter = ['A', 'B', 'C', 'D'][revealedOptionIndex] || '';
-        revealWrap.innerHTML = '<div style="padding:12px 14px;border-radius:10px;background:#fff4e5;border:1px solid #f0c36d;color:#744b00;font-weight:700;">Answer revealed. This question is permanently locked.<div style="margin-top:6px;font-weight:600;">Correct answer: ' + escapeHtml(revealedLetter ? revealedLetter + '. ' : '') + escapeHtml(revealed.correctAnswerText || '') + '</div></div>';
-    } else if (studentAnswers[studentCurrentIndex] !== null) {
-        revealWrap.innerHTML = '<button type="button" id="cmShowCorrectAnswerBtn" class="btn btn-secondary" style="margin-top:2px;">Show Correct Answer</button>';
-        document.getElementById('cmShowCorrectAnswerBtn').onclick = studentRevealCorrectAnswer;
-    } else {
-        revealWrap.innerHTML = '';
     }
 
     renderMathIn(document.getElementById('studentQuestionText'));
@@ -4958,35 +4927,8 @@ function studentDisplayQuestion() {
     studentUpdateNavigationButtons();
 }
 
-async function studentRevealCorrectAnswer() {
-    var q = studentQuestions[studentCurrentIndex];
-    if (!q || studentAnswers[studentCurrentIndex] === null) return;
-    var key = String(q.originalIndex);
-    if (studentAnswerReveals[key]) return;
-    var letters = ['A', 'B', 'C', 'D'];
-    var selectedIndex = letters.indexOf(studentAnswers[studentCurrentIndex]);
-    var selectedText = selectedIndex >= 0 ? q.options[selectedIndex] : null;
-    var btn = document.getElementById('cmShowCorrectAnswerBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Revealing...'; }
-    try {
-        var response = await fetch(BACKEND_URL + '/api/quiz/reveal-answer', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: currentAssessmentCode, studentName: studentName, admissionNumber: studentAdmissionNumber, originalIndex: q.originalIndex, selectedOptionText: selectedText })
-        });
-        var data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Could not reveal the correct answer.');
-        studentAnswerReveals[key] = { selectedOptionText: data.selectedOptionText, correctAnswerText: data.correctAnswerText, revealedAt: new Date().toISOString() };
-        saveQuizState();
-        studentDisplayQuestion();
-        syncStudentProgress(false);
-    } catch (e) {
-        if (btn) { btn.disabled = false; btn.textContent = 'Show Correct Answer'; }
-        alert(e.message || 'Could not reveal the correct answer. Please check your connection and try again.');
-    }
-}
-
 function studentSelectOption(index) {
-    if (studentIsTimeUp || studentFastWarningOpen || studentAnswerReveals[String(studentQuestions[studentCurrentIndex].originalIndex)]) return;
+    if (studentIsTimeUp || studentFastWarningOpen) return;
     var letters = ['A', 'B', 'C', 'D'];
     var wasFirstAnswer = studentAnswers[studentCurrentIndex] === null;
     studentAnswers[studentCurrentIndex] = letters[index];
@@ -5004,8 +4946,6 @@ function studentSelectOption(index) {
     queueStudentProgressSync();
     studentCheckFastAnswer(wasFirstAnswer);
 
-    // Preserve CleverMent's original automatic movement to the next question.
-    // Students can return with Previous to reveal the correct answer.
     if (studentCurrentIndex < studentQuestions.length - 1) {
         setTimeout(function() {
             studentCurrentIndex++;
@@ -6267,7 +6207,6 @@ function studentResetQuiz() {
     document.getElementById('studentAdmissionNumber').value = '';
     studentQuestions = [];
     studentAnswers = [];
-    studentAnswerReveals = {};
     studentCurrentIndex = 0;
     studentTimeRemaining = 0;
     studentIsTimeUp = false;
