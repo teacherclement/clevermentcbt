@@ -5030,7 +5030,6 @@ async function cmRevealClick() {
     var letters = ['A', 'B', 'C', 'D'];
     var li = letters.indexOf(studentAnswers[studentCurrentIndex]);
     if (li < 0) return;
-    if (!window.confirm('Show the correct answer?\n\nAfter you see it, you cannot change your answer for this question.')) return;
     var btn = document.getElementById('cmRevealBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Please wait...'; }
     var locked = q.options[li];
     var d = await cmFetchReveal(q, locked, false);
@@ -5054,13 +5053,18 @@ function cmRevealRefresh() {
     if (rv) {
         var opts = container.querySelectorAll('.option');
         for (var i = 0; i < opts.length; i++) {
-            opts[i].classList.add('cm-locked');
-            var t = q.options[i];
-            if (rv.correct && t === rv.correct) opts[i].classList.add('cm-correct');
-            else if (t === rv.locked) opts[i].classList.add('cm-wrong');
+            var t = q.options[i], el = opts[i];
+            el.classList.add('cm-locked');
+            if (rv.correct && t === rv.correct) {
+                el.classList.add('correct');
+                el.style.setProperty('background', 'rgba(45,156,92,0.30)', 'important');
+                el.style.setProperty('border-color', '#2d9c5c', 'important');
+            } else if (rv.correct && t === rv.locked) {
+                el.classList.add('wrong');
+                el.style.setProperty('background', 'rgba(214,69,69,0.26)', 'important');
+                el.style.setProperty('border-color', '#d64545', 'important');
+            }
         }
-        box.innerHTML = '<div class="cm-reveal-note">' + (rv.correct ? 'The green option is the correct answer. This question is now locked.' : 'Answer revealed. This question is locked.') + '</div>';
-        container.parentNode.insertBefore(box, container.nextSibling);
         if (!rv.correct) {
             cmFetchReveal(q, rv.locked, false).then(function(d) {
                 if (d && d.correctText) { rv.correct = d.correctText; saveQuizState(); if (studentQuestions[studentCurrentIndex] === q) cmRevealRefresh(); }
