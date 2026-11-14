@@ -1903,6 +1903,7 @@ async function savePublishedAssessmentToDatabase(assessment) {
                 cameraMonitoring: assessment.cameraMonitoring,
                 noiseMonitoring: assessment.noiseMonitoring,
                 showResults: assessment.showResults,
+                allowReveal: assessment.allowReveal === true,
                 availableFrom: assessment.availableFrom,
                 availableUntil: assessment.availableUntil,
                 passMark: assessment.passMark
