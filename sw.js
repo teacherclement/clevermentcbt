@@ -8,7 +8,7 @@
 // an old cached copy.
 // ============================================================
 
-var CACHE_NAME = 'cleverment-v88';
+var CACHE_NAME = 'cleverment-v89';
 // Only this site's own files are listed. Outside libraries (maths, Excel, PDF...) are NOT listed here:
 // this worker never serves them, so downloading them at install only slowed the first visit.
 var urlsToCache = [

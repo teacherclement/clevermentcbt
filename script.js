@@ -5725,7 +5725,10 @@ async function studentSubmitQuiz() {
             })
         });
         data = await res.json();
-        if (!res.ok) {
+        if (!res.ok && res.status === 409 && data && data.result) {
+            // The server had already submitted this attempt (time ran out): show the saved result normally.
+            data = data.result;
+        } else if (!res.ok) {
             if (studentIsTimeUp || studentEndReason === 'misconduct') {
                 // Automatic submissions never ask the student for anything.
                 if (res.status === 409) {
