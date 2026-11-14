@@ -853,6 +853,7 @@ var currentAssessmentCode = '';
 var studentQuestions = [];
 var studentCurrentIndex = 0;
 var studentAnswers = [];
+var studentRevealed = {};   // originalIndex -> { locked: picked option text, correct: correct option text or null }
 var studentTimerInterval = null;
 var studentTimeRemaining = 0;
 var studentTimeLimit = 0;
@@ -2144,6 +2145,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
     var cameraMonitoring = document.getElementById('teacherCameraMonitoring').checked;
     var noiseMonitoring = document.getElementById('teacherNoiseMonitoring').checked;
     var showResults = document.getElementById('teacherShowResults').checked;
+    var allowReveal = !!(document.getElementById('teacherAllowReveal') && document.getElementById('teacherAllowReveal').checked);
     var passMarkRaw = parseInt(document.getElementById('teacherPassMark').value);
     var passMark = (isNaN(passMarkRaw) || passMarkRaw < 0 || passMarkRaw > 100) ? 50 : passMarkRaw;
     var availableFromRaw = document.getElementById('teacherAvailableFrom').value;
@@ -2163,6 +2165,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         cameraMonitoring: cameraMonitoring,
         noiseMonitoring: noiseMonitoring,
         showResults: showResults,
+        allowReveal: allowReveal,
         passMark: passMark,
         questionLimit: parseInt((document.getElementById('teacherQuestionLimit') || {}).value, 10) || 0,
         negativeMarking: Number((document.getElementById('teacherNegativeMarking') || {}).value) || 0,
@@ -2184,6 +2187,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
             cameraMonitoring: cameraMonitoring,
             noiseMonitoring: noiseMonitoring,
             showResults: showResults,
+            allowReveal: allowReveal,
             passMark: passMark,
             certName: teacherCertName || ''
         });
@@ -2204,6 +2208,7 @@ async function doPublish(subject, className, teacherCertName, teacherSignature) 
         cameraMonitoring: cameraMonitoring,
         noiseMonitoring: noiseMonitoring,
         showResults: showResults,
+        allowReveal: allowReveal,
         passMark: passMark,
         availableFrom: availableFrom,
         availableUntil: availableUntil,
@@ -2437,6 +2442,7 @@ function renderAssessmentEditorSettings(a) {
                 toggle('aeNoise', 'Live monitoring: Noise', 'Warns if the surroundings are noisy', a.noiseMonitoring) +
                 toggle('aeShuffle', 'Shuffle questions &amp; options', '', a.shuffle) +
                 toggle('aeShowResults', 'Show results &amp; certificate to student', '', a.showResults !== false) +
+                toggle('aeAllowReveal', 'Allow "Show correct answer" during the test', 'Student must pick an option first; that question is then locked', a.allowReveal === true) +
             '</div>' +
         '</div>';
     box.style.display = 'block';
@@ -2472,6 +2478,7 @@ function collectAssessmentEditorSettings() {
             noiseMonitoring: document.getElementById('aeNoise').checked,
             shuffle: document.getElementById('aeShuffle').checked,
             showResults: document.getElementById('aeShowResults').checked,
+            allowReveal: document.getElementById('aeAllowReveal').checked,
             questionLimit: parseInt(document.getElementById('aeQuestionLimit').value, 10) || 0,
             negativeMarking: Number(document.getElementById('aeNegative').value) || 0
         }
@@ -2883,6 +2890,7 @@ async function saveAssessmentEditorChanges() {
                 localPublished[k].cameraMonitoring = updated.cameraMonitoring;
                 localPublished[k].noiseMonitoring = updated.noiseMonitoring;
                 localPublished[k].showResults = updated.showResults;
+                localPublished[k].allowReveal = updated.allowReveal;
                 break;
             }
         }
@@ -3956,6 +3964,7 @@ async function verifyAssessmentCode(opts) {
             cameraMonitoring: data.cameraMonitoring,
             noiseMonitoring: data.noiseMonitoring,
             showResults: data.showResults,
+            allowReveal: data.allowReveal === true,
             passMark: data.passMark
         };
         currentAssessmentCode = code;
@@ -3994,6 +4003,7 @@ function saveQuizState() {
         studentQuestions: studentQuestions,
         studentCurrentIndex: studentCurrentIndex,
         studentAnswers: studentAnswers,
+        studentRevealed: studentRevealed,
         studentTimeRemaining: studentTimeRemaining,
         studentTimeLimit: studentTimeLimit,
         studentName: studentName,
@@ -4130,6 +4140,7 @@ async function restoreQuizState() {
     studentQuestions = state.studentQuestions;
     studentCurrentIndex = state.studentCurrentIndex || 0;
     studentAnswers = state.studentAnswers || new Array(studentQuestions.length).fill(null);
+    studentRevealed = (state.studentRevealed && typeof state.studentRevealed === 'object') ? state.studentRevealed : {};
     studentTimeLimit = state.studentTimeLimit || 0;
     studentQuizEndsAt = savedEndsAt;
     studentTimeRemaining = studentTimeLimit > 0 && studentQuizEndsAt ? Math.max(0, Math.ceil((studentQuizEndsAt - Date.now()) / 1000)) : 0;
@@ -4185,6 +4196,7 @@ async function restoreQuizState() {
             studentProctorStrikes = cmR.proctorViolations || 0;
             studentFastAnswerWarnings = cmR.fastAnswerWarnings || 0;
         }
+        cmMergeServerReveals(cmR.revealed);
         if (cmR.endsAt && studentTimeLimit > 0) {
             studentTimeRemaining = Math.max(1, cmR.remainingSeconds);
             studentQuizEndsAt = Date.now() + studentTimeRemaining * 1000;
@@ -4752,6 +4764,7 @@ function proceedToStartQuiz() {
     }
     studentCurrentIndex = 0;
     studentAnswers = new Array(studentQuestions.length).fill(null);
+    studentRevealed = {};
     studentIsTimeUp = false;
     // A previous student's submission may have disabled the shared Submit button.
     // Always restore the button to a clean state when a new attempt begins.
@@ -4913,7 +4926,7 @@ function studentDisplayQuestion() {
 
         div.onclick = (function(index) {
             return function() {
-                if (!studentIsTimeUp) studentSelectOption(index);
+                if (!studentIsTimeUp && !cmIsRevealed(q)) studentSelectOption(index);
             };
         })(i);
 
@@ -4922,6 +4935,7 @@ function studentDisplayQuestion() {
 
     renderMathIn(document.getElementById('studentQuestionText'));
     renderMathIn(container);
+    cmRevealRefresh();
 
     studentUpdateQuestionBoxes();
     studentUpdateNavigationButtons();
@@ -4929,6 +4943,7 @@ function studentDisplayQuestion() {
 
 function studentSelectOption(index) {
     if (studentIsTimeUp || studentFastWarningOpen) return;
+    if (cmIsRevealed(studentQuestions[studentCurrentIndex])) return;
     var letters = ['A', 'B', 'C', 'D'];
     var wasFirstAnswer = studentAnswers[studentCurrentIndex] === null;
     studentAnswers[studentCurrentIndex] = letters[index];
@@ -4945,14 +4960,117 @@ function studentSelectOption(index) {
     saveQuizState();
     queueStudentProgressSync();
     studentCheckFastAnswer(wasFirstAnswer);
+    cmRevealRefresh();
 
-    if (studentCurrentIndex < studentQuestions.length - 1) {
+    // When "Show correct answer" is on, stay on the question so the student can use the button.
+    if (!(currentAssessment && currentAssessment.allowReveal) && studentCurrentIndex < studentQuestions.length - 1) {
         setTimeout(function() {
             studentCurrentIndex++;
             studentDisplayQuestion();
             studentUpdateNavigationButtons();
             saveQuizState();
         }, 300);
+    }
+}
+
+
+// ============================================================
+// SHOW CORRECT ANSWER (only when the teacher turned it on)
+// The student must pick an option first. After the answer is shown, that question is locked:
+// the server remembers the pick, so it cannot be changed (not even by refreshing or switching phone).
+// ============================================================
+function cmIsRevealed(q) { return !!(q && studentRevealed && studentRevealed[q.originalIndex]); }
+
+(function() {
+    if (document.getElementById('cmRevealStyle')) return;
+    var st = document.createElement('style'); st.id = 'cmRevealStyle';
+    st.textContent = '.option.cm-locked{cursor:not-allowed}.option.cm-correct{background:#e6f7ee !important;border-color:#2d9c5c !important}' +
+        '.option.cm-wrong{background:#fdecec !important;border-color:#d64545 !important}' +
+        '#cmRevealBox{margin-top:12px;text-align:center}#cmRevealBox button{padding:10px 16px;border:0;border-radius:8px;background:#6b4fd8;color:#fff;font-size:15px;cursor:pointer}' +
+        '#cmRevealBox button:disabled{opacity:.6}#cmRevealBox .cm-reveal-note{font-size:14px;color:#44505f}';
+    document.head.appendChild(st);
+})();
+
+function cmMergeServerReveals(map) {
+    if (!map || typeof map !== 'object') return;
+    var letters = ['A', 'B', 'C', 'D'];
+    Object.keys(map).forEach(function(k) {
+        if (!studentRevealed[k]) studentRevealed[k] = { locked: map[k], correct: null };
+        else studentRevealed[k].locked = map[k];
+    });
+    studentQuestions.forEach(function(q, i) {
+        var rv = studentRevealed[q.originalIndex];
+        if (!rv) return;
+        var li = q.options.indexOf(rv.locked);
+        if (li >= 0) studentAnswers[i] = letters[li];
+    });
+}
+
+async function cmFetchReveal(q, locked, retry) {
+    try {
+        var r = await fetch(BACKEND_URL + '/api/quiz/reveal', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: currentAssessmentCode, studentName: studentName, admissionNumber: studentAdmissionNumber, originalIndex: q.originalIndex, selectedOptionText: locked })
+        });
+        var d = {}; try { d = await r.json(); } catch (e) {}
+        if (r.status === 409 && d.error === 'no_session' && !retry) {
+            try { syncStudentProgress(false); } catch (e) {}
+            await new Promise(function(ok) { setTimeout(ok, 1800); });
+            return cmFetchReveal(q, locked, true);
+        }
+        if (!r.ok) return { error: d.error === 'no_session' ? 'Please try again in a moment.' : (d.error || 'Could not show the answer. Please try again.') };
+        return d;
+    } catch (e) { return { error: 'No connection. Please try again.' }; }
+}
+
+async function cmRevealClick() {
+    var q = studentQuestions[studentCurrentIndex];
+    if (!q || cmIsRevealed(q) || studentIsTimeUp) return;
+    var letters = ['A', 'B', 'C', 'D'];
+    var li = letters.indexOf(studentAnswers[studentCurrentIndex]);
+    if (li < 0) return;
+    if (!window.confirm('Show the correct answer?\n\nAfter you see it, you cannot change your answer for this question.')) return;
+    var btn = document.getElementById('cmRevealBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Please wait...'; }
+    var locked = q.options[li];
+    var d = await cmFetchReveal(q, locked, false);
+    if (d.error) { alert(d.error); cmRevealRefresh(); return; }
+    studentRevealed[q.originalIndex] = { locked: d.lockedText, correct: d.correctText };
+    var lli = q.options.indexOf(d.lockedText);
+    if (lli >= 0) studentAnswers[studentQuestions.indexOf(q)] = letters[lli];
+    saveQuizState();
+    queueStudentProgressSync();
+    if (studentQuestions[studentCurrentIndex] === q) cmRevealRefresh();
+}
+
+// Redraws the lock colours and the "Show correct answer" button for the question on screen.
+function cmRevealRefresh() {
+    var q = studentQuestions[studentCurrentIndex];
+    var old = document.getElementById('cmRevealBox'); if (old) old.parentNode.removeChild(old);
+    if (!q || !currentAssessment || !currentAssessment.allowReveal) return;
+    var container = document.getElementById('studentOptionsContainer'); if (!container) return;
+    var rv = studentRevealed[q.originalIndex];
+    var box = document.createElement('div'); box.id = 'cmRevealBox';
+    if (rv) {
+        var opts = container.querySelectorAll('.option');
+        for (var i = 0; i < opts.length; i++) {
+            opts[i].classList.add('cm-locked');
+            var t = q.options[i];
+            if (rv.correct && t === rv.correct) opts[i].classList.add('cm-correct');
+            else if (t === rv.locked) opts[i].classList.add('cm-wrong');
+        }
+        box.innerHTML = '<div class="cm-reveal-note">' + (rv.correct ? 'The green option is the correct answer. This question is now locked.' : 'Answer revealed. This question is locked.') + '</div>';
+        container.parentNode.insertBefore(box, container.nextSibling);
+        if (!rv.correct) {
+            cmFetchReveal(q, rv.locked, false).then(function(d) {
+                if (d && d.correctText) { rv.correct = d.correctText; saveQuizState(); if (studentQuestions[studentCurrentIndex] === q) cmRevealRefresh(); }
+            });
+        }
+        return;
+    }
+    if (studentAnswers[studentCurrentIndex] !== null && studentAnswers[studentCurrentIndex] !== undefined) {
+        box.innerHTML = '<button type="button" id="cmRevealBtn">Show correct answer</button>';
+        container.parentNode.insertBefore(box, container.nextSibling);
+        document.getElementById('cmRevealBtn').onclick = cmRevealClick;
     }
 }
 
@@ -5480,6 +5598,7 @@ function normalizeAssessmentRow(a) {
         cameraMonitoring: a.camera_monitoring || false,
         noiseMonitoring: a.noise_monitoring || false,
         showResults: a.show_results !== false,
+        allowReveal: a.allow_reveal === true,
         passMark: (a.pass_mark !== null && a.pass_mark !== undefined) ? a.pass_mark : 50,
         questionLimit: parseInt(a.question_limit, 10) || 0,
         negativeMarking: Number(a.negative_marking) || 0,
@@ -6207,6 +6326,7 @@ function studentResetQuiz() {
     document.getElementById('studentAdmissionNumber').value = '';
     studentQuestions = [];
     studentAnswers = [];
+    studentRevealed = {};
     studentCurrentIndex = 0;
     studentTimeRemaining = 0;
     studentIsTimeUp = false;
