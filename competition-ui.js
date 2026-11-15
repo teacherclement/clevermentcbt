@@ -299,10 +299,11 @@
             var h3 = netBanner() + '<h2 class="lc-title">Final results</h2>' + podium(rows) + '<div class="lc-board">';
             rows.forEach(function(r) { h3 += '<div class="lc-row"><span class="lc-rank">' + r.rank + '</span><span class="lc-dot" style="background:' + esc(r.color) + '"></span><span class="lc-name">' + esc(r.name) + '</span><span class="lc-small">' + r.correct + '/' + s.total + ' &middot; ' + r.avgSeconds + 's</span><span class="lc-score">' + r.score + '</span></div>'; });
             h3 += '</div><p class="lc-small center" id="lcSaveNote">' + (s.saved ? 'Results saved. Students can see their points in My Progress.' : (s.saveError ? 'Results could NOT be saved: ' + esc(s.saveError) + ' (Run supabase_competition.sql in Supabase.)' : 'Saving results...')) + '</p>' +
-                '<div class="lc-actions"><button class="lc-btn alt" id="lcCsvBtn">Download CSV</button><button class="lc-btn" id="lcDoneBtn">Close</button></div>';
+                '<div class="lc-actions"><button class="lc-btn alt" id="lcCsvBtn">Download CSV</button><button class="lc-btn alt" id="lcPdfBtn">Download PDF</button><button class="lc-btn" id="lcDoneBtn">Close</button></div>';
             shell(h3, '');
             $('lcDoneBtn').onclick = closeOverlay;
             $('lcCsvBtn').onclick = function() { downloadCsv(s); };
+            $('lcPdfBtn').onclick = function() { downloadPdf(s, this); };
         }
         var end = $('lcEndBtn');
         if (end) end.onclick = hostEnd;
@@ -334,6 +335,117 @@
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob); a.download = 'competition-' + lc.code + '.csv';
         document.body.appendChild(a); a.click(); a.remove();
+    }
+    // ---- PDF of the final results, with the CleverMent logo ----
+    function loadLogoData() {
+        return fetch('logo.png', { cache: 'force-cache' }).then(function(r) { if (!r.ok) throw new Error('logo'); return r.blob(); }).then(function(b) {
+            return new Promise(function(res, rej) { var fr = new FileReader(); fr.onload = function() { res(fr.result); }; fr.onerror = rej; fr.readAsDataURL(b); });
+        }).then(function(data) {
+            return new Promise(function(res) {
+                var im = new Image();
+                im.onload = function() {
+                    var ratio = (im.naturalWidth && im.naturalHeight) ? im.naturalWidth / im.naturalHeight : 1, out = data;
+                    try {   // shrink the logo so the PDF stays small
+                        var w = Math.min(im.naturalWidth, 360), c = document.createElement('canvas');
+                        c.width = w; c.height = Math.round(w / ratio);
+                        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+                        out = c.toDataURL('image/png');
+                    } catch (e) {}
+                    res({ data: out, ratio: ratio });
+                };
+                im.onerror = function() { res({ data: data, ratio: 1 }); };
+                im.src = data;
+            });
+        });
+    }
+    function waitForPdfLib() {
+        return new Promise(function(res) {
+            if (window.jspdf && window.jspdf.jsPDF) return res(true);
+            try { if (window.cmLibs && window.cmLibs.start) window.cmLibs.start(); } catch (e) {}
+            var tries = 0, t = setInterval(function() {
+                tries++;
+                if (window.jspdf && window.jspdf.jsPDF) { clearInterval(t); res(true); }
+                else if (tries > 60) { clearInterval(t); res(false); }
+            }, 250);
+        });
+    }
+    async function downloadPdf(s, btn) {
+        var label = btn ? btn.textContent : '';
+        if (btn) { btn.disabled = true; btn.textContent = 'Preparing PDF...'; }
+        try {
+            var ok = await waitForPdfLib();
+            if (!ok) { alert('The PDF tool is still loading. Please wait a few seconds and tap Download PDF again.'); return; }
+            var logo = null; try { logo = await loadLogoData(); } catch (e) {}
+            var rows = s.finalRows || [];
+            var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+            var W = 210, M = 14, navy = [30, 58, 138];
+            var colX = { rank: M + 3, name: M + 20, pts: 126, cor: 150, avg: 178 };
+            var y = 0, page = 0;
+            function tableHead() {
+                doc.setFillColor(navy[0], navy[1], navy[2]); doc.rect(M, y, W - 2 * M, 9, 'F');
+                doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+                doc.text('Rank', colX.rank, y + 6); doc.text('Name', colX.name, y + 6);
+                doc.text('Points', colX.pts, y + 6, { align: 'right' }); doc.text('Correct', colX.cor, y + 6, { align: 'right' }); doc.text('Avg time', colX.avg, y + 6, { align: 'right' });
+                y += 9;
+            }
+            function header() {
+                page++;
+                doc.setFillColor(navy[0], navy[1], navy[2]); doc.rect(0, 0, W, 30, 'F');
+                var x = M;
+                if (logo && logo.data) {
+                    var h = 18, w = Math.min(h * logo.ratio, 40);
+                    try { doc.setFillColor(255, 255, 255); doc.roundedRect(M - 1.5, 5.5, w + 3, h + 3, 2, 2, 'F'); doc.addImage(logo.data, 'PNG', M, 7, w, h, 'cmlogo', 'FAST'); } catch (e) {}
+                    x = M + w + 8;
+                }
+                doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(17);
+                doc.text('Live Competition Results', x, 15);
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+                doc.text('CleverMent Assessment Platform', x, 22);
+                y = 40;
+                if (page === 1) {
+                    doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+                    doc.text(doc.splitTextToSize(String(s.title || 'Live Competition'), W - 2 * M)[0], M, y);
+                    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(90, 100, 120);
+                    var meta = 'Room code: ' + (lc && lc.code ? lc.code : '') + '   |   Players: ' + rows.length + '   |   Questions: ' + (s.total || '') + '   |   ' + new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+                    doc.text(meta, M, y + 6);
+                    y += 14;
+                }
+                tableHead();
+            }
+            function footer() {
+                var n = doc.getNumberOfPages();
+                for (var p = 1; p <= n; p++) {
+                    doc.setPage(p); doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(120, 130, 150);
+                    doc.text('Generated by CleverMent  |  thecleverment.com', M, 289);
+                    doc.text('Page ' + p + ' of ' + n, W - M, 289, { align: 'right' });
+                }
+            }
+            header();
+            var medal = { 1: [201, 168, 76], 2: [148, 163, 184], 3: [180, 100, 45] };
+            rows.forEach(function(r, i) {
+                if (y > 276) { doc.addPage(); header(); }
+                if (i % 2 === 0) { doc.setFillColor(241, 245, 252); doc.rect(M, y, W - 2 * M, 9, 'F'); }
+                var m = medal[r.rank];
+                if (m) { doc.setFillColor(m[0], m[1], m[2]); doc.circle(colX.rank + 2.5, y + 4.5, 3.2, 'F'); doc.setTextColor(255, 255, 255); }
+                else doc.setTextColor(30, 41, 59);
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+                doc.text(String(r.rank), colX.rank + 2.5, y + 6, { align: 'center' });
+                doc.setTextColor(30, 41, 59); doc.setFont('helvetica', m ? 'bold' : 'normal');
+                doc.text(doc.splitTextToSize(String(r.name || ''), 78)[0], colX.name, y + 6);
+                doc.setFont('helvetica', 'normal');
+                doc.text(String(r.score), colX.pts, y + 6, { align: 'right' });
+                doc.text(r.correct + ' / ' + (s.total || ''), colX.cor, y + 6, { align: 'right' });
+                var hasAvg = r.avgSeconds !== undefined && r.avgSeconds !== null;
+                doc.text(hasAvg ? (r.avgSeconds + ' s') : '', colX.avg, y + 6, { align: 'right' });
+                y += 9;
+            });
+            footer();
+            doc.save('competition-' + (lc && lc.code ? lc.code : 'results') + '.pdf');
+        } catch (e) {
+            alert('Could not create the PDF. Please try again.');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = label || 'Download PDF'; }
+        }
     }
     function openHost(code) {
         lc = { role: 'host', code: code, have: -1, q: null, sig: '', offset: 0, state: null };
