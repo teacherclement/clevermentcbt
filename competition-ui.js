@@ -369,22 +369,32 @@
             }, 250);
         });
     }
-    async function downloadPdf(s, btn) {
+    function downloadPdf(s, btn) {
+        return makeResultsPdf({
+            title: s.title, subject: s.subject, code: (lc && lc.code) || '', date: new Date(), total: s.total, players: (s.finalRows || []).length,
+            rows: (s.finalRows || []).map(function(r) { return { rank: r.rank, name: r.name, adm: '', score: r.score, correct: r.correct, avgSeconds: r.avgSeconds }; })
+        }, btn);
+    }
+    // One PDF builder for both the game that just finished and any saved (previous) competition.
+    async function makeResultsPdf(info, btn) {
         var label = btn ? btn.textContent : '';
         if (btn) { btn.disabled = true; btn.textContent = 'Preparing PDF...'; }
         try {
             var ok = await waitForPdfLib();
             if (!ok) { alert('The PDF tool is still loading. Please wait a few seconds and tap Download PDF again.'); return; }
             var logo = null; try { logo = await loadLogoData(); } catch (e) {}
-            var rows = s.finalRows || [];
+            var rows = info.rows || [];
+            var hasAdm = rows.some(function(r) { return r.adm; });
             var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
             var W = 210, M = 14, navy = [30, 58, 138];
-            var colX = { rank: M + 3, name: M + 20, pts: 126, cor: 150, avg: 178 };
+            var colX = hasAdm ? { rank: M + 3, name: M + 20, adm: 100, pts: 140, cor: 164, avg: 192 } : { rank: M + 3, name: M + 20, pts: 126, cor: 150, avg: 178 };
+            var nameW = hasAdm ? 62 : 78;
             var y = 0, page = 0;
             function tableHead() {
                 doc.setFillColor(navy[0], navy[1], navy[2]); doc.rect(M, y, W - 2 * M, 9, 'F');
                 doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
                 doc.text('Rank', colX.rank, y + 6); doc.text('Name', colX.name, y + 6);
+                if (hasAdm) doc.text('Adm. No.', colX.adm, y + 6);
                 doc.text('Points', colX.pts, y + 6, { align: 'right' }); doc.text('Correct', colX.cor, y + 6, { align: 'right' }); doc.text('Avg time', colX.avg, y + 6, { align: 'right' });
                 y += 9;
             }
@@ -404,10 +414,16 @@
                 y = 40;
                 if (page === 1) {
                     doc.setTextColor(30, 41, 59); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-                    doc.text(doc.splitTextToSize(String(s.title || 'Live Competition'), W - 2 * M)[0], M, y);
+                    doc.text(doc.splitTextToSize(String(info.title || 'Live Competition'), W - 2 * M)[0], M, y);
                     doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(90, 100, 120);
-                    var meta = 'Room code: ' + (lc && lc.code ? lc.code : '') + '   |   Players: ' + rows.length + '   |   Questions: ' + (s.total || '') + '   |   ' + new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
-                    doc.text(meta, M, y + 6);
+                    var parts = [];
+                    if (info.className) parts.push('Class: ' + info.className);
+                    if (info.subject) parts.push(info.subject);
+                    if (info.code) parts.push('Room code: ' + info.code);
+                    parts.push('Players: ' + (info.players || rows.length));
+                    parts.push('Questions: ' + (info.total || ''));
+                    parts.push(new Date(info.date || Date.now()).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }));
+                    doc.text(doc.splitTextToSize(parts.join('   |   '), W - 2 * M), M, y + 6);
                     y += 14;
                 }
                 tableHead();
@@ -431,16 +447,19 @@
                 doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
                 doc.text(String(r.rank), colX.rank + 2.5, y + 6, { align: 'center' });
                 doc.setTextColor(30, 41, 59); doc.setFont('helvetica', m ? 'bold' : 'normal');
-                doc.text(doc.splitTextToSize(String(r.name || ''), 78)[0], colX.name, y + 6);
+                doc.text(doc.splitTextToSize(String(r.name || ''), nameW)[0], colX.name, y + 6);
                 doc.setFont('helvetica', 'normal');
+                if (hasAdm) doc.text(doc.splitTextToSize(String(r.adm || ''), 34)[0], colX.adm, y + 6);
                 doc.text(String(r.score), colX.pts, y + 6, { align: 'right' });
-                doc.text(r.correct + ' / ' + (s.total || ''), colX.cor, y + 6, { align: 'right' });
+                doc.text(r.correct + ' / ' + (info.total || ''), colX.cor, y + 6, { align: 'right' });
                 var hasAvg = r.avgSeconds !== undefined && r.avgSeconds !== null;
                 doc.text(hasAvg ? (r.avgSeconds + ' s') : '', colX.avg, y + 6, { align: 'right' });
                 y += 9;
             });
             footer();
-            doc.save('competition-' + (lc && lc.code ? lc.code : 'results') + '.pdf');
+            var slug = String(info.code || info.title || 'results').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 40) || 'results';
+            var d = new Date(info.date || Date.now()), ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+            doc.save('competition-' + slug + '-' + ds + '.pdf');
         } catch (e) {
             alert('Could not create the PDF. Please try again.');
         } finally {
@@ -729,8 +748,18 @@
             var rows = g.results.map(function(x) { return '<tr><td>' + x.rank + '</td><td>' + esc(x.name) + (x.guest ? ' <small>(guest)</small>' : '') + '</td><td>' + esc(x.admissionNumber) + '</td><td>' + x.points + '</td><td>' + x.correct + '/' + x.total + '</td><td>' + x.avgSeconds + 's</td></tr>'; }).join('');
             return '<details class="lc-hist"><summary><b>' + esc(g.title) + '</b> <small>' + new Date(g.date).toLocaleDateString() + ' &middot; ' + g.playerCount + ' players' + (g.className ? ' &middot; ' + esc(g.className) : '') + '</small></summary>' +
                 '<div style="overflow-x:auto;"><table class="lc-table"><tr><th>#</th><th>Name</th><th>Adm. No.</th><th>Points</th><th>Correct</th><th>Avg</th></tr>' + rows + '</table></div>' +
+                '<button type="button" class="secondary-btn" data-pdf="' + gi + '" style="margin-top:8px;margin-right:8px;">Download PDF</button>' +
                 '<button type="button" class="secondary-btn" data-del="' + esc(g.gameId) + '" style="margin-top:8px;color:#dc3545;">Delete this record</button></details>';
         }).join('');
+        box.querySelectorAll('[data-pdf]').forEach(function(b) {
+            b.onclick = function() {
+                var g = games[parseInt(b.getAttribute('data-pdf'), 10)]; if (!g) return;
+                makeResultsPdf({
+                    title: g.title, subject: g.subject, className: g.className, code: '', date: g.date, total: g.questionCount, players: g.playerCount,
+                    rows: g.results.map(function(x) { return { rank: x.rank, name: x.name + (x.guest ? ' (guest)' : ''), adm: x.admissionNumber, score: x.points, correct: x.correct, avgSeconds: x.avgSeconds }; })
+                }, b);
+            };
+        });
         box.querySelectorAll('[data-del]').forEach(function(b) {
             b.onclick = async function() {
                 if (!confirm('Delete this competition record?')) return;
