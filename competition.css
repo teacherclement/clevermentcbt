@@ -111,3 +111,6 @@ html body .lc-overlay .lc-qhead, html body .lc-overlay .lc-small, html body .lc-
 html body .lc-overlay .lc-row { background: rgba(255,255,255,.09) !important; color: #fff !important; }
 html body .lc-overlay .lc-row.me { background: rgba(45,108,223,.55) !important; outline: 2px solid #93c5fd !important; }
 html body .lc-overlay .lc-timebar-wrap { background: rgba(255,255,255,.18) !important; }
+
+/* Headings on the dark live-competition screens ("You are in...", "Game over", "Final results") must be light. */
+html body .lc-overlay h1, html body .lc-overlay h2, html body .lc-overlay h3, html body .lc-overlay .lc-title, html body .lc-overlay .lc-center h2 { color: #ffffff !important; }
