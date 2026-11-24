@@ -554,11 +554,12 @@
             <button onclick="submitNewPassword()" id="teacherResetSubmitBtn" class="primary-btn full-width">Set New Password</button>
         </div>
         <div id="teacherReactivateForm" style="display:none;">
-            <h2>Account Paused</h2>
-            <p class="helper-text" style="margin-bottom:14px;">Your account has been paused. Pay <strong id="reactivateFeeDisplay">₦2,500</strong> to reactivate it instantly.</p>
+            <h2 id="reactivateTitle">Account Paused</h2>
+            <p class="helper-text" id="reactivateText" style="margin-bottom:14px;">Your account has been paused. Pay <strong id="reactivateFeeDisplay">₦2,500</strong> to reactivate it instantly.</p>
+            <p class="helper-text" id="reactivateOneTimeNote" style="display:none; margin-bottom:14px; padding:12px 14px; border-radius:10px; background:rgba(45,156,92,.10); border:1px solid rgba(45,156,92,.35);"><strong>One-time payment.</strong> Pay once to enjoy all CleverMent features. No monthly or yearly charges.</p>
             <button onclick="startReactivationPayment()" id="teacherReactivateBtn" class="primary-btn full-width" style="background:#2d9c5c;">Pay Now to Reactivate</button>
             <p class="helper-text" style="margin-top:8px; text-align:center;">
-                <a href="#" onclick="showTeacherLoginForm(); return false;" style="color:#2d6cdf; text-decoration:none; font-weight:600;">← Back to Login</a>
+                <a href="#" id="reactivateBackLink" onclick="showTeacherLoginForm(); return false;" style="color:#2d6cdf; text-decoration:none; font-weight:600;">← Back to Login</a>
             </p>
         </div>
         <div id="paymentCallbackSection" style="display:none;">
@@ -1604,7 +1605,7 @@
   </section>
 </div>
 
-<script src="script.js?v=prem13"></script>
+<script src="script.js?v=prem14"></script>
 <script src="competition-ui.js?v=3"></script>
 
 <!-- ===== PUBLISHED ASSESSMENT QUESTION EDITOR ===== -->

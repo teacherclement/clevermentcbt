@@ -987,7 +987,26 @@ function showForgotPasswordForm() {
 
 var pendingReactivationEmail = null;
 
-async function showReactivationForm() {
+var cmPaymentMode = 'reactivate';
+function cmPayBtnLabel() { return cmPaymentMode === 'upgrade' ? 'Pay Once to Upgrade' : 'Pay Now to Reactivate'; }
+function cmSetPaymentMode(mode) {
+    cmPaymentMode = mode === 'upgrade' ? 'upgrade' : 'reactivate';
+    var up = cmPaymentMode === 'upgrade';
+    var t = document.getElementById('reactivateTitle'), p = document.getElementById('reactivateText'), n = document.getElementById('reactivateOneTimeNote'), b = document.getElementById('teacherReactivateBtn'), l = document.getElementById('reactivateBackLink');
+    if (t) t.textContent = up ? 'Upgrade Your Account' : 'Account Paused';
+    if (p) p.innerHTML = up
+        ? 'Unlock every CleverMent tool: Live Now, Live Competition, Insights, Messages, Class Roster, Analytics, Class Positions, Student Progress, Backup and Export, Question Bank, Certificates and more. Pay <strong id="reactivateFeeDisplay">₦2,500</strong> to upgrade instantly.'
+        : 'Your account has been paused. Pay <strong id="reactivateFeeDisplay">₦2,500</strong> to reactivate it instantly.';
+    if (n) n.style.display = up ? 'block' : 'none';
+    if (b) { b.textContent = cmPayBtnLabel(); b.disabled = false; }
+    if (l) {
+        l.textContent = up ? '← Back to Dashboard' : '← Back to Login';
+        l.onclick = up ? function(){ showPageFromURL('teacher-dashboard'); return false; } : function(){ showTeacherLoginForm(); return false; };
+    }
+}
+
+async function showReactivationForm(mode) {
+    cmSetPaymentMode(mode);
     document.getElementById('teacherLoginForm').style.display = 'none';
     document.getElementById('teacherSignupForm').style.display = 'none';
     document.getElementById('teacherForgotPasswordForm').style.display = 'none';
@@ -1027,14 +1046,15 @@ async function startReactivationPayment() {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token
-            }
+            },
+            body: JSON.stringify({ purpose: cmPaymentMode === 'upgrade' ? 'upgrade' : 'reactivation' })
         });
         var data = await res.json();
 
         if (!res.ok) {
             alert(data.error || 'Could not start payment. Please try again.');
             btn.disabled = false;
-            btn.textContent = 'Pay Now to Reactivate';
+            btn.textContent = cmPayBtnLabel();
             return;
         }
 
@@ -1042,7 +1062,7 @@ async function startReactivationPayment() {
     } catch (e) {
         alert('Could not reach the server. Please check your connection and try again.');
         btn.disabled = false;
-        btn.textContent = 'Pay Now to Reactivate';
+        btn.textContent = cmPayBtnLabel();
     }
 }
 
@@ -1084,7 +1104,13 @@ async function checkForPaymentCallback() {
 
         if (res.ok && data.success) {
             titleEl.textContent = 'Payment Successful!';
-            msgEl.textContent = 'Your account has been reactivated. You can now log in as usual.';
+            if (data.purpose === 'upgrade') {
+                msgEl.textContent = 'Thank you! Your account is upgraded and every CleverMent feature is now unlocked.';
+                backBtn.textContent = 'Continue to Dashboard';
+                backBtn.onclick = function(){ window.location.href = '/?page=teacher-dashboard'; };
+            } else {
+                msgEl.textContent = 'Your account has been reactivated. You can now log in as usual.';
+            }
         } else {
             titleEl.textContent = 'Could Not Verify Payment';
             msgEl.textContent = (data.error || 'Something went wrong verifying your payment.') + ' If you were charged, please contact support.';
@@ -12994,7 +13020,8 @@ async function adminManageTeacherFeatures(id, name) {
       var payload = await response.json();
       if (!response.ok) throw new Error(payload.migrationRequired ? 'Run supabase_feature_permissions.sql in the Supabase SQL Editor first.' : (payload.error || 'Could not load permissions.'));
       var current = payload.features || {};
-      rows.innerHTML = CM_FEATURE_CATALOG.map(function(f){ var on = current[f.key] !== false; return '<label style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid #e5eaf0;cursor:pointer"><span><strong style="display:block;font-size:14px">'+f.label+'</strong><small style="display:block;color:#64748b;margin-top:3px">'+f.detail+'</small></span><input type="checkbox" data-feature="'+f.key+'" '+(on?'checked':'')+' style="width:20px;height:20px;accent-color:#2563eb;flex-shrink:0"></label>'; }).join('');
+      var planNow = payload.released ? 'Released by you (saved)' : 'Free plan (not released yet)';
+      rows.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button type="button" id="cmFeatReleaseAll" class="primary-btn">Release all features</button><button type="button" id="cmFeatFreePlan" class="secondary-btn">Set to Free plan</button></div><p style="margin:0 0 6px;font-size:13px;color:#64748b">Current status: '+planNow+'</p>' + CM_FEATURE_CATALOG.map(function(f){ var on = current[f.key] !== false; return '<label style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid #e5eaf0;cursor:pointer"><span><strong style="display:block;font-size:14px">'+f.label+'</strong><small style="display:block;color:#64748b;margin-top:3px">'+f.detail+'</small></span><input type="checkbox" data-feature="'+f.key+'" '+(on?'checked':'')+' style="width:20px;height:20px;accent-color:#2563eb;flex-shrink:0"></label>'; }).join('');
       saveBtn.disabled = false;
       saveBtn.onclick = async function(){
         var features = {}; Array.prototype.forEach.call(rows.querySelectorAll('[data-feature]'),function(el){features[el.getAttribute('data-feature')]=el.checked;});
@@ -13002,6 +13029,9 @@ async function adminManageTeacherFeatures(id, name) {
         try { var r = await fetch(BACKEND_URL + '/api/admin/teachers/' + encodeURIComponent(id) + '/features',{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({features:features})}); var d = await r.json(); if(!r.ok) throw new Error(d.migrationRequired?'Run supabase_feature_permissions.sql in the Supabase SQL Editor first.':(d.error||'Save failed.')); status.textContent='Permissions saved successfully.'; status.style.color='#16845b'; }
         catch(e){status.textContent=e.message;status.style.color='#b42318';} finally {saveBtn.disabled=false;}
       };
+      var freeKeys = ['createAssessments','publishedAssessments','studentReports'];
+      rows.querySelector('#cmFeatReleaseAll').onclick = function(){ Array.prototype.forEach.call(rows.querySelectorAll('[data-feature]'),function(el){el.checked=true;}); saveBtn.onclick(); };
+      rows.querySelector('#cmFeatFreePlan').onclick = function(){ Array.prototype.forEach.call(rows.querySelectorAll('[data-feature]'),function(el){el.checked = freeKeys.indexOf(el.getAttribute('data-feature')) !== -1;}); saveBtn.onclick(); };
     } catch(e) { rows.innerHTML = '<p style="color:#b42318">'+String(e.message).replace(/</g,'&lt;')+'</p>'; status.textContent=''; }
 }
 var CM_TEACHER_NAV_FEATURES = {
@@ -13014,14 +13044,37 @@ var CM_TEACHER_NAV_FEATURES = {
 function cmTeacherFeatureOff(key) { return !!(window.cmTeacherFeaturePermissions && window.cmTeacherFeaturePermissions[key] === false); }
 function cmFeatureNotice() {
   var note = document.getElementById('cmFeatureDisabledNotice');
-  if (!note) { note = document.createElement('div'); note.id = 'cmFeatureDisabledNotice'; note.setAttribute('role','status'); note.style.cssText = 'position:fixed;z-index:100001;left:50%;bottom:22px;transform:translateX(-50%);max-width:calc(100vw - 32px);padding:12px 16px;border-radius:10px;background:#18233d;color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.22);font:500 13px/1.45 Inter,Arial,sans-serif;display:none'; document.body.appendChild(note); }
-  note.textContent = 'This feature has been disabled for your account by the administrator.';
-  note.style.display = 'block';
+  if (!note) { note = document.createElement('div'); note.id = 'cmFeatureDisabledNotice'; note.setAttribute('role','status'); note.style.cssText = 'position:fixed;z-index:100001;left:50%;bottom:22px;transform:translateX(-50%);max-width:calc(100vw - 32px);padding:12px 16px;border-radius:10px;background:#18233d;color:#fff;box-shadow:0 8px 30px rgba(0,0,0,.22);font:500 13px/1.45 Inter,Arial,sans-serif;display:none;align-items:center;gap:12px'; document.body.appendChild(note); }
+  note.innerHTML = '<span>This feature is not included in the Free plan.</span><button type="button" onclick="cmOpenUpgrade()" style="border:0;border-radius:8px;background:#2563eb;color:#fff;font:600 13px Inter,Arial,sans-serif;padding:8px 14px;cursor:pointer;white-space:nowrap">Upgrade</button>';
+  note.style.display = 'flex';
   if (note._cmHide) clearTimeout(note._cmHide);
-  note._cmHide = setTimeout(function(){ note.style.display='none'; }, 3200);
+  note._cmHide = setTimeout(function(){ note.style.display='none'; }, 6000);
+}
+/* Opens the existing payment page (the same one paused teachers use) in "upgrade" mode. */
+function cmOpenUpgrade() {
+  var note = document.getElementById('cmFeatureDisabledNotice'); if (note) note.style.display = 'none';
+  showPageFromURL('teacher');
+  setDashboardHeaderVisible(true);
+  showReactivationForm('upgrade');
+  try { window.scrollTo(0, 0); } catch (e) {}
 }
 function cmApplyFeatureStateToPage() {
   var dash = document.getElementById('teacherDashboard'); if (!dash) return;
+  if (!document.getElementById('cmPlanStyle')) {
+    var st = document.createElement('style'); st.id = 'cmPlanStyle';
+    st.textContent = '.dash-nav-item.cm-feature-disabled::after{content:"PRO";margin-left:8px;padding:1px 6px;border-radius:999px;background:#2563eb;color:#fff;font:700 9px/1.6 Inter,Arial,sans-serif;letter-spacing:.04em;vertical-align:middle}';
+    document.head.appendChild(st);
+  }
+  var overview = document.getElementById('teacherOverviewPanel');
+  var banner = document.getElementById('cmFreePlanBanner');
+  if (window.cmTeacherPlan === 'free' && overview) {
+    if (!banner) {
+      banner = document.createElement('div'); banner.id = 'cmFreePlanBanner';
+      banner.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 14px;padding:12px 16px;border-radius:12px;background:rgba(37,99,235,.10);border:1px solid rgba(37,99,235,.35);font-size:14px';
+      banner.innerHTML = '<span><strong>Free plan.</strong> You can publish assessments and see results. Upgrade to unlock every tool.</span><button type="button" class="primary-btn" onclick="cmOpenUpgrade()">Upgrade</button>';
+      overview.insertBefore(banner, overview.firstChild);
+    }
+  } else if (banner) { banner.remove(); }
   /* 1) menu items */
   Object.keys(CM_TEACHER_NAV_FEATURES).forEach(function(panelId){
     var nav = dash.querySelector('.dash-nav-item[data-target="'+panelId+'"]'); if (!nav) return;
@@ -13073,6 +13126,7 @@ async function cmApplyTeacherFeaturePermissions() {
     if (!r.ok) return;
     var d = await r.json();
     window.cmTeacherFeaturePermissions = d.features || {};
+    window.cmTeacherPlan = d.plan || '';
     cmApplyFeatureStateToPage();
   } catch(e) { window.cmFeaturePermissionRequest = null; /* permissions service unavailable: do not silently alter existing workflows */ }
 }
